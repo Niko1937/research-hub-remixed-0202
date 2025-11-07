@@ -84,13 +84,24 @@ const Index = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {mode === "search" && researchData && (
+                  {mode === "search" && (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                         <FileText className="w-4 h-4" />
                         検索結果
                       </h3>
-                      <ResearchResults data={researchData} />
+                      {researchData ? (
+                        <ResearchResults data={researchData} />
+                      ) : isLoading ? (
+                        <div className="flex items-center justify-center p-8 text-muted-foreground">
+                          <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                          <span>検索中...</span>
+                        </div>
+                      ) : (
+                        <div className="text-center p-8 text-muted-foreground">
+                          <p>検索結果が見つかりませんでした</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
