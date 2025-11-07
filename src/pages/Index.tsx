@@ -56,7 +56,7 @@ const mockResearchData = [
 
 const Index = () => {
   const [mode, setMode] = useState<Mode>("search");
-  const { messages, isLoading, researchData, thinkingStatus, executionPlan, currentStep, themeEvaluation, experts, sendMessage } = useResearchChat();
+  const { timeline, isLoading, sendMessage } = useResearchChat();
   const [pdfViewer, setPdfViewer] = useState<{ url: string; title: string } | null>(null);
 
   const handleSubmit = (message: string, tool?: string) => {
@@ -68,11 +68,11 @@ const Index = () => {
       <div className="flex h-screen bg-background w-full">
         <ResearchSidebar />
 
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${pdfViewer ? 'mr-[500px]' : ''}`}>
         <ScrollArea className="flex-1">
           <div className="p-6">
             <div className="max-w-4xl mx-auto space-y-6 pb-32">
-              {messages.length === 0 ? (
+              {timeline.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-[50vh] text-center">
                   <div className="p-4 bg-primary/10 rounded-full mb-4">
                     <Sparkles className="w-8 h-8 text-primary" />
@@ -88,46 +88,65 @@ const Index = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {mode === "assistant" && thinkingStatus && executionPlan.length > 0 && (
-                    <ThinkingBlock steps={executionPlan} status={thinkingStatus} currentStep={currentStep} />
-                  )}
-
-                  {researchData && researchData.external.length > 0 && (
-                    <ResearchResults data={researchData} onPdfClick={(url, title) => setPdfViewer({ url, title })} />
-                  )}
-
-                  {themeEvaluation && (
-                    <ThemeEvaluation comparison={themeEvaluation.comparison} needs={themeEvaluation.needs} />
-                  )}
-
-                  {experts.length > 0 && (
-                    <KnowWhoResults experts={experts} />
-                  )}
-
-                  {messages.map((msg, index) => (
-                    <div
-                      key={index}
-                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[85%] rounded-lg p-4 ${
-                          msg.role === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-card text-card-foreground border border-border"
-                        }`}
-                      >
-                        {msg.role === "assistant" ? (
-                          <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {msg.content}
-                            </ReactMarkdown>
+                  {timeline.map((item, index) => {
+                    switch (item.type) {
+                      case "user_message":
+                        return (
+                          <div key={index} className="flex justify-end">
+                            <div className="max-w-[85%] rounded-lg p-4 bg-primary text-primary-foreground">
+                              <p className="text-sm whitespace-pre-wrap">{item.data.content}</p>
+                            </div>
                           </div>
-                        ) : (
-                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                        );
+                      
+                      case "thinking":
+                        return (
+                          <ThinkingBlock
+                            key={index}
+                            steps={item.data.steps}
+                            status={item.data.status}
+                            currentStep={item.data.currentStep}
+                          />
+                        );
+                      
+                      case "research_result":
+                        return (
+                          <ResearchResults
+                            key={index}
+                            data={item.data}
+                            onPdfClick={(url, title) => setPdfViewer({ url, title })}
+                          />
+                        );
+                      
+                      case "theme_evaluation":
+                        return (
+                          <ThemeEvaluation
+                            key={index}
+                            comparison={item.data.comparison}
+                            needs={item.data.needs}
+                          />
+                        );
+                      
+                      case "knowwho_result":
+                        return <KnowWhoResults key={index} experts={item.data.experts} />;
+                      
+                      case "assistant_message":
+                        return (
+                          <div key={index} className="flex justify-start">
+                            <div className="max-w-[85%] rounded-lg p-4 bg-card text-card-foreground border border-border">
+                              <div className="prose prose-sm dark:prose-invert max-w-none">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {item.data.content}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      
+                      default:
+                        return null;
+                    }
+                  })}
 
                   {isLoading && (
                     <div className="flex items-center gap-2 text-muted-foreground">

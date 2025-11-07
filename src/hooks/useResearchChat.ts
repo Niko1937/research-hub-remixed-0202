@@ -5,6 +5,12 @@ export interface Message {
   content: string;
 }
 
+export interface TimelineItem {
+  type: "user_message" | "thinking" | "research_result" | "theme_evaluation" | "knowwho_result" | "assistant_message";
+  timestamp: number;
+  data: any;
+}
+
 export interface ResearchData {
   internal: Array<{
     title: string;
@@ -60,29 +66,38 @@ export interface Expert {
 }
 
 export function useResearchChat() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [researchData, setResearchData] = useState<ResearchData | null>(null);
-  const [thinkingStatus, setThinkingStatus] = useState<"planning" | "executing" | "completed" | null>(null);
-  const [executionPlan, setExecutionPlan] = useState<Step[]>([]);
-  const [currentStep, setCurrentStep] = useState<number>(-1);
-  const [themeEvaluation, setThemeEvaluation] = useState<ThemeEvaluation | null>(null);
-  const [experts, setExperts] = useState<Expert[]>([]);
 
   const sendMessage = useCallback(
     async (content: string, mode: "search" | "assistant", tool?: string) => {
-      const userMessage: Message = { role: "user", content };
-      setMessages((prev) => [...prev, userMessage]);
+      const userMessage = { role: "user" as const, content };
+      const timestamp = Date.now();
+      
+      // Add user message to timeline
+      setTimeline((prev) => [
+        ...prev,
+        {
+          type: "user_message",
+          timestamp,
+          data: { content },
+        },
+      ]);
+      
       setIsLoading(true);
-      setResearchData(null);
-      setThinkingStatus(null);
-      setExecutionPlan([]);
-      setCurrentStep(-1);
-      setThemeEvaluation(null);
-      setExperts([]);
 
       try {
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
+        const allMessages = [
+          ...timeline
+            .filter((item) => item.type === "user_message" || item.type === "assistant_message")
+            .map((item) =>
+              item.type === "user_message"
+                ? { role: "user" as const, content: item.data.content }
+                : { role: "assistant" as const, content: item.data.content }
+            ),
+          userMessage,
+        ];
 
         const response = await fetch(CHAT_URL, {
           method: "POST",
@@ -91,7 +106,7 @@ export function useResearchChat() {
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
-            messages: [...messages, userMessage],
+            messages: allMessages,
             mode,
             tool,
           }),
@@ -106,6 +121,7 @@ export function useResearchChat() {
         let textBuffer = "";
         let streamDone = false;
         let assistantContent = "";
+        let thinkingItemId: number | null = null;
 
         while (!streamDone) {
           const { done, value } = await reader.read();
@@ -132,20 +148,57 @@ export function useResearchChat() {
 
               // Handle thinking start
               if (parsed.type === "thinking_start") {
-                setThinkingStatus("planning");
+                const thinkingTimestamp = Date.now();
+                thinkingItemId = thinkingTimestamp;
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "thinking",
+                    timestamp: thinkingTimestamp,
+                    data: { status: "planning", steps: [], currentStep: -1 },
+                  },
+                ]);
                 continue;
               }
 
               // Handle execution plan
               if (parsed.type === "plan") {
-                setExecutionPlan(parsed.steps || []);
-                setThinkingStatus("executing");
+                if (thinkingItemId !== null) {
+                  setTimeline((prev) =>
+                    prev.map((item) =>
+                      item.timestamp === thinkingItemId && item.type === "thinking"
+                        ? {
+                            ...item,
+                            data: {
+                              ...item.data,
+                              status: "executing",
+                              steps: parsed.steps || [],
+                            },
+                          }
+                        : item
+                    )
+                  );
+                }
                 continue;
               }
 
               // Handle step start
               if (parsed.type === "step_start") {
-                setCurrentStep(parsed.step);
+                if (thinkingItemId !== null) {
+                  setTimeline((prev) =>
+                    prev.map((item) =>
+                      item.timestamp === thinkingItemId && item.type === "thinking"
+                        ? {
+                            ...item,
+                            data: {
+                              ...item.data,
+                              currentStep: parsed.step,
+                            },
+                          }
+                        : item
+                    )
+                  );
+                }
                 continue;
               }
 
@@ -156,32 +209,67 @@ export function useResearchChat() {
 
               // Handle research data
               if (parsed.type === "research_data") {
-                setResearchData((prev) => ({
-                  internal: parsed.internal || prev?.internal || [],
-                  business: parsed.business || prev?.business || [],
-                  external: [...(prev?.external || []), ...(parsed.external || [])],
-                }));
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "research_result",
+                    timestamp: Date.now(),
+                    data: {
+                      internal: parsed.internal || [],
+                      business: parsed.business || [],
+                      external: parsed.external || [],
+                    },
+                  },
+                ]);
                 continue;
               }
 
               // Handle theme evaluation
               if (parsed.type === "theme_evaluation") {
-                setThemeEvaluation({
-                  comparison: parsed.comparison || [],
-                  needs: parsed.needs || [],
-                });
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "theme_evaluation",
+                    timestamp: Date.now(),
+                    data: {
+                      comparison: parsed.comparison || [],
+                      needs: parsed.needs || [],
+                    },
+                  },
+                ]);
                 continue;
               }
 
               // Handle knowwho results
               if (parsed.type === "knowwho_results") {
-                setExperts(parsed.experts || []);
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "knowwho_result",
+                    timestamp: Date.now(),
+                    data: { experts: parsed.experts || [] },
+                  },
+                ]);
                 continue;
               }
 
               // Handle chat start
               if (parsed.type === "chat_start") {
-                setThinkingStatus("completed");
+                if (thinkingItemId !== null) {
+                  setTimeline((prev) =>
+                    prev.map((item) =>
+                      item.timestamp === thinkingItemId && item.type === "thinking"
+                        ? {
+                            ...item,
+                            data: {
+                              ...item.data,
+                              status: "completed",
+                            },
+                          }
+                        : item
+                    )
+                  );
+                }
                 continue;
               }
 
@@ -189,14 +277,23 @@ export function useResearchChat() {
               const content = parsed.choices?.[0]?.delta?.content as string | undefined;
               if (content) {
                 assistantContent += content;
-                setMessages((prev) => {
+                setTimeline((prev) => {
                   const last = prev[prev.length - 1];
-                  if (last?.role === "assistant") {
-                    return prev.map((m, i) =>
-                      i === prev.length - 1 ? { ...m, content: assistantContent } : m
+                  if (last?.type === "assistant_message") {
+                    return prev.map((item, i) =>
+                      i === prev.length - 1
+                        ? { ...item, data: { content: assistantContent } }
+                        : item
                     );
                   }
-                  return [...prev, { role: "assistant", content: assistantContent }];
+                  return [
+                    ...prev,
+                    {
+                      type: "assistant_message",
+                      timestamp: Date.now(),
+                      data: { content: assistantContent },
+                    },
+                  ];
                 });
               }
             } catch (e) {
@@ -217,14 +314,23 @@ export function useResearchChat() {
               const content = parsed.choices?.[0]?.delta?.content as string | undefined;
               if (content) {
                 assistantContent += content;
-                setMessages((prev) => {
+                setTimeline((prev) => {
                   const last = prev[prev.length - 1];
-                  if (last?.role === "assistant") {
-                    return prev.map((m, i) =>
-                      i === prev.length - 1 ? { ...m, content: assistantContent } : m
+                  if (last?.type === "assistant_message") {
+                    return prev.map((item, i) =>
+                      i === prev.length - 1
+                        ? { ...item, data: { content: assistantContent } }
+                        : item
                     );
                   }
-                  return [...prev, { role: "assistant", content: assistantContent }];
+                  return [
+                    ...prev,
+                    {
+                      type: "assistant_message",
+                      timestamp: Date.now(),
+                      data: { content: assistantContent },
+                    },
+                  ];
                 });
               }
             } catch {
@@ -234,39 +340,28 @@ export function useResearchChat() {
         }
       } catch (error) {
         console.error("Chat error:", error);
-        setMessages((prev) => [
+        setTimeline((prev) => [
           ...prev,
           {
-            role: "assistant",
-            content: "エラーが発生しました。もう一度お試しください。",
+            type: "assistant_message",
+            timestamp: Date.now(),
+            data: { content: "エラーが発生しました。もう一度お試しください。" },
           },
         ]);
       } finally {
         setIsLoading(false);
       }
     },
-    [messages]
+    [timeline]
   );
 
   const clearMessages = useCallback(() => {
-    setMessages([]);
-    setResearchData(null);
-    setThinkingStatus(null);
-    setExecutionPlan([]);
-    setCurrentStep(-1);
-    setThemeEvaluation(null);
-    setExperts([]);
+    setTimeline([]);
   }, []);
 
   return {
-    messages,
+    timeline,
     isLoading,
-    researchData,
-    thinkingStatus,
-    executionPlan,
-    currentStep,
-    themeEvaluation,
-    experts,
     sendMessage,
     clearMessages,
   };
