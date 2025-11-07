@@ -48,42 +48,36 @@ export function ResearchSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/"
-                    className="flex items-center gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
-                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-                  >
-                    <Home className="w-5 h-5 shrink-0" />
-                    {open && <span className="text-sm font-medium">ホーム</span>}
-                  </NavLink>
-                </SidebarMenuButton>
+                <NavLink
+                  to="/"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                >
+                  <Home className="w-5 h-5 shrink-0" />
+                  {open && <span className="text-sm font-medium">ホーム</span>}
+                </NavLink>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/search"
-                    className="flex items-center gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
-                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-                  >
-                    <Search className="w-5 h-5 shrink-0" />
-                    {open && <span className="text-sm font-medium">検索</span>}
-                  </NavLink>
-                </SidebarMenuButton>
+                <NavLink
+                  to="/search"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                >
+                  <Search className="w-5 h-5 shrink-0" />
+                  {open && <span className="text-sm font-medium">検索</span>}
+                </NavLink>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/assistant"
-                    className="flex items-center gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
-                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-                  >
-                    <MessageSquare className="w-5 h-5 shrink-0" />
-                    {open && <span className="text-sm font-medium">アシスタント</span>}
-                  </NavLink>
-                </SidebarMenuButton>
+                <NavLink
+                  to="/assistant"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                >
+                  <MessageSquare className="w-5 h-5 shrink-0" />
+                  {open && <span className="text-sm font-medium">アシスタント</span>}
+                </NavLink>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

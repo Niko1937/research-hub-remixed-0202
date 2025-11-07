@@ -70,11 +70,7 @@ const Index = () => {
           <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
-                <SidebarTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Menu className="w-5 h-5" />
-                  </Button>
-                </SidebarTrigger>
+                <SidebarTrigger className="-ml-1" />
                 <Sparkles className="w-6 h-6 text-primary" />
                 <h2 className="text-xl font-semibold text-foreground">
                   {mode === "search" ? "研究資料検索" : "AIアシスタント"}
