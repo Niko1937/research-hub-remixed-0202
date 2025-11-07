@@ -1,17 +1,20 @@
 import { useState } from "react";
-import { Send, Wrench, X } from "lucide-react";
+import { Send, Wrench, X, Search, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 
 type Tool = "wide-knowledge" | "theme-evaluation" | "knowwho" | "html-generation";
+type Mode = "search" | "assistant";
 
 interface ChatInputProps {
   onSubmit: (message: string, tool?: Tool) => void;
+  mode: Mode;
+  onModeChange: (mode: Mode) => void;
 }
 
-export function ChatInput({ onSubmit }: ChatInputProps) {
+export function ChatInput({ onSubmit, mode, onModeChange }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [toolPopoverOpen, setToolPopoverOpen] = useState(false);
@@ -95,6 +98,29 @@ export function ChatInput({ onSubmit }: ChatInputProps) {
           {/* Bottom Menu Bar */}
           <div className="flex items-center justify-between px-4 py-2.5 bg-background border-t border-border">
             <div className="flex items-center gap-3">
+              {/* Mode Toggle */}
+              <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+                <Button
+                  variant={mode === "search" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => onModeChange("search")}
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>検索</span>
+                </Button>
+                <Button
+                  variant={mode === "assistant" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => onModeChange("assistant")}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>アシスタント</span>
+                </Button>
+              </div>
+
+              {/* Tools */}
               <Popover open={toolPopoverOpen} onOpenChange={setToolPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs">

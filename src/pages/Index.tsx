@@ -132,7 +132,7 @@ const Index = () => {
               {/* Search Input at Top */}
               <div className="border-b border-border bg-background p-4">
                 <div className="max-w-4xl mx-auto">
-                  <ChatInput onSubmit={handleSubmit} />
+                  <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
                 </div>
               </div>
 
@@ -142,17 +142,6 @@ const Index = () => {
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-semibold text-foreground">検索結果</h2>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-2"
-                          onClick={() => setMode("assistant")}
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          <span className="text-xs">アシスタントモードに切り替え</span>
-                        </Button>
-                      </div>
                     </div>
                     
                     <Card className="bg-card border-border overflow-hidden">
@@ -174,18 +163,6 @@ const Index = () => {
               <ScrollArea className="flex-1">
                 <div className="p-6">
                   <div className="max-w-4xl mx-auto space-y-6 pb-32">
-                    <div className="flex items-center justify-between mb-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => setMode("search")}
-                      >
-                        <Search className="w-4 h-4" />
-                        <span className="text-xs">検索モードに戻る</span>
-                      </Button>
-                    </div>
-
                     {timeline.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-[50vh] text-center">
                         <div className="p-4 bg-primary/10 rounded-full mb-4">
@@ -305,7 +282,7 @@ const Index = () => {
                 </div>
               </ScrollArea>
 
-              <ChatInput onSubmit={handleSubmit} />
+              <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
             </>
           )}
         </main>
