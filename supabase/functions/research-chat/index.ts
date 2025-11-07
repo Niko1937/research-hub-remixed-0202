@@ -24,20 +24,23 @@ interface ExternalPaper {
 async function searchOpenAlex(query: string): Promise<ExternalPaper[]> {
   try {
     const response = await fetch(
-      `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=3&sort=cited_by_count:desc`,
+      `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=10&sort=cited_by_count:desc`,
       { headers: { "User-Agent": "Research-Hub/1.0 (mailto:research@example.com)" } }
     );
     const data = await response.json();
     
-    return (data.results || []).map((work: any) => ({
-      title: work.title || "No title",
-      abstract: work.abstract || work.display_name || "",
-      authors: (work.authorships || []).slice(0, 3).map((a: any) => a.author?.display_name || "Unknown"),
-      year: work.publication_year?.toString() || "N/A",
-      source: "OpenAlex",
-      url: work.doi ? `https://doi.org/${work.doi}` : work.id,
-      citations: work.cited_by_count,
-    }));
+    return (data.results || [])
+      .filter((work: any) => work.open_access?.oa_url) // PDFリンクがあるもののみ
+      .slice(0, 3)
+      .map((work: any) => ({
+        title: work.title || "No title",
+        abstract: work.abstract || work.display_name || "",
+        authors: (work.authorships || []).slice(0, 3).map((a: any) => a.author?.display_name || "Unknown"),
+        year: work.publication_year?.toString() || "N/A",
+        source: "OpenAlex",
+        url: work.open_access.oa_url,
+        citations: work.cited_by_count,
+      }));
   } catch (error) {
     console.error("OpenAlex search error:", error);
     return [];
@@ -48,20 +51,23 @@ async function searchOpenAlex(query: string): Promise<ExternalPaper[]> {
 async function searchSemanticScholar(query: string): Promise<ExternalPaper[]> {
   try {
     const response = await fetch(
-      `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=3&fields=title,abstract,year,authors,venue,citationCount,url`,
+      `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10&fields=title,abstract,year,authors,venue,citationCount,openAccessPdf`,
       { headers: { "User-Agent": "Research-Hub/1.0" } }
     );
     const data = await response.json();
     
-    return (data.data || []).map((paper: any) => ({
-      title: paper.title || "No title",
-      abstract: paper.abstract || "",
-      authors: (paper.authors || []).slice(0, 3).map((a: any) => a.name),
-      year: paper.year?.toString() || "N/A",
-      source: "Semantic Scholar",
-      url: paper.url || "",
-      citations: paper.citationCount,
-    }));
+    return (data.data || [])
+      .filter((paper: any) => paper.openAccessPdf?.url) // PDFリンクがあるもののみ
+      .slice(0, 3)
+      .map((paper: any) => ({
+        title: paper.title || "No title",
+        abstract: paper.abstract || "",
+        authors: (paper.authors || []).slice(0, 3).map((a: any) => a.name),
+        year: paper.year?.toString() || "N/A",
+        source: "Semantic Scholar",
+        url: paper.openAccessPdf.url,
+        citations: paper.citationCount,
+      }));
   } catch (error) {
     console.error("Semantic Scholar search error:", error);
     return [];
@@ -90,7 +96,7 @@ async function searchArXiv(query: string): Promise<ExternalPaper[]> {
         authors: authors.slice(0, 3),
         year: published,
         source: "arXiv",
-        url: id,
+        url: id.replace('/abs/', '/pdf/') + '.pdf', // PDF URLに変換
       };
     });
   } catch (error) {
