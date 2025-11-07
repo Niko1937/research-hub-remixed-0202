@@ -3,14 +3,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ResearchSidebar } from "@/components/ResearchSidebar";
 import { ResearchCard } from "@/components/ResearchCard";
-import { ModeToggle } from "@/components/ModeToggle";
 import { ChatInput } from "@/components/ChatInput";
 import { ResearchResults } from "@/components/ResearchResults";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Loader2, FileText, Menu } from "lucide-react";
+import { Sparkles, Loader2, FileText } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 
 type Mode = "search" | "assistant";
 
@@ -68,15 +66,12 @@ const Index = () => {
 
         <main className="flex-1 flex flex-col overflow-hidden">
           <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex items-center justify-between px-6 py-4">
-              <div className="flex items-center gap-3">
-                <SidebarTrigger className="-ml-1" />
-                <Sparkles className="w-6 h-6 text-primary" />
-                <h2 className="text-xl font-semibold text-foreground">
-                  {mode === "search" ? "研究資料検索" : "AIアシスタント"}
-                </h2>
-              </div>
-              <ModeToggle mode={mode} onModeChange={setMode} />
+            <div className="flex items-center gap-3 px-6 py-4">
+              <SidebarTrigger className="-ml-1" />
+              <Sparkles className="w-6 h-6 text-primary" />
+              <h2 className="text-xl font-semibold text-foreground">
+                {mode === "search" ? "研究資料検索" : "AIアシスタント"}
+              </h2>
             </div>
           </header>
 
@@ -148,7 +143,7 @@ const Index = () => {
           </div>
         </ScrollArea>
 
-        <ChatInput mode={mode} onSubmit={handleSubmit} />
+        <ChatInput mode={mode} onSubmit={handleSubmit} onModeChange={setMode} />
       </main>
     </div>
     </SidebarProvider>
