@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Send, Sparkles, Search, MessageSquare, Infinity } from "lucide-react";
+import { Send, Search, MessageSquare, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 
-type Mode = "search" | "assistant" | "agent";
+type Mode = "search" | "assistant";
 type Tool = "wide-knowledge" | "theme-evaluation" | "knowwho";
 
 interface ChatInputProps {
@@ -15,11 +17,12 @@ interface ChatInputProps {
 
 export function ChatInput({ mode, onSubmit, onModeChange }: ChatInputProps) {
   const [message, setMessage] = useState("");
-  const [selectedTool, setSelectedTool] = useState<Tool>("wide-knowledge");
+  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
+  const [toolPopoverOpen, setToolPopoverOpen] = useState(false);
 
   const handleSubmit = () => {
     if (message.trim()) {
-      onSubmit(message, mode === "agent" ? selectedTool : undefined);
+      onSubmit(message, selectedTool || undefined);
       setMessage("");
     }
   };
@@ -34,13 +37,44 @@ export function ChatInput({ mode, onSubmit, onModeChange }: ChatInputProps) {
   const placeholder =
     mode === "search"
       ? "研究論文やドキュメントを検索..."
-      : mode === "agent"
-      ? "エージェントに依頼する内容を入力..."
       : "質問を入力してください...";
+
+  const toolLabels = {
+    "wide-knowledge": "ワイドナレッジ検索",
+    "theme-evaluation": "テーマ評価",
+    "knowwho": "KnowWho検索",
+  };
+
+  const handleToolSelect = (tool: Tool) => {
+    setSelectedTool(tool);
+    setToolPopoverOpen(false);
+  };
+
+  const handleToolRemove = () => {
+    setSelectedTool(null);
+  };
 
   return (
     <div className="sticky bottom-0 bg-background border-t border-border p-4">
       <div className="max-w-4xl mx-auto">
+        {/* Selected Tool Badge */}
+        {selectedTool && mode === "assistant" && (
+          <div className="mb-2 flex justify-end">
+            <Badge variant="secondary" className="gap-2 pr-1">
+              <Wrench className="w-3 h-3" />
+              <span className="text-xs">{toolLabels[selectedTool]}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={handleToolRemove}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </Badge>
+          </div>
+        )}
+
         {/* Unified Chat Input Component */}
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           {/* Text Input Area */}
@@ -78,11 +112,6 @@ export function ChatInput({ mode, onSubmit, onModeChange }: ChatInputProps) {
                           <Search className="w-3.5 h-3.5" />
                           <span className="text-xs font-medium">検索</span>
                         </>
-                      ) : mode === "agent" ? (
-                        <>
-                          <Infinity className="w-3.5 h-3.5" />
-                          <span className="text-xs font-medium">Agent</span>
-                        </>
                       ) : (
                         <>
                           <MessageSquare className="w-3.5 h-3.5" />
@@ -99,12 +128,6 @@ export function ChatInput({ mode, onSubmit, onModeChange }: ChatInputProps) {
                       <span>検索</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="agent" className="cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <Infinity className="w-4 h-4" />
-                      <span>Agent</span>
-                    </div>
-                  </SelectItem>
                   <SelectItem value="assistant" className="cursor-pointer">
                     <div className="flex items-center gap-2">
                       <MessageSquare className="w-4 h-4" />
@@ -114,37 +137,42 @@ export function ChatInput({ mode, onSubmit, onModeChange }: ChatInputProps) {
                 </SelectContent>
               </Select>
 
-              {mode === "agent" && (
+              {mode === "assistant" && (
                 <>
                   <span className="text-xs text-muted-foreground">|</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Tools:</span>
-                    <Select value={selectedTool} onValueChange={(value) => setSelectedTool(value as Tool)}>
-                      <SelectTrigger className="w-[180px] h-8 bg-secondary/50 border-border hover:bg-secondary transition-colors">
-                        <SelectValue>
-                          <span className="text-xs font-medium">
-                            {selectedTool === "wide-knowledge" && "ワイドナレッジ検索"}
-                            {selectedTool === "theme-evaluation" && "テーマ評価"}
-                            {selectedTool === "knowwho" && "KnowWho検索"}
-                          </span>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border-border">
-                        <SelectItem value="wide-knowledge" className="cursor-pointer">
-                          <span>ワイドナレッジ検索</span>
-                        </SelectItem>
-                        <SelectItem value="theme-evaluation" className="cursor-pointer">
-                          <div className="flex flex-col">
-                            <span>テーマ評価</span>
-                            <span className="text-xs text-muted-foreground">社内外研究・Seeds-Needsマッチング</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="knowwho" className="cursor-pointer">
-                          <span>KnowWho検索</span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Popover open={toolPopoverOpen} onOpenChange={setToolPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs">
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span>Tools</span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2" align="start">
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => handleToolSelect("wide-knowledge")}
+                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                        >
+                          <div className="text-sm font-medium">ワイドナレッジ検索</div>
+                          <div className="text-xs text-muted-foreground">幅広い知識ベースから検索</div>
+                        </button>
+                        <button
+                          onClick={() => handleToolSelect("theme-evaluation")}
+                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                        >
+                          <div className="text-sm font-medium">テーマ評価</div>
+                          <div className="text-xs text-muted-foreground">社内外研究・Seeds-Needsマッチング</div>
+                        </button>
+                        <button
+                          onClick={() => handleToolSelect("knowwho")}
+                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                        >
+                          <div className="text-sm font-medium">KnowWho検索</div>
+                          <div className="text-xs text-muted-foreground">専門家・研究者を検索</div>
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </>
               )}
             </div>

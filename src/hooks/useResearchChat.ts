@@ -35,7 +35,7 @@ export function useResearchChat() {
   const [researchData, setResearchData] = useState<ResearchData | null>(null);
 
   const sendMessage = useCallback(
-    async (content: string, mode: "search" | "assistant" | "agent", tool?: string) => {
+    async (content: string, mode: "search" | "assistant", tool?: string) => {
       const userMessage: Message = { role: "user", content };
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
