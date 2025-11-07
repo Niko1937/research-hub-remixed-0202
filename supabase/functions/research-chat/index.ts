@@ -191,6 +191,7 @@ Available tools:
 - wide-knowledge: Search external papers and research
 - theme-evaluation: Evaluate research themes against internal research and business needs
 - knowwho: Search for experts and researchers
+- html-generation: Generate HTML infographics summarizing the conversation
 - chat: Use AI to summarize or format results
 
 Return a JSON object with "steps" array containing objects with this structure:
@@ -321,6 +322,83 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                     })}\n\n`
                   )
                 );
+              } else if (step.tool === "html-generation") {
+                // Generate HTML infographic
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({ type: "html_start" })}\n\n`)
+                );
+
+                const htmlPrompt = `Create a beautiful, interactive HTML infographic summarizing our conversation about "${step.query}".
+
+Requirements:
+- Single HTML file with all CSS and JavaScript embedded
+- Modern, responsive design with animations
+- Use gradients, icons, and visual elements
+- Include key points, statistics, and insights
+- Make it visually engaging and professional
+- Use a dark theme to match the app
+- Ensure all content is in Japanese
+
+Return ONLY the complete HTML code, nothing else.`;
+
+                const htmlResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    model: "google/gemini-2.5-flash",
+                    messages: [
+                      { role: "system", content: htmlPrompt },
+                      { role: "user", content: userMessage }
+                    ],
+                    stream: true,
+                  }),
+                });
+
+                if (htmlResponse.ok && htmlResponse.body) {
+                  const reader = htmlResponse.body.getReader();
+                  let htmlContent = "";
+                  
+                  try {
+                    while (true) {
+                      const { done, value } = await reader.read();
+                      if (done) break;
+                      
+                      const chunk = new TextDecoder().decode(value);
+                      const lines = chunk.split("\n");
+                      
+                      for (const line of lines) {
+                        if (line.startsWith("data: ") && line !== "data: [DONE]") {
+                          try {
+                            const data = JSON.parse(line.slice(6));
+                            const content = data.choices?.[0]?.delta?.content;
+                            if (content) {
+                              htmlContent += content;
+                              controller.enqueue(
+                                encoder.encode(
+                                  `data: ${JSON.stringify({
+                                    type: "html_chunk",
+                                    content: content,
+                                  })}\n\n`
+                                )
+                              );
+                            }
+                          } catch (e) {
+                            // Skip invalid JSON
+                          }
+                        }
+                      }
+                    }
+                  } finally {
+                    reader.releaseLock();
+                  }
+
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ type: "html_complete" })}\n\n`)
+                  );
+                }
               }
 
               controller.enqueue(

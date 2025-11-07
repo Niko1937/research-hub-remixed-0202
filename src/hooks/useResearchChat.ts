@@ -6,7 +6,7 @@ export interface Message {
 }
 
 export interface TimelineItem {
-  type: "user_message" | "thinking" | "research_result" | "theme_evaluation" | "knowwho_result" | "assistant_message";
+  type: "user_message" | "thinking" | "research_result" | "theme_evaluation" | "knowwho_result" | "html_generation" | "assistant_message";
   timestamp: number;
   data: any;
 }
@@ -249,6 +249,72 @@ export function useResearchChat() {
                     data: { experts: parsed.experts || [] },
                   },
                 ]);
+                continue;
+              }
+
+              // Handle HTML generation start
+              if (parsed.type === "html_start") {
+                const htmlTimestamp = Date.now();
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "html_generation",
+                    timestamp: htmlTimestamp,
+                    data: { html: "", isComplete: false },
+                  },
+                ]);
+                continue;
+              }
+
+              // Handle HTML chunks
+              if (parsed.type === "html_chunk") {
+                setTimeline((prev) => {
+                  const updated = [...prev];
+                  // Find last HTML generation item
+                  let lastHtmlIndex = -1;
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].type === "html_generation") {
+                      lastHtmlIndex = i;
+                      break;
+                    }
+                  }
+                  if (lastHtmlIndex !== -1) {
+                    updated[lastHtmlIndex] = {
+                      ...updated[lastHtmlIndex],
+                      data: {
+                        html: updated[lastHtmlIndex].data.html + parsed.content,
+                        isComplete: false,
+                      },
+                    };
+                  }
+                  return updated;
+                });
+                continue;
+              }
+
+              // Handle HTML complete
+              if (parsed.type === "html_complete") {
+                setTimeline((prev) => {
+                  const updated = [...prev];
+                  // Find last HTML generation item
+                  let lastHtmlIndex = -1;
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].type === "html_generation") {
+                      lastHtmlIndex = i;
+                      break;
+                    }
+                  }
+                  if (lastHtmlIndex !== -1) {
+                    updated[lastHtmlIndex] = {
+                      ...updated[lastHtmlIndex],
+                      data: {
+                        ...updated[lastHtmlIndex].data,
+                        isComplete: true,
+                      },
+                    };
+                  }
+                  return updated;
+                });
                 continue;
               }
 

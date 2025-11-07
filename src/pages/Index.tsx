@@ -6,9 +6,11 @@ import { ChatInput } from "@/components/ChatInput";
 import { ResearchResults } from "@/components/ResearchResults";
 import { ThinkingBlock } from "@/components/ThinkingBlock";
 import { PDFViewer } from "@/components/PDFViewer";
+import { HTMLViewer } from "@/components/HTMLViewer";
 import { ThemeEvaluation } from "@/components/ThemeEvaluation";
 import { KnowWhoResults } from "@/components/KnowWhoResults";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
 import { Sparkles, Loader2, FileText } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -58,6 +60,7 @@ const Index = () => {
   const [mode, setMode] = useState<Mode>("search");
   const { timeline, isLoading, sendMessage } = useResearchChat();
   const [pdfViewer, setPdfViewer] = useState<{ url: string; title: string } | null>(null);
+  const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
 
   const handleSubmit = (message: string, tool?: string) => {
     sendMessage(message, mode, tool);
@@ -68,7 +71,7 @@ const Index = () => {
       <div className="flex h-screen bg-background w-full">
         <ResearchSidebar />
 
-        <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${pdfViewer ? 'mr-[500px]' : ''}`}>
+        <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${(pdfViewer || htmlViewer) ? 'mr-[500px]' : ''}`}>
         <ScrollArea className="flex-1">
           <div className="p-6">
             <div className="max-w-4xl mx-auto space-y-6 pb-32">
@@ -113,7 +116,10 @@ const Index = () => {
                           <ResearchResults
                             key={index}
                             data={item.data}
-                            onPdfClick={(url, title) => setPdfViewer({ url, title })}
+                            onPdfClick={(url, title) => {
+                              setHtmlViewer(null);
+                              setPdfViewer({ url, title });
+                            }}
                           />
                         );
                       
@@ -128,6 +134,37 @@ const Index = () => {
                       
                       case "knowwho_result":
                         return <KnowWhoResults key={index} experts={item.data.experts} />;
+                      
+                      case "html_generation":
+                        return (
+                          <Card
+                            key={index}
+                            className="p-4 bg-card border-border cursor-pointer hover:bg-card-hover transition-colors"
+                            onClick={() => {
+                              if (item.data.isComplete) {
+                                setPdfViewer(null);
+                                setHtmlViewer(item.data.html);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-primary" />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-foreground">
+                                  {item.data.isComplete ? "HTML資料生成完了" : "HTML資料生成中..."}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {item.data.isComplete
+                                    ? "クリックしてプレビュー"
+                                    : "生成中です..."}
+                                </p>
+                              </div>
+                              {!item.data.isComplete && (
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                              )}
+                            </div>
+                          </Card>
+                        );
                       
                       case "assistant_message":
                         return (
@@ -162,8 +199,12 @@ const Index = () => {
         <ChatInput mode={mode} onSubmit={handleSubmit} onModeChange={setMode} />
       </main>
 
-      {pdfViewer && (
+      {pdfViewer && !htmlViewer && (
         <PDFViewer url={pdfViewer.url} title={pdfViewer.title} onClose={() => setPdfViewer(null)} />
+      )}
+      
+      {htmlViewer && (
+        <HTMLViewer html={htmlViewer} onClose={() => setHtmlViewer(null)} />
       )}
     </div>
     </SidebarProvider>
