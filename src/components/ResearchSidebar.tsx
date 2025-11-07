@@ -1,8 +1,20 @@
-import { Home, Search, MessageSquare, Settings, Plus, Clock } from "lucide-react";
+import { Home, Search, MessageSquare, Settings, Plus, Clock, Sparkles } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
 
 interface Thread {
   id: string;
@@ -17,70 +29,104 @@ const mockThreads: Thread[] = [
 ];
 
 export function ResearchSidebar() {
+  const { open } = useSidebar();
+
   return (
-    <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col h-screen">
-      <div className="p-4 border-b border-sidebar-border">
-        <h1 className="text-lg font-bold bg-gradient-primary bg-clip-text text-transparent">
-          Research Hub
-        </h1>
+    <Sidebar className={open ? "w-64" : "w-16"} collapsible="icon">
+      <div className="p-4 border-b border-sidebar-border flex items-center justify-center">
+        {open ? (
+          <h1 className="text-lg font-bold bg-gradient-primary bg-clip-text text-transparent">
+            Research Hub
+          </h1>
+        ) : (
+          <Sparkles className="w-6 h-6 text-primary" />
+        )}
       </div>
 
-      <nav className="p-3 space-y-1">
-        <NavLink
-          to="/"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-        >
-          <Home className="w-5 h-5" />
-          <span className="text-sm font-medium">ホーム</span>
-        </NavLink>
-        <NavLink
-          to="/search"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-        >
-          <Search className="w-5 h-5" />
-          <span className="text-sm font-medium">検索</span>
-        </NavLink>
-        <NavLink
-          to="/assistant"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-        >
-          <MessageSquare className="w-5 h-5" />
-          <span className="text-sm font-medium">アシスタント</span>
-        </NavLink>
-      </nav>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/"
+                    className="flex items-center gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                  >
+                    <Home className="w-5 h-5 shrink-0" />
+                    {open && <span className="text-sm font-medium">ホーム</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
-      <Separator className="bg-sidebar-border" />
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/search"
+                    className="flex items-center gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                  >
+                    <Search className="w-5 h-5 shrink-0" />
+                    {open && <span className="text-sm font-medium">検索</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="p-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-sidebar-foreground flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            スレッド履歴
-          </h2>
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
-            <Plus className="w-4 h-4" />
-          </Button>
-        </div>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/assistant"
+                    className="flex items-center gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                  >
+                    <MessageSquare className="w-5 h-5 shrink-0" />
+                    {open && <span className="text-sm font-medium">アシスタント</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-        <ScrollArea className="flex-1 px-3">
-          <div className="space-y-1 pb-3">
-            {mockThreads.map((thread) => (
-              <button
-                key={thread.id}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors group"
-              >
-                <p className="text-sm text-sidebar-foreground truncate group-hover:text-sidebar-accent-foreground">
-                  {thread.title}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">{thread.timestamp}</p>
-              </button>
-            ))}
-          </div>
-        </ScrollArea>
-      </div>
+        {open && (
+          <>
+            <Separator className="bg-sidebar-border my-2" />
+
+            <SidebarGroup className="flex-1">
+              <SidebarGroupLabel className="flex items-center justify-between px-3">
+                <span className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  スレッド履歴
+                </span>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </SidebarGroupLabel>
+
+              <SidebarGroupContent>
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-1 px-3">
+                    {mockThreads.map((thread) => (
+                      <button
+                        key={thread.id}
+                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors group"
+                      >
+                        <p className="text-sm text-sidebar-foreground truncate group-hover:text-sidebar-accent-foreground">
+                          {thread.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {thread.timestamp}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+      </SidebarContent>
 
       <Separator className="bg-sidebar-border" />
 
@@ -89,10 +135,10 @@ export function ResearchSidebar() {
           variant="ghost"
           className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
         >
-          <Settings className="w-5 h-5" />
-          <span className="text-sm">設定</span>
+          <Settings className="w-5 h-5 shrink-0" />
+          {open && <span className="text-sm">設定</span>}
         </Button>
       </div>
-    </aside>
+    </Sidebar>
   );
 }
