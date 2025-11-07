@@ -1,4 +1,6 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ResearchSidebar } from "@/components/ResearchSidebar";
 import { ResearchCard } from "@/components/ResearchCard";
 import { ModeToggle } from "@/components/ModeToggle";
@@ -119,7 +121,15 @@ const Index = () => {
                             : "bg-card text-card-foreground border border-border"
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        {msg.role === "assistant" ? (
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        )}
                       </div>
                     </div>
                   ))}
