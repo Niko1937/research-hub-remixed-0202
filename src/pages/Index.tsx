@@ -71,7 +71,7 @@ const Index = () => {
                 <Sparkles className="w-6 h-6 text-primary" />
                 <h2 className="text-xl font-semibold text-foreground">ResearchHub</h2>
               </div>
-              <SidebarTrigger />
+              <SidebarTrigger className="hover:bg-accent rounded-md" />
             </div>
           </header>
 
