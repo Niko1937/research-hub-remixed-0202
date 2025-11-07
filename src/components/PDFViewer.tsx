@@ -7,12 +7,17 @@ interface PDFViewerProps {
   url: string;
   title: string;
   onClose: () => void;
+  onWidthChange?: (width: number) => void;
 }
 
-export function PDFViewer({ url, title, onClose }: PDFViewerProps) {
+export function PDFViewer({ url, title, onClose, onWidthChange }: PDFViewerProps) {
   const [width, setWidth] = useState(500);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    onWidthChange?.(width);
+  }, [width, onWidthChange]);
 
   useEffect(() => {
     if (!isDragging) return;

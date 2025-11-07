@@ -106,6 +106,7 @@ const Index = () => {
   const [pdfViewer, setPdfViewer] = useState<{ url: string; title: string } | null>(null);
   const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
   const [searchResults] = useState(initialSearchResults);
+  const [viewerWidth, setViewerWidth] = useState(500);
 
   // Auto-open HTML viewer when HTML generation starts and update in real-time
   useEffect(() => {
@@ -132,12 +133,21 @@ const Index = () => {
     setPdfViewer({ url, title });
   };
 
+  const handleViewerWidthChange = (width: number) => {
+    setViewerWidth(width);
+  };
+
   return (
     <SidebarProvider>
       <div className="flex h-screen bg-background w-full">
         <ResearchSidebar />
 
-        <main className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
+        <main 
+          className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
+          style={{
+            marginRight: (pdfViewer || htmlViewer) ? `${viewerWidth}px` : 0
+          }}
+        >
           {mode === "search" ? (
             // Search Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
@@ -297,11 +307,20 @@ const Index = () => {
         </main>
 
       {pdfViewer && !htmlViewer && (
-        <PDFViewer url={pdfViewer.url} title={pdfViewer.title} onClose={() => setPdfViewer(null)} />
+        <PDFViewer 
+          url={pdfViewer.url} 
+          title={pdfViewer.title} 
+          onClose={() => setPdfViewer(null)}
+          onWidthChange={handleViewerWidthChange}
+        />
       )}
       
       {htmlViewer && (
-        <HTMLViewer html={htmlViewer} onClose={() => setHtmlViewer(null)} />
+        <HTMLViewer 
+          html={htmlViewer} 
+          onClose={() => setHtmlViewer(null)}
+          onWidthChange={handleViewerWidthChange}
+        />
       )}
     </div>
     </SidebarProvider>

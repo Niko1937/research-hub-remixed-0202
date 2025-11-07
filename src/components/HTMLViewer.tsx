@@ -6,12 +6,17 @@ import { useState, useRef, useEffect } from "react";
 interface HTMLViewerProps {
   html: string;
   onClose: () => void;
+  onWidthChange?: (width: number) => void;
 }
 
-export function HTMLViewer({ html, onClose }: HTMLViewerProps) {
+export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
   const [width, setWidth] = useState(500);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    onWidthChange?.(width);
+  }, [width, onWidthChange]);
 
   useEffect(() => {
     if (!isDragging) return;
