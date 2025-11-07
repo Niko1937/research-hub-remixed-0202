@@ -128,9 +128,9 @@ const Index = () => {
         <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${(pdfViewer || htmlViewer) ? 'mr-[500px]' : ''}`}>
           {mode === "search" ? (
             // Search Mode Layout
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full animate-fade-in">
               {/* Search Input at Top */}
-              <div className="border-b border-border bg-background p-4">
+              <div className="border-b border-border bg-background p-4 animate-slide-in-top">
                 <div className="max-w-4xl mx-auto">
                   <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
                 </div>
@@ -139,7 +139,7 @@ const Index = () => {
               {/* Search Results */}
               <ScrollArea className="flex-1">
                 <div className="max-w-6xl mx-auto">
-                  <div className="p-6">
+                  <div className="p-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-semibold text-foreground">検索結果</h2>
                     </div>
@@ -159,7 +159,7 @@ const Index = () => {
             </div>
           ) : (
             // Assistant Mode Layout
-            <>
+            <div className="flex flex-col h-full animate-fade-in">
               <ScrollArea className="flex-1">
                 <div className="p-6">
                   <div className="max-w-4xl mx-auto space-y-6 pb-32">
@@ -282,8 +282,10 @@ const Index = () => {
                 </div>
               </ScrollArea>
 
-              <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
-            </>
+              <div className="animate-slide-in-bottom">
+                <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
+              </div>
+            </div>
           )}
         </main>
 
