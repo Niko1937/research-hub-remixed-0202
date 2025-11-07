@@ -1,7 +1,6 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useEffect, useRef } from "react";
 
 interface HTMLViewerProps {
   html: string;
@@ -9,20 +8,6 @@ interface HTMLViewerProps {
 }
 
 export function HTMLViewer({ html, onClose }: HTMLViewerProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    if (iframeRef.current && html) {
-      const iframe = iframeRef.current;
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (doc) {
-        doc.open();
-        doc.write(html);
-        doc.close();
-      }
-    }
-  }, [html]);
-
   return (
     <div className="fixed right-0 top-0 h-screen w-[500px] bg-background border-l border-border shadow-2xl z-50 animate-slide-in-right">
       <Card className="h-full flex flex-col rounded-none border-0">
@@ -41,7 +26,7 @@ export function HTMLViewer({ html, onClose }: HTMLViewerProps) {
         </div>
         <div className="flex-1 overflow-hidden">
           <iframe
-            ref={iframeRef}
+            srcDoc={html}
             className="w-full h-full border-0"
             title="HTML Preview"
             sandbox="allow-scripts"

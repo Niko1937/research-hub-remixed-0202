@@ -107,6 +107,18 @@ const Index = () => {
   const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
   const [searchResults] = useState(initialSearchResults);
 
+  // Auto-open HTML viewer when HTML generation completes
+  useEffect(() => {
+    const lastHtmlItem = [...timeline]
+      .reverse()
+      .find(item => item.type === "html_generation");
+    
+    if (lastHtmlItem && lastHtmlItem.data.isComplete && lastHtmlItem.data.html) {
+      setPdfViewer(null);
+      setHtmlViewer(lastHtmlItem.data.html);
+    }
+  }, [timeline]);
+
   const handleSubmit = (message: string, tool?: string) => {
     if (mode === "search") {
       setMode("assistant");

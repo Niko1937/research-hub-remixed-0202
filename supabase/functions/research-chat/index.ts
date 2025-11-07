@@ -170,23 +170,45 @@ serve(async (req) => {
       const readable = new ReadableStream({
         async start(controller) {
           try {
-            // Step 1: Generate execution plan
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "thinking_start" })}\n\n`)
-            );
+            let steps = [];
 
-            const planResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                model: "google/gemini-2.5-flash",
-                messages: [
-                  {
-                    role: "system",
-                    content: `You are a research planning assistant. Analyze the user query and create a step-by-step execution plan.
+            // If a specific tool is selected, force execute only that tool
+            if (tool && tool !== "none") {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "thinking_start" })}\n\n`)
+              );
+
+              steps = [{
+                tool: tool,
+                query: userMessage,
+                description: `Execute ${tool} tool with user query`
+              }, {
+                tool: "chat",
+                query: "Summarize the results",
+                description: "AI summary of results"
+              }];
+
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "plan", steps })}\n\n`)
+              );
+            } else {
+              // Step 1: Generate execution plan
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "thinking_start" })}\n\n`)
+              );
+
+              const planResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "google/gemini-2.5-flash",
+                  messages: [
+                    {
+                      role: "system",
+                      content: `You are a research planning assistant. Analyze the user query and create a step-by-step execution plan.
 Available tools:
 - wide-knowledge: Search external papers and research
 - theme-evaluation: Evaluate research themes against internal research and business needs
@@ -201,24 +223,25 @@ Return a JSON object with "steps" array containing objects with this structure:
 ]}
 
 Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
-                  },
-                  { role: "user", content: `User query: ${userMessage}\nSelected tool: ${tool || "none"}` }
-                ],
-                response_format: { type: "json_object" }
-              }),
-            });
+                    },
+                    { role: "user", content: `User query: ${userMessage}\nSelected tool: ${tool || "none"}` }
+                  ],
+                  response_format: { type: "json_object" }
+                }),
+              });
 
-            if (!planResponse.ok) {
-              throw new Error("Failed to generate plan");
+              if (!planResponse.ok) {
+                throw new Error("Failed to generate plan");
+              }
+
+              const planData = await planResponse.json();
+              const planContent = JSON.parse(planData.choices[0].message.content);
+              steps = planContent.steps || [];
+
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "plan", steps })}\n\n`)
+              );
             }
-
-            const planData = await planResponse.json();
-            const planContent = JSON.parse(planData.choices[0].message.content);
-            const steps = planContent.steps || [];
-
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "plan", steps })}\n\n`)
-            );
 
             // Step 2: Execute each tool in the plan
             for (let i = 0; i < steps.length; i++) {
