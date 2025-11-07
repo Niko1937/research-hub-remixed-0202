@@ -76,74 +76,63 @@ const Index = () => {
 
         <ScrollArea className="flex-1">
           <div className="p-6">
-            {mode === "search" ? (
-              <div className="max-w-5xl mx-auto space-y-4">
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-4">
-                    おすすめの研究資料
+            <div className="max-w-4xl mx-auto space-y-6 pb-32">
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[50vh] text-center">
+                  <div className="p-4 bg-primary/10 rounded-full mb-4">
+                    <Sparkles className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
+                    {mode === "search" ? "研究資料を検索" : "AIアシスタント"}
                   </h3>
+                  <p className="text-muted-foreground max-w-md">
+                    {mode === "search" 
+                      ? "キーワードや研究テーマを入力して、外部論文・社内研究・事業部課題を検索します"
+                      : "研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします"}
+                    <br />
+                    <span className="text-xs mt-2 block">
+                      社内研究・事業部課題・外部論文の3つの視点から回答します
+                    </span>
+                  </p>
                 </div>
-                {mockResearchData.map((research, index) => (
-                  <ResearchCard key={index} {...research} />
-                ))}
-              </div>
-            ) : (
-              <div className="max-w-4xl mx-auto space-y-6 pb-32">
-                {messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-[50vh] text-center">
-                    <div className="p-4 bg-primary/10 rounded-full mb-4">
-                      <Sparkles className="w-8 h-8 text-primary" />
+              ) : (
+                <div className="space-y-6">
+                  {researchData && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        検索結果
+                      </h3>
+                      <ResearchResults data={researchData} />
                     </div>
-                    <h3 className="text-xl font-semibold text-foreground mb-2">
-                      AIアシスタントへようこそ
-                    </h3>
-                    <p className="text-muted-foreground max-w-md">
-                      研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします。
-                      <br />
-                      <span className="text-xs mt-2 block">
-                        社内研究・事業部課題・外部論文の3つの視点から回答します
-                      </span>
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {researchData && (
-                      <div className="mb-6">
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          検索結果
-                        </h3>
-                        <ResearchResults data={researchData} />
-                      </div>
-                    )}
+                  )}
 
-                    {messages.map((msg, index) => (
+                  {messages.map((msg, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
                       <div
-                        key={index}
-                        className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                        className={`max-w-[85%] rounded-lg p-4 ${
+                          msg.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card text-card-foreground border border-border"
+                        }`}
                       >
-                        <div
-                          className={`max-w-[85%] rounded-lg p-4 ${
-                            msg.role === "user"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-card text-card-foreground border border-border"
-                          }`}
-                        >
-                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                       </div>
-                    ))}
+                    </div>
+                  ))}
 
-                    {isLoading && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm">AI が回答を生成中...</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+                  {isLoading && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">AI が回答を生成中...</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </ScrollArea>
 
