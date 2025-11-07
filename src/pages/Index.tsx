@@ -18,14 +18,86 @@ import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 const initialSearchResults = [
-  { title: "Deep Learning for Natural Language Processing", authors: ["Smith, J.", "Wang, L."], year: "2024", source: "arXiv", citations: 152, url: "https://arxiv.org/pdf/2401.00001.pdf", query: "機械学習" },
-  { title: "Transformer Architecture and Its Applications", authors: ["Chen, Y.", "Liu, M."], year: "2024", source: "ACL", citations: 289, url: "https://arxiv.org/pdf/2401.00002.pdf", query: "機械学習" },
-  { title: "Large Language Models: A Comprehensive Survey", authors: ["Brown, T.", "Davis, R."], year: "2024", source: "OpenAlex", citations: 412, url: "https://arxiv.org/pdf/2401.00003.pdf", query: "LLM" },
-  { title: "Efficient Training of Large Language Models", authors: ["Johnson, A.", "Lee, K."], year: "2023", source: "NeurIPS", citations: 276, url: "https://arxiv.org/pdf/2401.00004.pdf", query: "LLM" },
-  { title: "Multi-Agent Reinforcement Learning Framework", authors: ["Garcia, M.", "Kim, S."], year: "2024", source: "ICML", citations: 198, url: "https://arxiv.org/pdf/2401.00005.pdf", query: "Agent" },
-  { title: "Autonomous Agents in Complex Environments", authors: ["Wilson, D.", "Zhang, H."], year: "2024", source: "arXiv", citations: 143, url: "https://arxiv.org/pdf/2401.00006.pdf", query: "Agent" },
-  { title: "Neural Architecture Search for Machine Learning", authors: ["Anderson, P.", "Taylor, E."], year: "2023", source: "ICLR", citations: 231, url: "https://arxiv.org/pdf/2401.00007.pdf", query: "機械学習" },
-  { title: "Prompt Engineering for Large Language Models", authors: ["Martinez, R.", "White, C."], year: "2024", source: "Semantic Scholar", citations: 167, url: "https://arxiv.org/pdf/2401.00008.pdf", query: "LLM" },
+  { 
+    title: "Deep Learning for Natural Language Processing", 
+    authors: ["Smith, J.", "Wang, L."], 
+    year: "2024", 
+    source: "arXiv", 
+    citations: 152, 
+    url: "https://arxiv.org/pdf/2401.00001.pdf", 
+    query: "機械学習",
+    abstract: "本論文では、自然言語処理における深層学習の最新手法を包括的に調査する。特にTransformerアーキテクチャの発展と、事前学習モデルの効率的な活用方法について詳述する。"
+  },
+  { 
+    title: "Transformer Architecture and Its Applications", 
+    authors: ["Chen, Y.", "Liu, M."], 
+    year: "2024", 
+    source: "ACL", 
+    citations: 289, 
+    url: "https://arxiv.org/pdf/2401.00002.pdf", 
+    query: "機械学習",
+    abstract: "We present a comprehensive analysis of Transformer architectures and their applications across various NLP tasks. Our study demonstrates significant improvements in translation, summarization, and question-answering benchmarks."
+  },
+  { 
+    title: "Large Language Models: A Comprehensive Survey", 
+    authors: ["Brown, T.", "Davis, R."], 
+    year: "2024", 
+    source: "OpenAlex", 
+    citations: 412, 
+    url: "https://arxiv.org/pdf/2401.00003.pdf", 
+    query: "LLM",
+    abstract: "This survey examines the evolution of large language models from GPT-3 to contemporary architectures. We analyze training methodologies, scaling laws, emergent capabilities, and ethical considerations in deployment."
+  },
+  { 
+    title: "Efficient Training of Large Language Models", 
+    authors: ["Johnson, A.", "Lee, K."], 
+    year: "2023", 
+    source: "NeurIPS", 
+    citations: 276, 
+    url: "https://arxiv.org/pdf/2401.00004.pdf", 
+    query: "LLM",
+    abstract: "We propose novel optimization techniques for training large-scale language models with reduced computational costs. Our methods achieve 40% faster convergence while maintaining model quality across multiple benchmarks."
+  },
+  { 
+    title: "Multi-Agent Reinforcement Learning Framework", 
+    authors: ["Garcia, M.", "Kim, S."], 
+    year: "2024", 
+    source: "ICML", 
+    citations: 198, 
+    url: "https://arxiv.org/pdf/2401.00005.pdf", 
+    query: "Agent",
+    abstract: "マルチエージェント強化学習のための新しいフレームワークを提案する。協調と競争が混在する環境において、エージェント間の効率的な学習と通信プロトコルを実現する。"
+  },
+  { 
+    title: "Autonomous Agents in Complex Environments", 
+    authors: ["Wilson, D.", "Zhang, H."], 
+    year: "2024", 
+    source: "arXiv", 
+    citations: 143, 
+    url: "https://arxiv.org/pdf/2401.00006.pdf", 
+    query: "Agent",
+    abstract: "This paper explores the design and implementation of autonomous agents capable of navigating complex, dynamic environments. We introduce a hierarchical decision-making framework that balances exploration and exploitation."
+  },
+  { 
+    title: "Neural Architecture Search for Machine Learning", 
+    authors: ["Anderson, P.", "Taylor, E."], 
+    year: "2023", 
+    source: "ICLR", 
+    citations: 231, 
+    url: "https://arxiv.org/pdf/2401.00007.pdf", 
+    query: "機械学習",
+    abstract: "ニューラルアーキテクチャサーチの最新動向を調査し、効率的な探索アルゴリズムと評価指標を提案する。実験結果により、提案手法が従来手法を大幅に上回ることを示す。"
+  },
+  { 
+    title: "Prompt Engineering for Large Language Models", 
+    authors: ["Martinez, R.", "White, C."], 
+    year: "2024", 
+    source: "Semantic Scholar", 
+    citations: 167, 
+    url: "https://arxiv.org/pdf/2401.00008.pdf", 
+    query: "LLM",
+    abstract: "We systematically investigate prompt engineering techniques for optimizing large language model performance. Our findings reveal critical factors affecting model outputs and provide practical guidelines for effective prompt design."
+  },
 ];
 
 const Index = () => {
