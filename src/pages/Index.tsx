@@ -132,8 +132,8 @@ const Index = () => {
                       
                       case "assistant_message":
                         return (
-                          <div key={index} className="flex justify-start">
-                            <div className="max-w-[85%] rounded-lg p-4 bg-card text-card-foreground border border-border">
+                          <div key={index} className="flex justify-start w-full">
+                            <div className="w-full rounded-lg p-4 bg-card text-card-foreground border border-border">
                               <div className="prose prose-sm dark:prose-invert max-w-none">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                   {item.data.content}
