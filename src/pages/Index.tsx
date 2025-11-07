@@ -107,13 +107,13 @@ const Index = () => {
   const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
   const [searchResults] = useState(initialSearchResults);
 
-  // Auto-open HTML viewer when HTML generation completes
+  // Auto-open HTML viewer when HTML generation starts and update in real-time
   useEffect(() => {
     const lastHtmlItem = [...timeline]
       .reverse()
       .find(item => item.type === "html_generation");
     
-    if (lastHtmlItem && lastHtmlItem.data.isComplete && lastHtmlItem.data.html) {
+    if (lastHtmlItem && lastHtmlItem.data.html) {
       setPdfViewer(null);
       setHtmlViewer(lastHtmlItem.data.html);
     }
