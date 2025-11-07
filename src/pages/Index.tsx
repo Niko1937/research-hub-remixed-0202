@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ResearchSidebar } from "@/components/ResearchSidebar";
@@ -9,58 +9,43 @@ import { PDFViewer } from "@/components/PDFViewer";
 import { HTMLViewer } from "@/components/HTMLViewer";
 import { ThemeEvaluation } from "@/components/ThemeEvaluation";
 import { KnowWhoResults } from "@/components/KnowWhoResults";
+import { SearchResultItem } from "@/components/SearchResultItem";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Loader2, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Loader2, FileText, Search, MessageSquare } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
-const mockResearchData = [
-  {
-    title: "量子機械学習における新しいアルゴリズムの提案と評価",
-    abstract:
-      "本研究では、量子コンピューティングと機械学習を融合させた新しいアルゴリズムを提案します。従来の古典的手法と比較して、計算効率が大幅に向上することを実証しました。",
-    authors: ["山田太郎", "佐藤花子", "鈴木一郎"],
-    date: "2024-03-15",
-    tags: ["量子コンピューティング", "機械学習", "アルゴリズム"],
-    source: "arXiv",
-  },
-  {
-    title: "深層学習を用いたタンパク質構造予測の精度向上",
-    abstract:
-      "AlphaFoldを超える精度を目指し、新しいアーキテクチャを提案。実験結果から、特に複雑な構造において顕著な改善が見られました。",
-    authors: ["田中美咲", "高橋健太"],
-    date: "2024-03-10",
-    tags: ["深層学習", "バイオインフォマティクス", "構造予測"],
-    source: "Nature",
-  },
-  {
-    title: "大規模言語モデルにおける推論能力の理論的分析",
-    abstract:
-      "GPTやBERTなどの大規模言語モデルの推論メカニズムを理論的に解析。新しい評価指標を提案し、モデルの解釈可能性を向上させました。",
-    authors: ["中村直人", "小林由美"],
-    date: "2024-03-05",
-    tags: ["自然言語処理", "大規模言語モデル", "推論"],
-    source: "ACL",
-  },
-  {
-    title: "強化学習による自律ロボットの協調制御システム",
-    abstract:
-      "複数の自律ロボットが協調して作業を行うための新しい強化学習フレームワークを開発。実機実験により有効性を検証しました。",
-    authors: ["渡辺拓也", "伊藤明"],
-    date: "2024-02-28",
-    tags: ["強化学習", "ロボティクス", "協調制御"],
-    source: "IEEE",
-  },
+const initialSearchResults = [
+  { title: "Deep Learning for Natural Language Processing", authors: ["Smith, J.", "Wang, L."], year: "2024", source: "arXiv", citations: 152, url: "https://arxiv.org/pdf/2401.00001.pdf", query: "機械学習" },
+  { title: "Transformer Architecture and Its Applications", authors: ["Chen, Y.", "Liu, M."], year: "2024", source: "ACL", citations: 289, url: "https://arxiv.org/pdf/2401.00002.pdf", query: "機械学習" },
+  { title: "Large Language Models: A Comprehensive Survey", authors: ["Brown, T.", "Davis, R."], year: "2024", source: "OpenAlex", citations: 412, url: "https://arxiv.org/pdf/2401.00003.pdf", query: "LLM" },
+  { title: "Efficient Training of Large Language Models", authors: ["Johnson, A.", "Lee, K."], year: "2023", source: "NeurIPS", citations: 276, url: "https://arxiv.org/pdf/2401.00004.pdf", query: "LLM" },
+  { title: "Multi-Agent Reinforcement Learning Framework", authors: ["Garcia, M.", "Kim, S."], year: "2024", source: "ICML", citations: 198, url: "https://arxiv.org/pdf/2401.00005.pdf", query: "Agent" },
+  { title: "Autonomous Agents in Complex Environments", authors: ["Wilson, D.", "Zhang, H."], year: "2024", source: "arXiv", citations: 143, url: "https://arxiv.org/pdf/2401.00006.pdf", query: "Agent" },
+  { title: "Neural Architecture Search for Machine Learning", authors: ["Anderson, P.", "Taylor, E."], year: "2023", source: "ICLR", citations: 231, url: "https://arxiv.org/pdf/2401.00007.pdf", query: "機械学習" },
+  { title: "Prompt Engineering for Large Language Models", authors: ["Martinez, R.", "White, C."], year: "2024", source: "Semantic Scholar", citations: 167, url: "https://arxiv.org/pdf/2401.00008.pdf", query: "LLM" },
 ];
 
 const Index = () => {
+  const [mode, setMode] = useState<"search" | "assistant">("search");
   const { timeline, isLoading, sendMessage } = useResearchChat();
   const [pdfViewer, setPdfViewer] = useState<{ url: string; title: string } | null>(null);
   const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
+  const [searchResults] = useState(initialSearchResults);
 
   const handleSubmit = (message: string, tool?: string) => {
+    if (mode === "search") {
+      setMode("assistant");
+    }
     sendMessage(message, "assistant", tool);
+  };
+
+  const handleSearchResultClick = (url: string, title: string) => {
+    setMode("assistant");
+    setHtmlViewer(null);
+    setPdfViewer({ url, title });
   };
 
   return (
@@ -69,130 +54,189 @@ const Index = () => {
         <ResearchSidebar />
 
         <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${(pdfViewer || htmlViewer) ? 'mr-[500px]' : ''}`}>
-        <ScrollArea className="flex-1">
-          <div className="p-6">
-            <div className="max-w-4xl mx-auto space-y-6 pb-32">
-              {timeline.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-[50vh] text-center">
-                  <div className="p-4 bg-primary/10 rounded-full mb-4">
-                    <Sparkles className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    ResearchHub AI
-                  </h3>
-                  <p className="text-muted-foreground max-w-md">
-                    研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします
-                  </p>
+          {mode === "search" ? (
+            // Search Mode Layout
+            <div className="flex flex-col h-full">
+              {/* Search Input at Top */}
+              <div className="border-b border-border bg-background p-4">
+                <div className="max-w-4xl mx-auto">
+                  <ChatInput onSubmit={handleSubmit} />
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {timeline.map((item, index) => {
-                    switch (item.type) {
-                      case "user_message":
-                        return (
-                          <div key={index} className="flex justify-end">
-                            <div className="max-w-[85%] rounded-lg p-4 bg-primary text-primary-foreground">
-                              <p className="text-sm whitespace-pre-wrap">{item.data.content}</p>
-                            </div>
-                          </div>
-                        );
-                      
-                      case "thinking":
-                        return (
-                          <ThinkingBlock
-                            key={index}
-                            steps={item.data.steps}
-                            currentStep={item.data.currentStep}
-                          />
-                        );
-                      
-                      case "research_result":
-                        return (
-                          <ResearchResults
-                            key={index}
-                            data={item.data}
-                            onPdfClick={(url, title) => {
-                              setHtmlViewer(null);
-                              setPdfViewer({ url, title });
-                            }}
-                          />
-                        );
-                      
-                      case "theme_evaluation":
-                        return (
-                          <ThemeEvaluation
-                            key={index}
-                            comparison={item.data.comparison}
-                            needs={item.data.needs}
-                          />
-                        );
-                      
-                      case "knowwho_result":
-                        return <KnowWhoResults key={index} experts={item.data.experts} />;
-                      
-                      case "html_generation":
-                        return (
-                          <Card
-                            key={index}
-                            className="p-4 bg-card border-border cursor-pointer hover:bg-card-hover transition-colors"
-                            onClick={() => {
-                              if (item.data.isComplete) {
-                                setPdfViewer(null);
-                                setHtmlViewer(item.data.html);
-                              }
-                            }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <FileText className="w-5 h-5 text-primary" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-foreground">
-                                  {item.data.isComplete ? "HTML資料生成完了" : "HTML資料生成中..."}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {item.data.isComplete
-                                    ? "クリックしてプレビュー"
-                                    : "生成中です..."}
-                                </p>
-                              </div>
-                              {!item.data.isComplete && (
-                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                              )}
-                            </div>
-                          </Card>
-                        );
-                      
-                      case "assistant_message":
-                        return (
-                          <div key={index} className="flex justify-start w-full">
-                            <div className="w-full rounded-lg p-4 bg-card text-card-foreground border border-border">
-                              <div className="prose prose-sm dark:prose-invert max-w-none">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                  {item.data.content}
-                                </ReactMarkdown>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      
-                      default:
-                        return null;
-                    }
-                  })}
+              </div>
 
-                  {isLoading && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">AI が回答を生成中...</span>
+              {/* Search Results */}
+              <ScrollArea className="flex-1">
+                <div className="max-w-6xl mx-auto">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-semibold text-foreground">検索結果</h2>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => setMode("assistant")}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span className="text-xs">アシスタントモードに切り替え</span>
+                        </Button>
+                      </div>
                     </div>
-                  )}
+                    
+                    <Card className="bg-card border-border overflow-hidden">
+                      {searchResults.map((result, index) => (
+                        <SearchResultItem
+                          key={index}
+                          {...result}
+                          onClick={() => handleSearchResultClick(result.url, result.title)}
+                        />
+                      ))}
+                    </Card>
+                  </div>
                 </div>
-              )}
+              </ScrollArea>
             </div>
-          </div>
-        </ScrollArea>
+          ) : (
+            // Assistant Mode Layout
+            <>
+              <ScrollArea className="flex-1">
+                <div className="p-6">
+                  <div className="max-w-4xl mx-auto space-y-6 pb-32">
+                    <div className="flex items-center justify-between mb-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setMode("search")}
+                      >
+                        <Search className="w-4 h-4" />
+                        <span className="text-xs">検索モードに戻る</span>
+                      </Button>
+                    </div>
 
-        <ChatInput onSubmit={handleSubmit} />
-      </main>
+                    {timeline.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-[50vh] text-center">
+                        <div className="p-4 bg-primary/10 rounded-full mb-4">
+                          <Sparkles className="w-8 h-8 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-foreground mb-2">
+                          ResearchHub AI
+                        </h3>
+                        <p className="text-muted-foreground max-w-md">
+                          研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {timeline.map((item, index) => {
+                          switch (item.type) {
+                            case "user_message":
+                              return (
+                                <div key={index} className="flex justify-end">
+                                  <div className="max-w-[85%] rounded-lg p-4 bg-primary text-primary-foreground">
+                                    <p className="text-sm whitespace-pre-wrap">{item.data.content}</p>
+                                  </div>
+                                </div>
+                              );
+                            
+                            case "thinking":
+                              return (
+                                <ThinkingBlock
+                                  key={index}
+                                  steps={item.data.steps}
+                                  currentStep={item.data.currentStep}
+                                />
+                              );
+                            
+                            case "research_result":
+                              return (
+                                <ResearchResults
+                                  key={index}
+                                  data={item.data}
+                                  onPdfClick={(url, title) => {
+                                    setHtmlViewer(null);
+                                    setPdfViewer({ url, title });
+                                  }}
+                                />
+                              );
+                            
+                            case "theme_evaluation":
+                              return (
+                                <ThemeEvaluation
+                                  key={index}
+                                  comparison={item.data.comparison}
+                                  needs={item.data.needs}
+                                />
+                              );
+                            
+                            case "knowwho_result":
+                              return <KnowWhoResults key={index} experts={item.data.experts} />;
+                            
+                            case "html_generation":
+                              return (
+                                <Card
+                                  key={index}
+                                  className="p-4 bg-card border-border cursor-pointer hover:bg-card-hover transition-colors"
+                                  onClick={() => {
+                                    if (item.data.isComplete) {
+                                      setPdfViewer(null);
+                                      setHtmlViewer(item.data.html);
+                                    }
+                                  }}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <FileText className="w-5 h-5 text-primary" />
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium text-foreground">
+                                        {item.data.isComplete ? "HTML資料生成完了" : "HTML資料生成中..."}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {item.data.isComplete
+                                          ? "クリックしてプレビュー"
+                                          : "生成中です..."}
+                                      </p>
+                                    </div>
+                                    {!item.data.isComplete && (
+                                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                    )}
+                                  </div>
+                                </Card>
+                              );
+                            
+                            case "assistant_message":
+                              return (
+                                <div key={index} className="flex justify-start w-full">
+                                  <div className="w-full rounded-lg p-4 bg-card text-card-foreground border border-border">
+                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {item.data.content}
+                                      </ReactMarkdown>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            
+                            default:
+                              return null;
+                          }
+                        })}
+
+                        {isLoading && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">AI が回答を生成中...</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </ScrollArea>
+
+              <ChatInput onSubmit={handleSubmit} />
+            </>
+          )}
+        </main>
 
       {pdfViewer && !htmlViewer && (
         <PDFViewer url={pdfViewer.url} title={pdfViewer.title} onClose={() => setPdfViewer(null)} />
