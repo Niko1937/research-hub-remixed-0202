@@ -120,47 +120,49 @@ export function ChatInput({ onSubmit, mode, onModeChange }: ChatInputProps) {
                 </Button>
               </div>
 
-              {/* Tools */}
-              <Popover open={toolPopoverOpen} onOpenChange={setToolPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs">
-                    <Wrench className="w-3.5 h-3.5" />
-                    <span>Tools</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-2" align="start">
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => handleToolSelect("wide-knowledge")}
-                      className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                    >
-                      <div className="text-sm font-medium">ワイドナレッジ検索</div>
-                      <div className="text-xs text-muted-foreground">幅広い知識ベースから検索</div>
-                    </button>
-                    <button
-                      onClick={() => handleToolSelect("theme-evaluation")}
-                      className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                    >
-                      <div className="text-sm font-medium">テーマ評価</div>
-                      <div className="text-xs text-muted-foreground">社内外研究・Seeds-Needsマッチング</div>
-                    </button>
-                    <button
-                      onClick={() => handleToolSelect("knowwho")}
-                      className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                    >
-                      <div className="text-sm font-medium">KnowWho検索</div>
-                      <div className="text-xs text-muted-foreground">専門家・研究者を検索</div>
-                    </button>
-                    <button
-                      onClick={() => handleToolSelect("html-generation")}
-                      className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                    >
-                      <div className="text-sm font-medium">HTML資料生成</div>
-                      <div className="text-xs text-muted-foreground">会話内容をインフォグラフィックス化</div>
-                    </button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              {/* Tools - Only show in Assistant mode */}
+              {mode === "assistant" && (
+                <Popover open={toolPopoverOpen} onOpenChange={setToolPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs">
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Tools</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2" align="start">
+                    <div className="space-y-1">
+                      <button
+                        onClick={() => handleToolSelect("wide-knowledge")}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                      >
+                        <div className="text-sm font-medium">ワイドナレッジ検索</div>
+                        <div className="text-xs text-muted-foreground">幅広い知識ベースから検索</div>
+                      </button>
+                      <button
+                        onClick={() => handleToolSelect("theme-evaluation")}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                      >
+                        <div className="text-sm font-medium">テーマ評価</div>
+                        <div className="text-xs text-muted-foreground">社内外研究・Seeds-Needsマッチング</div>
+                      </button>
+                      <button
+                        onClick={() => handleToolSelect("knowwho")}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                      >
+                        <div className="text-sm font-medium">KnowWho検索</div>
+                        <div className="text-xs text-muted-foreground">専門家・研究者を検索</div>
+                      </button>
+                      <button
+                        onClick={() => handleToolSelect("html-generation")}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                      >
+                        <div className="text-sm font-medium">HTML資料生成</div>
+                        <div className="text-xs text-muted-foreground">会話内容をインフォグラフィックス化</div>
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
           </div>
         </div>
