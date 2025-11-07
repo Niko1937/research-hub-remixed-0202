@@ -2,13 +2,16 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ResearchSidebar } from "@/components/ResearchSidebar";
-import { ResearchCard } from "@/components/ResearchCard";
 import { ChatInput } from "@/components/ChatInput";
 import { ResearchResults } from "@/components/ResearchResults";
+import { ThinkingBlock } from "@/components/ThinkingBlock";
+import { PDFViewer } from "@/components/PDFViewer";
+import { ThemeEvaluation } from "@/components/ThemeEvaluation";
+import { KnowWhoResults } from "@/components/KnowWhoResults";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, Loader2, FileText } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 type Mode = "search" | "assistant";
 
@@ -53,7 +56,8 @@ const mockResearchData = [
 
 const Index = () => {
   const [mode, setMode] = useState<Mode>("search");
-  const { messages, isLoading, researchData, sendMessage } = useResearchChat();
+  const { messages, isLoading, researchData, thinkingStatus, executionPlan, currentStep, themeEvaluation, experts, sendMessage } = useResearchChat();
+  const [pdfViewer, setPdfViewer] = useState<{ url: string; title: string } | null>(null);
 
   const handleSubmit = (message: string, tool?: string) => {
     sendMessage(message, mode, tool);
@@ -84,28 +88,23 @@ const Index = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {mode === "search" && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        検索結果
-                      </h3>
-                      {researchData ? (
-                        <ResearchResults data={researchData} />
-                      ) : isLoading ? (
-                        <div className="flex items-center justify-center p-8 text-muted-foreground">
-                          <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                          <span>検索中...</span>
-                        </div>
-                      ) : (
-                        <div className="text-center p-8 text-muted-foreground">
-                          <p>検索結果が見つかりませんでした</p>
-                        </div>
-                      )}
-                    </div>
+                  {mode === "assistant" && thinkingStatus && executionPlan.length > 0 && (
+                    <ThinkingBlock steps={executionPlan} status={thinkingStatus} currentStep={currentStep} />
                   )}
 
-                  {mode === "assistant" && messages.map((msg, index) => (
+                  {researchData && researchData.external.length > 0 && (
+                    <ResearchResults data={researchData} onPdfClick={(url, title) => setPdfViewer({ url, title })} />
+                  )}
+
+                  {themeEvaluation && (
+                    <ThemeEvaluation comparison={themeEvaluation.comparison} needs={themeEvaluation.needs} />
+                  )}
+
+                  {experts.length > 0 && (
+                    <KnowWhoResults experts={experts} />
+                  )}
+
+                  {messages.map((msg, index) => (
                     <div
                       key={index}
                       className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -133,9 +132,7 @@ const Index = () => {
                   {isLoading && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">
-                        {mode === "search" ? "検索中..." : "AI が回答を生成中..."}
-                      </span>
+                      <span className="text-sm">AI が回答を生成中...</span>
                     </div>
                   )}
                 </div>
@@ -146,6 +143,10 @@ const Index = () => {
 
         <ChatInput mode={mode} onSubmit={handleSubmit} onModeChange={setMode} />
       </main>
+
+      {pdfViewer && (
+        <PDFViewer url={pdfViewer.url} title={pdfViewer.title} onClose={() => setPdfViewer(null)} />
+      )}
     </div>
     </SidebarProvider>
   );

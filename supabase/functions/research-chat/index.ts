@@ -149,7 +149,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode } = await req.json();
+    const { messages, mode, tool } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -157,8 +157,228 @@ serve(async (req) => {
     }
 
     const userMessage = messages[messages.length - 1].content;
+    const encoder = new TextEncoder();
 
-    // Execute searches in parallel
+    // For assistant mode, create execution plan first
+    if (mode === "assistant") {
+      const readable = new ReadableStream({
+        async start(controller) {
+          try {
+            // Step 1: Generate execution plan
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "thinking_start" })}\n\n`)
+            );
+
+            const planResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                messages: [
+                  {
+                    role: "system",
+                    content: `You are a research planning assistant. Analyze the user query and create a step-by-step execution plan.
+Available tools:
+- wide-knowledge: Search external papers and research
+- theme-evaluation: Evaluate research themes against internal research and business needs
+- knowwho: Search for experts and researchers
+- chat: Use AI to summarize or format results
+
+Return a JSON object with "steps" array containing objects with this structure:
+{"steps": [
+  {"tool": "tool_name", "query": "search query or input", "description": "what this step does"},
+  ...
+]}
+
+Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
+                  },
+                  { role: "user", content: `User query: ${userMessage}\nSelected tool: ${tool || "none"}` }
+                ],
+                response_format: { type: "json_object" }
+              }),
+            });
+
+            if (!planResponse.ok) {
+              throw new Error("Failed to generate plan");
+            }
+
+            const planData = await planResponse.json();
+            const planContent = JSON.parse(planData.choices[0].message.content);
+            const steps = planContent.steps || [];
+
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "plan", steps })}\n\n`)
+            );
+
+            // Step 2: Execute each tool in the plan
+            for (let i = 0; i < steps.length; i++) {
+              const step = steps[i];
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "step_start", step: i })}\n\n`)
+              );
+
+              if (step.tool === "wide-knowledge") {
+                const [openAlexResults, semanticResults, arxivResults] = await Promise.all([
+                  searchOpenAlex(step.query),
+                  searchSemanticScholar(step.query),
+                  searchArXiv(step.query),
+                ]);
+
+                const externalPapers = [...openAlexResults, ...semanticResults, ...arxivResults]
+                  .sort((a, b) => (b.citations || 0) - (a.citations || 0))
+                  .slice(0, 5);
+
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "research_data",
+                      external: externalPapers,
+                    })}\n\n`
+                  )
+                );
+              } else if (step.tool === "theme-evaluation") {
+                const internalResearch = searchInternalResearch(step.query);
+                const businessChallenges = searchBusinessChallenges(step.query);
+
+                const comparison = [
+                  {
+                    aspect: "技術成熟度",
+                    internal: "プロトタイプレベル（TRL 4-5）",
+                    external: "研究段階（TRL 2-3）",
+                    evaluation: "advantage"
+                  },
+                  {
+                    aspect: "市場適用性",
+                    internal: "特定業界向け",
+                    external: "汎用的アプローチ",
+                    evaluation: "neutral"
+                  },
+                  {
+                    aspect: "理論的新規性",
+                    internal: "既存手法の改良",
+                    external: "新規アルゴリズム提案",
+                    evaluation: "gap"
+                  }
+                ];
+
+                const needs = businessChallenges.map(c => ({
+                  title: c.challenge,
+                  department: c.business_unit,
+                  priority: c.priority === "高" ? "high" : c.priority === "中" ? "medium" : "low",
+                  match_score: Math.floor(Math.random() * 30) + 65
+                }));
+
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "theme_evaluation",
+                      comparison,
+                      needs,
+                    })}\n\n`
+                  )
+                );
+              } else if (step.tool === "knowwho") {
+                const experts = [
+                  {
+                    name: "Dr. 山田太郎",
+                    affiliation: "東京大学 情報理工学研究科",
+                    expertise: ["機械学習", "深層学習", "自然言語処理"],
+                    publications: 87,
+                    h_index: 24,
+                    email: "yamada@example.jp"
+                  },
+                  {
+                    name: "Dr. 佐藤花子",
+                    affiliation: "京都大学 工学研究科",
+                    expertise: ["推薦システム", "情報検索", "Two-Tower Model"],
+                    publications: 62,
+                    h_index: 19,
+                    email: "sato@example.jp"
+                  },
+                  {
+                    name: "Dr. 田中直人",
+                    affiliation: "大阪大学 基礎工学研究科",
+                    expertise: ["ニューラルネットワーク", "表現学習"],
+                    publications: 45,
+                    h_index: 16
+                  }
+                ];
+
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "knowwho_results",
+                      experts,
+                    })}\n\n`
+                  )
+                );
+              }
+
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "step_complete", step: i })}\n\n`)
+              );
+            }
+
+            // Step 3: Generate final AI summary
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "chat_start" })}\n\n`)
+            );
+
+            const contextPrompt = `ユーザーの質問: ${userMessage}\n\n上記の検索結果とツール実行結果を踏まえて、R&D研究者向けに簡潔で実践的な回答を生成してください。`;
+
+            const summaryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                messages: [
+                  { role: "system", content: contextPrompt },
+                  ...messages,
+                ],
+                stream: true,
+              }),
+            });
+
+            if (summaryResponse.ok && summaryResponse.body) {
+              const reader = summaryResponse.body.getReader();
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  controller.enqueue(value);
+                }
+              } finally {
+                reader.releaseLock();
+              }
+            }
+
+          } catch (error) {
+            console.error("Assistant mode error:", error);
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  message: error instanceof Error ? error.message : "Unknown error",
+                })}\n\n`
+              )
+            );
+          }
+          controller.close();
+        },
+      });
+
+      return new Response(readable, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
+    // Search mode: Execute searches in parallel
     const [openAlexResults, semanticResults, arxivResults, internalResearch, businessChallenges] = 
       await Promise.all([
         searchOpenAlex(userMessage),
@@ -235,7 +455,6 @@ ${externalPapers.length > 0 ? externalPapers.map((p, i) =>
     }
 
     // Add research data to stream
-    const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
         // First, send the research data

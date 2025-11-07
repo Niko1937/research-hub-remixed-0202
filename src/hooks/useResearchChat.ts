@@ -29,10 +29,45 @@ export interface ResearchData {
   }>;
 }
 
+export interface Step {
+  tool: string;
+  query: string;
+  description: string;
+}
+
+export interface ThemeEvaluation {
+  comparison: Array<{
+    aspect: string;
+    internal: string;
+    external: string;
+    evaluation: "advantage" | "neutral" | "gap";
+  }>;
+  needs: Array<{
+    title: string;
+    department: string;
+    priority: "high" | "medium" | "low";
+    match_score: number;
+  }>;
+}
+
+export interface Expert {
+  name: string;
+  affiliation: string;
+  expertise: string[];
+  publications: number;
+  h_index: number;
+  email?: string;
+}
+
 export function useResearchChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [researchData, setResearchData] = useState<ResearchData | null>(null);
+  const [thinkingStatus, setThinkingStatus] = useState<"planning" | "executing" | "completed" | null>(null);
+  const [executionPlan, setExecutionPlan] = useState<Step[]>([]);
+  const [currentStep, setCurrentStep] = useState<number>(-1);
+  const [themeEvaluation, setThemeEvaluation] = useState<ThemeEvaluation | null>(null);
+  const [experts, setExperts] = useState<Expert[]>([]);
 
   const sendMessage = useCallback(
     async (content: string, mode: "search" | "assistant", tool?: string) => {
@@ -40,6 +75,11 @@ export function useResearchChat() {
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
       setResearchData(null);
+      setThinkingStatus(null);
+      setExecutionPlan([]);
+      setCurrentStep(-1);
+      setThemeEvaluation(null);
+      setExperts([]);
 
       try {
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
@@ -90,13 +130,58 @@ export function useResearchChat() {
             try {
               const parsed = JSON.parse(jsonStr);
 
+              // Handle thinking start
+              if (parsed.type === "thinking_start") {
+                setThinkingStatus("planning");
+                continue;
+              }
+
+              // Handle execution plan
+              if (parsed.type === "plan") {
+                setExecutionPlan(parsed.steps || []);
+                setThinkingStatus("executing");
+                continue;
+              }
+
+              // Handle step start
+              if (parsed.type === "step_start") {
+                setCurrentStep(parsed.step);
+                continue;
+              }
+
+              // Handle step complete
+              if (parsed.type === "step_complete") {
+                continue;
+              }
+
               // Handle research data
               if (parsed.type === "research_data") {
-                setResearchData({
-                  internal: parsed.internal || [],
-                  business: parsed.business || [],
-                  external: parsed.external || [],
+                setResearchData((prev) => ({
+                  internal: parsed.internal || prev?.internal || [],
+                  business: parsed.business || prev?.business || [],
+                  external: [...(prev?.external || []), ...(parsed.external || [])],
+                }));
+                continue;
+              }
+
+              // Handle theme evaluation
+              if (parsed.type === "theme_evaluation") {
+                setThemeEvaluation({
+                  comparison: parsed.comparison || [],
+                  needs: parsed.needs || [],
                 });
+                continue;
+              }
+
+              // Handle knowwho results
+              if (parsed.type === "knowwho_results") {
+                setExperts(parsed.experts || []);
+                continue;
+              }
+
+              // Handle chat start
+              if (parsed.type === "chat_start") {
+                setThinkingStatus("completed");
                 continue;
               }
 
@@ -166,12 +251,22 @@ export function useResearchChat() {
   const clearMessages = useCallback(() => {
     setMessages([]);
     setResearchData(null);
+    setThinkingStatus(null);
+    setExecutionPlan([]);
+    setCurrentStep(-1);
+    setThemeEvaluation(null);
+    setExperts([]);
   }, []);
 
   return {
     messages,
     isLoading,
     researchData,
+    thinkingStatus,
+    executionPlan,
+    currentStep,
+    themeEvaluation,
+    experts,
     sendMessage,
     clearMessages,
   };

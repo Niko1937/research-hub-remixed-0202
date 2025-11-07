@@ -6,9 +6,10 @@ import { ResearchData } from "@/hooks/useResearchChat";
 
 interface ResearchResultsProps {
   data: ResearchData;
+  onPdfClick?: (url: string, title: string) => void;
 }
 
-export function ResearchResults({ data }: ResearchResultsProps) {
+export function ResearchResults({ data, onPdfClick }: ResearchResultsProps) {
   return (
     <div className="space-y-4">
       <Tabs defaultValue="external" className="w-full">
