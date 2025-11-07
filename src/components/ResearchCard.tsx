@@ -23,10 +23,15 @@ export function ResearchCard({
   citations,
   onClick,
 }: ResearchCardProps) {
+  const handleClick = () => {
+    // PDFリンクは新しいタブで開く
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+  
   return (
     <Card 
       className="bg-card hover:bg-card-hover transition-colors border-border shadow-sm cursor-pointer" 
-      onClick={onClick}
+      onClick={handleClick}
     >
       <div className="p-5 space-y-3">
         <h3 className="text-base font-semibold text-foreground line-clamp-2">
