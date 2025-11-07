@@ -3,8 +3,10 @@ import { ResearchSidebar } from "@/components/ResearchSidebar";
 import { ResearchCard } from "@/components/ResearchCard";
 import { ModeToggle } from "@/components/ModeToggle";
 import { ChatInput } from "@/components/ChatInput";
+import { ResearchResults } from "@/components/ResearchResults";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Loader2, FileText } from "lucide-react";
+import { useResearchChat } from "@/hooks/useResearchChat";
 
 type Mode = "search" | "assistant";
 
@@ -49,24 +51,10 @@ const mockResearchData = [
 
 const Index = () => {
   const [mode, setMode] = useState<Mode>("search");
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+  const { messages, isLoading, researchData, sendMessage } = useResearchChat();
 
   const handleSubmit = (message: string) => {
-    if (mode === "search") {
-      console.log("Search query:", message);
-    } else {
-      setMessages((prev) => [...prev, { role: "user", content: message }]);
-      // Simulate assistant response
-      setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: "申し訳ございません。これはデモ版のため、実際のAI応答機能はまだ実装されていません。",
-          },
-        ]);
-      }, 1000);
-    }
+    sendMessage(message, mode);
   };
 
   return (
@@ -111,26 +99,47 @@ const Index = () => {
                     </h3>
                     <p className="text-muted-foreground max-w-md">
                       研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします。
+                      <br />
+                      <span className="text-xs mt-2 block">
+                        社内研究・事業部課題・外部論文の3つの視点から回答します
+                      </span>
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
+                    {researchData && (
+                      <div className="mb-6">
+                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          検索結果
+                        </h3>
+                        <ResearchResults data={researchData} />
+                      </div>
+                    )}
+
                     {messages.map((msg, index) => (
                       <div
                         key={index}
                         className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-lg p-4 ${
+                          className={`max-w-[85%] rounded-lg p-4 ${
                             msg.role === "user"
                               ? "bg-primary text-primary-foreground"
                               : "bg-card text-card-foreground border border-border"
                           }`}
                         >
-                          <p className="text-sm">{msg.content}</p>
+                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                         </div>
                       </div>
                     ))}
+
+                    {isLoading && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm">AI が回答を生成中...</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
