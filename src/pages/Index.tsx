@@ -129,12 +129,7 @@ const Index = () => {
           {mode === "search" ? (
             // Search Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
-              {/* Search Input at Top */}
-              <div className="bg-background p-4 animate-slide-in-top">
-                <div className="max-w-4xl mx-auto">
-                  <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
-                </div>
-              </div>
+              <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
 
               {/* Search Results */}
               <ScrollArea className="flex-1">
