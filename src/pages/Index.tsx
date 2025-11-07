@@ -91,15 +91,11 @@ const Index = () => {
                     {mode === "search" 
                       ? "キーワードや研究テーマを入力して、外部論文・社内研究・事業部課題を検索します"
                       : "研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします"}
-                    <br />
-                    <span className="text-xs mt-2 block">
-                      社内研究・事業部課題・外部論文の3つの視点から回答します
-                    </span>
                   </p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {researchData && (
+                  {mode === "search" && researchData && (
                     <div className="mb-6">
                       <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                         <FileText className="w-4 h-4" />
@@ -109,7 +105,7 @@ const Index = () => {
                     </div>
                   )}
 
-                  {messages.map((msg, index) => (
+                  {mode === "assistant" && messages.map((msg, index) => (
                     <div
                       key={index}
                       className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -137,7 +133,9 @@ const Index = () => {
                   {isLoading && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">AI が回答を生成中...</span>
+                      <span className="text-sm">
+                        {mode === "search" ? "検索中..." : "AI が回答を生成中..."}
+                      </span>
                     </div>
                   )}
                 </div>
