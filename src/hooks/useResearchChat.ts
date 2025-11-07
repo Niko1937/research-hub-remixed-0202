@@ -35,7 +35,7 @@ export function useResearchChat() {
   const [researchData, setResearchData] = useState<ResearchData | null>(null);
 
   const sendMessage = useCallback(
-    async (content: string, mode: "search" | "assistant") => {
+    async (content: string, mode: "search" | "assistant" | "agent", tool?: string) => {
       const userMessage: Message = { role: "user", content };
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
@@ -53,6 +53,7 @@ export function useResearchChat() {
           body: JSON.stringify({
             messages: [...messages, userMessage],
             mode,
+            tool,
           }),
         });
 

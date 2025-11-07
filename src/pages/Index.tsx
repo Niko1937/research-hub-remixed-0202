@@ -10,7 +10,7 @@ import { Sparkles, Loader2, FileText } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
-type Mode = "search" | "assistant";
+type Mode = "search" | "assistant" | "agent";
 
 const mockResearchData = [
   {
@@ -55,8 +55,8 @@ const Index = () => {
   const [mode, setMode] = useState<Mode>("search");
   const { messages, isLoading, researchData, sendMessage } = useResearchChat();
 
-  const handleSubmit = (message: string) => {
-    sendMessage(message, mode);
+  const handleSubmit = (message: string, tool?: string) => {
+    sendMessage(message, mode, tool);
   };
 
   return (
@@ -74,11 +74,13 @@ const Index = () => {
                     <Sparkles className="w-8 h-8 text-primary" />
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">
-                    {mode === "search" ? "研究資料を検索" : "AIアシスタント"}
+                    {mode === "search" ? "研究資料を検索" : mode === "agent" ? "AIエージェント" : "AIアシスタント"}
                   </h3>
                   <p className="text-muted-foreground max-w-md">
                     {mode === "search" 
                       ? "キーワードや研究テーマを入力して、外部論文・社内研究・事業部課題を検索します"
+                      : mode === "agent"
+                      ? "研究活動を支援するツールを選択して、エージェントに依頼してください"
                       : "研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします"}
                   </p>
                 </div>
@@ -105,7 +107,7 @@ const Index = () => {
                     </div>
                   )}
 
-                  {mode === "assistant" && messages.map((msg, index) => (
+                  {(mode === "assistant" || mode === "agent") && messages.map((msg, index) => (
                     <div
                       key={index}
                       className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -134,7 +136,7 @@ const Index = () => {
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span className="text-sm">
-                        {mode === "search" ? "検索中..." : "AI が回答を生成中..."}
+                        {mode === "search" ? "検索中..." : mode === "agent" ? "エージェントが実行中..." : "AI が回答を生成中..."}
                       </span>
                     </div>
                   )}
