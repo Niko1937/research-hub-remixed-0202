@@ -104,7 +104,6 @@ const Index = () => {
                           <ThinkingBlock
                             key={index}
                             steps={item.data.steps}
-                            status={item.data.status}
                             currentStep={item.data.currentStep}
                           />
                         );

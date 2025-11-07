@@ -155,7 +155,7 @@ export function useResearchChat() {
                   {
                     type: "thinking",
                     timestamp: thinkingTimestamp,
-                    data: { status: "planning", steps: [], currentStep: -1 },
+                    data: { steps: [], currentStep: -1 },
                   },
                 ]);
                 continue;
@@ -170,9 +170,8 @@ export function useResearchChat() {
                         ? {
                             ...item,
                             data: {
-                              ...item.data,
-                              status: "executing",
                               steps: parsed.steps || [],
+                              currentStep: -1,
                             },
                           }
                         : item
@@ -255,21 +254,8 @@ export function useResearchChat() {
 
               // Handle chat start
               if (parsed.type === "chat_start") {
-                if (thinkingItemId !== null) {
-                  setTimeline((prev) =>
-                    prev.map((item) =>
-                      item.timestamp === thinkingItemId && item.type === "thinking"
-                        ? {
-                            ...item,
-                            data: {
-                              ...item.data,
-                              status: "completed",
-                            },
-                          }
-                        : item
-                    )
-                  );
-                }
+                // chat_startが来たらthinkingを完了させるために削除または非表示にする必要はない
+                // すでに全ステップが実行されているはず
                 continue;
               }
 
