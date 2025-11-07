@@ -33,6 +33,21 @@ export function ResearchSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
+      {/* Header with ResearchHub title and toggle */}
+      <div className="flex items-center justify-between px-4 py-4 border-b border-border">
+        {open ? (
+          <>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <h1 className="text-lg font-semibold text-foreground">ResearchHub</h1>
+            </div>
+            <SidebarTrigger className="hover:bg-accent rounded-md" />
+          </>
+        ) : (
+          <SidebarTrigger className="hover:bg-accent rounded-md mx-auto" />
+        )}
+      </div>
+
       <SidebarContent className="pt-4">
         <SidebarGroup>
           <SidebarGroupLabel className="px-4 text-xs uppercase tracking-wider text-muted-foreground mb-2">
