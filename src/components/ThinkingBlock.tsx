@@ -14,18 +14,24 @@ interface ThinkingBlockProps {
 }
 
 export function ThinkingBlock({ steps, currentStep }: ThinkingBlockProps) {
+  const isAllCompleted = currentStep >= steps.length;
+
   return (
     <Card className="bg-card border-border">
       <div className="p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Brain className="w-4 h-4 text-primary animate-pulse" />
-          <span>実行ステップ</span>
+          {isAllCompleted ? (
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
+          ) : (
+            <Brain className="w-4 h-4 text-primary animate-pulse" />
+          )}
+          <span>{isAllCompleted ? "実行完了" : "実行ステップ"}</span>
         </div>
 
         <div className="space-y-2">
           {steps.map((step, index) => {
             const isCompleted = index < currentStep;
-            const isCurrent = index === currentStep;
+            const isCurrent = index === currentStep && !isAllCompleted;
             const isPending = index > currentStep;
 
             return (

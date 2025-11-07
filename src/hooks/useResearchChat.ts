@@ -203,6 +203,28 @@ export function useResearchChat() {
 
               // Handle step complete
               if (parsed.type === "step_complete") {
+                setTimeline((prev) => {
+                  const updated = [...prev];
+                  // Find last thinking item
+                  let lastThinkingIndex = -1;
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].type === "thinking") {
+                      lastThinkingIndex = i;
+                      break;
+                    }
+                  }
+                  if (lastThinkingIndex !== -1) {
+                    const thinkingItem = updated[lastThinkingIndex];
+                    updated[lastThinkingIndex] = {
+                      ...thinkingItem,
+                      data: {
+                        ...thinkingItem.data,
+                        currentStep: parsed.step + 1,
+                      },
+                    };
+                  }
+                  return updated;
+                });
                 continue;
               }
 

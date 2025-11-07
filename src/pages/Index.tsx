@@ -137,7 +137,7 @@ const Index = () => {
       <div className="flex h-screen bg-background w-full">
         <ResearchSidebar />
 
-        <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${(pdfViewer || htmlViewer) ? 'mr-[500px]' : ''}`}>
+        <main className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
           {mode === "search" ? (
             // Search Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
