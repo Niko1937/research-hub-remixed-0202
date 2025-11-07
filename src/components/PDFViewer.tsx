@@ -27,7 +27,7 @@ export function PDFViewer({ url, title, onClose }: PDFViewerProps) {
         </div>
         <div className="flex-1 overflow-hidden">
           <iframe
-            src={url}
+            src={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
             className="w-full h-full border-0"
             title={title}
           />
