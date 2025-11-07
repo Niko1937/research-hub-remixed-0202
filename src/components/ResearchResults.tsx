@@ -37,7 +37,8 @@ export function ResearchResults({ data, onPdfClick }: ResearchResultsProps) {
             data.external.map((paper, index) => (
               <Card
                 key={index}
-                className="p-4 bg-card border-border hover:bg-card-hover hover:shadow-hover transition-all group"
+                className="p-4 bg-card border-border hover:bg-card-hover hover:shadow-hover transition-all group cursor-pointer"
+                onClick={() => onPdfClick?.(paper.url, paper.title)}
               >
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors shrink-0">
@@ -72,15 +73,10 @@ export function ResearchResults({ data, onPdfClick }: ResearchResultsProps) {
                       <Badge variant="secondary" className="text-xs">
                         {paper.source}
                       </Badge>
-                      <a
-                        href={paper.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-primary hover:text-highlight transition-colors"
-                      >
-                        <span>詳細を見る</span>
+                      <div className="flex items-center gap-1 text-xs text-primary group-hover:text-highlight transition-colors">
+                        <span>PDFを開く</span>
                         <ExternalLink className="w-3 h-3" />
-                      </a>
+                      </div>
                     </div>
                   </div>
                 </div>
