@@ -15,8 +15,6 @@ import { Sparkles, Loader2, FileText } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
-type Mode = "search" | "assistant";
-
 const mockResearchData = [
   {
     title: "量子機械学習における新しいアルゴリズムの提案と評価",
@@ -57,13 +55,12 @@ const mockResearchData = [
 ];
 
 const Index = () => {
-  const [mode, setMode] = useState<Mode>("search");
   const { timeline, isLoading, sendMessage } = useResearchChat();
   const [pdfViewer, setPdfViewer] = useState<{ url: string; title: string } | null>(null);
   const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
 
   const handleSubmit = (message: string, tool?: string) => {
-    sendMessage(message, mode, tool);
+    sendMessage(message, "assistant", tool);
   };
 
   return (
@@ -81,12 +78,10 @@ const Index = () => {
                     <Sparkles className="w-8 h-8 text-primary" />
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">
-                    {mode === "search" ? "研究資料を検索" : "AIアシスタント"}
+                    ResearchHub AI
                   </h3>
                   <p className="text-muted-foreground max-w-md">
-                    {mode === "search" 
-                      ? "キーワードや研究テーマを入力して、外部論文・社内研究・事業部課題を検索します"
-                      : "研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします"}
+                    研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします
                   </p>
                 </div>
               ) : (
@@ -196,7 +191,7 @@ const Index = () => {
           </div>
         </ScrollArea>
 
-        <ChatInput mode={mode} onSubmit={handleSubmit} onModeChange={setMode} />
+        <ChatInput onSubmit={handleSubmit} />
       </main>
 
       {pdfViewer && !htmlViewer && (

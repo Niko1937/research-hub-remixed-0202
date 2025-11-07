@@ -1,4 +1,4 @@
-import { Home, Search, MessageSquare, Settings, Plus, Clock, Sparkles, FileText } from "lucide-react";
+import { Compass, FileText, Sparkles } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -61,30 +61,8 @@ export function ResearchSidebar() {
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
                   activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
                 >
-                  <Home className="w-5 h-5 shrink-0" />
-                  {open && <span className="text-sm font-medium">ホーム</span>}
-                </NavLink>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <NavLink
-                  to="/search"
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-                >
-                  <Search className="w-5 h-5 shrink-0" />
-                  {open && <span className="text-sm font-medium">検索</span>}
-                </NavLink>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <NavLink
-                  to="/assistant"
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-                >
-                  <MessageSquare className="w-5 h-5 shrink-0" />
-                  {open && <span className="text-sm font-medium">アシスタント</span>}
+                  <Compass className="w-5 h-5 shrink-0" />
+                  {open && <span className="text-sm font-medium">Explorer</span>}
                 </NavLink>
               </SidebarMenuItem>
             </SidebarMenu>
