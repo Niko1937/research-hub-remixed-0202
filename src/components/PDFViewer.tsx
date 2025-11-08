@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import "pdfjs-dist/web/pdf_viewer.css";
 
@@ -21,6 +21,37 @@ interface PDFViewerProps {
   onWidthChange?: (width: number) => void;
   onTextSelect?: (text: string) => void;
   onPdfLoaded?: (fullText: string) => void;
+  clearHighlightSignal?: number;
+}
+
+type HighlightRect = {
+  topRatio: number;
+  leftRatio: number;
+  widthRatio: number;
+  heightRatio: number;
+};
+
+interface HighlightData {
+  pageNumber: number;
+  rects: HighlightRect[];
+}
+
+const clamp = (value: number, min = 0, max = 1) => Math.min(Math.max(value, min), max);
+
+function ensureHighlightLayer(pageWrapper: HTMLElement) {
+  let highlightLayer = pageWrapper.querySelector<HTMLDivElement>(".pdf-highlight-layer");
+  if (!highlightLayer) {
+    highlightLayer = document.createElement("div");
+    highlightLayer.className = "pdf-highlight-layer";
+    highlightLayer.style.cssText = `
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    `;
+    pageWrapper.appendChild(highlightLayer);
+  }
+  return highlightLayer;
 }
 
 export function PDFViewer({ 
@@ -29,7 +60,8 @@ export function PDFViewer({
   onClose, 
   onWidthChange,
   onTextSelect,
-  onPdfLoaded 
+  onPdfLoaded,
+  clearHighlightSignal
 }: PDFViewerProps) {
   const [width, setWidth] = useState(500);
   const [isDragging, setIsDragging] = useState(false);
@@ -38,6 +70,87 @@ export function PDFViewer({
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
+  const highlightDataRef = useRef<HighlightData | null>(null);
+
+  const clearHighlightOverlays = useCallback(() => {
+    if (!pdfContainerRef.current) return;
+    const layers = pdfContainerRef.current.querySelectorAll<HTMLElement>(".pdf-highlight-layer");
+    layers.forEach((layer) => {
+      layer.innerHTML = "";
+    });
+  }, []);
+
+  const renderHighlightOverlay = useCallback(() => {
+    const container = pdfContainerRef.current;
+    if (!container) return;
+    clearHighlightOverlays();
+    const highlightData = highlightDataRef.current;
+    if (!highlightData) return;
+
+    const pageWrapper = container.querySelector<HTMLElement>(
+      `[data-page-number="${highlightData.pageNumber}"]`
+    );
+    if (!pageWrapper) return;
+
+    const highlightLayer = ensureHighlightLayer(pageWrapper);
+    highlightData.rects.forEach((rect) => {
+      const highlight = document.createElement("div");
+      highlight.className = "pdf-highlight-block";
+      highlight.style.cssText = `
+        position: absolute;
+        pointer-events: none;
+        background: rgba(250, 204, 21, 0.35);
+        border-radius: 4px;
+        left: ${rect.leftRatio * 100}%;
+        top: ${rect.topRatio * 100}%;
+        width: ${rect.widthRatio * 100}%;
+        height: ${rect.heightRatio * 100}%;
+      `;
+      highlightLayer.appendChild(highlight);
+    });
+  }, [clearHighlightOverlays]);
+
+  const persistSelectionHighlight = useCallback(
+    (selection: Selection) => {
+      if (!selection.rangeCount) return false;
+      const range = selection.getRangeAt(0);
+      if (range.collapsed) return false;
+      const text = selection.toString().trim();
+      if (!text) return false;
+
+      const commonContainer = range.commonAncestorContainer;
+      const element =
+        commonContainer.nodeType === Node.ELEMENT_NODE
+          ? (commonContainer as HTMLElement)
+          : commonContainer.parentElement;
+      if (!element) return false;
+
+      const pageWrapper = element.closest<HTMLElement>(".pdf-page-wrapper");
+      if (!pageWrapper || !pageWrapper.dataset.pageNumber) return false;
+
+      const pageRect = pageWrapper.getBoundingClientRect();
+      if (pageRect.width === 0 || pageRect.height === 0) return false;
+
+      const rects = Array.from(range.getClientRects())
+        .map((rect) => ({
+          topRatio: clamp((rect.top - pageRect.top) / pageRect.height),
+          leftRatio: clamp((rect.left - pageRect.left) / pageRect.width),
+          widthRatio: clamp(rect.width / pageRect.width),
+          heightRatio: clamp(rect.height / pageRect.height),
+        }))
+        .filter((rect) => rect.widthRatio > 0 && rect.heightRatio > 0);
+
+      if (!rects.length) return false;
+
+      highlightDataRef.current = {
+        pageNumber: Number(pageWrapper.dataset.pageNumber),
+        rects,
+      };
+      renderHighlightOverlay();
+      return true;
+    },
+    [renderHighlightOverlay]
+  );
 
   useEffect(() => {
     onWidthChange?.(width);
@@ -72,7 +185,8 @@ export function PDFViewer({
     (async () => {
       try {
         setIsLoading(true);
-        setRenderedPages([]);
+        highlightDataRef.current = null;
+        clearHighlightOverlays();
         // Use proxy to fetch PDF to avoid CORS issues
         const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pdf-proxy?url=${encodeURIComponent(url)}`;
         const res = await fetch(proxyUrl);
@@ -114,7 +228,7 @@ export function PDFViewer({
     return () => {
       cancelled = true;
     };
-  }, [url]); // Remove onPdfLoaded from dependencies to prevent infinite loops
+  }, [url, clearHighlightOverlays]); // Remove onPdfLoaded from dependencies to prevent infinite loops
 
   // Render all pages at once for scrolling
   useEffect(() => {
@@ -123,25 +237,40 @@ export function PDFViewer({
     let cancelled = false;
     const container = pdfContainerRef.current;
     container.innerHTML = "";
+    const availableWidth =
+      container.clientWidth ||
+      container.getBoundingClientRect().width ||
+      width ||
+      container.parentElement?.clientWidth ||
+      600;
+    const targetContentWidth = Math.max(availableWidth - 32, 320);
+    const MIN_SCALE = 0.6;
+    const MAX_SCALE = 3;
 
     (async () => {
       try {
-        const rendered: number[] = [];
-        
         for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
           if (cancelled) return;
-          
+
           const page = await pdfDoc.getPage(pageNum);
-          const viewport = page.getViewport({ scale: 1.5 });
+          const baseViewport = page.getViewport({ scale: 1 });
+          const scale = Math.min(
+            Math.max(targetContentWidth / baseViewport.width, MIN_SCALE),
+            MAX_SCALE
+          );
+          const viewport = page.getViewport({ scale });
 
           // Create page wrapper
           const pageWrapper = document.createElement("div");
           pageWrapper.className = "pdf-page-wrapper";
+          pageWrapper.dataset.pageNumber = pageNum.toString();
           pageWrapper.style.cssText = `
             position: relative;
             margin-bottom: 16px;
             background: white;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 100%;
+            width: ${viewport.width}px;
           `;
 
           // Create canvas
@@ -151,6 +280,8 @@ export function PDFViewer({
 
           canvas.width = viewport.width;
           canvas.height = viewport.height;
+          canvas.style.width = "100%";
+          canvas.style.height = "auto";
 
           // Create text layer
           const textLayerDiv = document.createElement("div");
@@ -162,10 +293,12 @@ export function PDFViewer({
             height: ${viewport.height}px;
             width: ${viewport.width}px;
             line-height: 1.0;
+            max-width: 100%;
           `;
 
           pageWrapper.appendChild(canvas);
           pageWrapper.appendChild(textLayerDiv);
+          ensureHighlightLayer(pageWrapper);
           container.appendChild(pageWrapper);
 
           // Render PDF page
@@ -179,28 +312,45 @@ export function PDFViewer({
             viewport,
             textDivs: [],
           });
-
-          setRenderedPages(prev => [...prev, pageNum]);
+        }
+        if (!cancelled) {
+          renderHighlightOverlay();
         }
       } catch (error) {
-        console.error("Page rendering error:", error);
-      }
-    })();
-  }, [pdfDoc, totalPages]);
+      console.error("Page rendering error:", error);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+  }, [pdfDoc, totalPages, isLoading, width, renderHighlightOverlay]);
+
+  // React to external highlight clearing (e.g., user hits the X button)
+  useEffect(() => {
+    if (typeof clearHighlightSignal === "undefined") return;
+    highlightDataRef.current = null;
+    clearHighlightOverlays();
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+  }, [clearHighlightSignal, clearHighlightOverlays]);
 
   // Text selection detection
   useEffect(() => {
     const handleMouseUp = () => {
       const selection = window.getSelection();
       const text = selection?.toString().trim();
-      if (text && text.length > 0) {
-        onTextSelect?.(text);
+      if (selection && text && text.length > 0) {
+        const highlighted = persistSelectionHighlight(selection);
+        if (highlighted) {
+          onTextSelect?.(text);
+        }
       }
     };
 
     document.addEventListener("mouseup", handleMouseUp);
     return () => document.removeEventListener("mouseup", handleMouseUp);
-  }, [onTextSelect]);
+  }, [onTextSelect, persistSelectionHighlight]);
 
 
   return (
@@ -238,7 +388,10 @@ export function PDFViewer({
           </div>
         ) : (
           <div className="flex-1 overflow-auto p-4 bg-muted/30">
-            <div ref={pdfContainerRef} className="mx-auto flex flex-col items-center" />
+            <div
+              ref={pdfContainerRef}
+              className="mx-auto flex flex-col items-center w-full max-w-full"
+            />
             {totalPages > 0 && (
               <div className="text-center text-sm text-muted-foreground mt-4 pb-4">
                 全 {totalPages} ページ

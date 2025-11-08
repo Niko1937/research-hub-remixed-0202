@@ -15,7 +15,16 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    exclude: ["pdfjs-dist"],
+    esbuildOptions: {
+      target: "esnext",
+      supported: {
+        "top-level-await": true,
+      },
+    },
+  },
   build: {
-    target: ["chrome89", "edge89", "firefox89", "safari15"],
+    target: "esnext",
   },
 }));

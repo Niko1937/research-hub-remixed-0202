@@ -109,6 +109,12 @@ const Index = () => {
   const [viewerWidth, setViewerWidth] = useState(500);
   const [selectedPdfText, setSelectedPdfText] = useState<string>("");
   const [pdfContext, setPdfContext] = useState<string>("");
+  const [clearHighlightSignal, setClearHighlightSignal] = useState(0);
+
+  const clearHighlight = () => {
+    setSelectedPdfText("");
+    setClearHighlightSignal((prev) => prev + 1);
+  };
 
   // Auto-open HTML viewer when HTML generation starts and update in real-time
   useEffect(() => {
@@ -139,7 +145,7 @@ const Index = () => {
     setHtmlViewer(null);
     setPdfViewer({ url, title });
     // Clear previous PDF context when opening new PDF
-    setSelectedPdfText("");
+    clearHighlight();
     setPdfContext("");
   };
 
@@ -167,7 +173,7 @@ const Index = () => {
               onModeChange={setMode}
               highlightedText={selectedPdfText}
               pdfContext={pdfContext}
-              onClearHighlight={() => setSelectedPdfText("")}
+              onClearHighlight={clearHighlight}
             />
 
               {/* Search Results */}
@@ -323,7 +329,7 @@ const Index = () => {
                   onModeChange={setMode}
                   highlightedText={selectedPdfText}
                   pdfContext={pdfContext}
-                  onClearHighlight={() => setSelectedPdfText("")}
+                  onClearHighlight={clearHighlight}
                 />
               </div>
             </div>
@@ -336,12 +342,13 @@ const Index = () => {
           title={pdfViewer.title} 
           onClose={() => {
             setPdfViewer(null);
-            setSelectedPdfText("");
+            clearHighlight();
             setPdfContext("");
           }}
           onWidthChange={handleViewerWidthChange}
           onTextSelect={(text) => setSelectedPdfText(text)}
           onPdfLoaded={(fullText) => setPdfContext(fullText)}
+          clearHighlightSignal={clearHighlightSignal}
         />
       )}
       
