@@ -72,6 +72,7 @@ export function PDFViewer({
     (async () => {
       try {
         setIsLoading(true);
+        setRenderedPages([]);
         // Use proxy to fetch PDF to avoid CORS issues
         const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pdf-proxy?url=${encodeURIComponent(url)}`;
         const res = await fetch(proxyUrl);
@@ -91,6 +92,7 @@ export function PDFViewer({
         // Extract text from all pages
         const texts: string[] = [];
         for (let i = 1; i <= pdf.numPages; i++) {
+          if (cancelled) return;
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
           const pageText = textContent.items
@@ -99,6 +101,7 @@ export function PDFViewer({
           texts.push(pageText);
         }
 
+        if (cancelled) return;
         const fullText = texts.join("\n\n");
         onPdfLoaded?.(fullText);
         setIsLoading(false);
@@ -111,18 +114,23 @@ export function PDFViewer({
     return () => {
       cancelled = true;
     };
-  }, [url, onPdfLoaded]);
+  }, [url]); // Remove onPdfLoaded from dependencies to prevent infinite loops
 
   // Render all pages at once for scrolling
   useEffect(() => {
     if (isLoading || !pdfDoc || !pdfContainerRef.current || totalPages === 0) return;
 
+    let cancelled = false;
     const container = pdfContainerRef.current;
     container.innerHTML = "";
 
     (async () => {
       try {
+        const rendered: number[] = [];
+        
         for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          if (cancelled) return;
+          
           const page = await pdfDoc.getPage(pageNum);
           const viewport = page.getViewport({ scale: 1.5 });
 
@@ -172,12 +180,13 @@ export function PDFViewer({
             textDivs: [],
           });
 
+          setRenderedPages(prev => [...prev, pageNum]);
         }
       } catch (error) {
         console.error("Page rendering error:", error);
       }
     })();
-  }, [pdfDoc, totalPages, isLoading]);
+  }, [pdfDoc, totalPages]);
 
   // Text selection detection
   useEffect(() => {
