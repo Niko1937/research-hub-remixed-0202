@@ -38,7 +38,7 @@ async function searchOpenAlex(query: string): Promise<ExternalPaper[]> {
     const data = await response.json();
     
     return (data.results || [])
-      .filter((work: any) => work.open_access?.oa_url) // PDFリンクがあるもののみ
+      .filter((work: any) => work.open_access?.oa_url)
       .slice(0, 3)
       .map((work: any) => ({
         title: work.title || "No title",
@@ -65,7 +65,7 @@ async function searchSemanticScholar(query: string): Promise<ExternalPaper[]> {
     const data = await response.json();
     
     return (data.data || [])
-      .filter((paper: any) => paper.openAccessPdf?.url) // PDFリンクがあるもののみ
+      .filter((paper: any) => paper.openAccessPdf?.url)
       .slice(0, 3)
       .map((paper: any) => ({
         title: paper.title || "No title",
@@ -104,7 +104,7 @@ async function searchArXiv(query: string): Promise<ExternalPaper[]> {
         authors: authors.slice(0, 3),
         year: published,
         source: "arXiv",
-        url: id.replace('/abs/', '/pdf/') + '.pdf', // PDF URLに変換
+        url: id.replace('/abs/', '/pdf/') + '.pdf',
       };
     });
   } catch (error) {
@@ -221,6 +221,7 @@ Available tools:
 - wide-knowledge: Search external papers and research
 - theme-evaluation: Evaluate research themes against internal research and business needs
 - knowwho: Search for experts and researchers
+- positioning-analysis: Create positioning analysis comparing research items across multiple axes
 - html-generation: Generate HTML infographics summarizing the conversation
 - chat: Use AI to summarize or format results
 
@@ -357,40 +358,80 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
               } else if (step.tool === "positioning-analysis") {
                 console.log("Starting positioning-analysis tool execution");
                 
-                // Always send positioning data (using fallback for now to ensure it works)
-                const positioningData = {
-                  axes: { 
-                    x: "技術成熟度", 
-                    y: "市場適用性" 
+                const positioningPrompt = `あなたは研究ポジショニング分析の専門家です。ユーザーの質問「${step.query}」に基づき、研究のポジショニング分析を行ってください。
+
+以下のJSON形式で出力してください：
+
+{
+  "axes": [
+    { "name": "軸の名前", "type": "quantitative" }
+  ],
+  "items": [
+    {
+      "name": "研究項目名",
+      "values": { "軸の名前1": 50, "軸の名前2": 60 },
+      "type": "internal"
+    }
+  ],
+  "insights": ["分析結果1"]
+}
+
+**指示：**
+- axesは最低2軸、推奨3-5軸を生成
+- 各軸はquantitative（定量）またはqualitative（定性）
+- itemsには internal（社内2-3個）、external（外部3-4個）、target（目標1個）を含む
+- 各itemのvaluesには全軸の評価値（0-100）を含む
+- insightsは3-5個の実践的分析結果
+- 全て日本語で記述`;
+
+                const positioningResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                    "Content-Type": "application/json",
                   },
-                  items: [
-                    { name: "RAG基本実装", x: 35, y: 45, type: "internal" },
-                    { name: "Advanced RAG", x: 55, y: 65, type: "internal" },
-                    { name: "学術研究（基礎RAG）", x: 75, y: 35, type: "external" },
-                    { name: "商用推薦システム", x: 45, y: 75, type: "external" },
-                    { name: "ハイブリッド手法", x: 60, y: 50, type: "external" },
-                    { name: "次世代推薦AI", x: 85, y: 85, type: "target" }
-                  ],
-                  insights: [
-                    "RAGは推薦システムにおいて、説明可能性と精度向上の両立を実現する重要技術です",
-                    "現在の実装は基礎的なレベルですが、Advanced RAGへの発展により市場適用性が大幅に向上します",
-                    "学術研究と商用システムのギャップを埋めるため、実用化に向けた技術開発が推奨されます",
-                    "目標とする次世代推薦AIに到達するには、技術成熟度と市場適用性の両面での向上が必要です"
-                  ]
-                };
-                
-                console.log("Sending positioning data:", positioningData);
-                
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "positioning_analysis",
-                      data: positioningData,
-                    })}\n\n`
-                  )
-                );
-                
-                console.log("Positioning data sent successfully");
+                  body: JSON.stringify({
+                    model: "google/gemini-2.5-flash",
+                    messages: [
+                      { role: "system", content: positioningPrompt },
+                      { role: "user", content: step.query }
+                    ],
+                    response_format: { type: "json_object" }
+                  }),
+                });
+
+                if (positioningResponse.ok) {
+                  const posData = await positioningResponse.json();
+                  const positioningContent = JSON.parse(stripCodeFence(posData.choices?.[0]?.message?.content || "{}"));
+                  
+                  const axisCount = positioningContent.axes?.length || 0;
+                  let suggestedChartType = "scatter";
+                  if (axisCount === 1) {
+                    suggestedChartType = "box";
+                  } else if (axisCount >= 3) {
+                    suggestedChartType = "radar";
+                  }
+                  
+                  const positioningData = {
+                    axes: positioningContent.axes || [],
+                    suggestedChartType,
+                    items: positioningContent.items || [],
+                    insights: positioningContent.insights || []
+                  };
+                  
+                  console.log("Sending dynamic positioning data:", positioningData);
+                  
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "positioning_analysis",
+                        data: positioningData,
+                      })}\n\n`
+                    )
+                  );
+                  
+                  console.log("Positioning data sent successfully");
+                }
               } else if (step.tool === "seeds-needs-matching") {
                 // Generate seeds-needs matching with AI
                 const matchingPrompt = `You are a technology transfer analyst. Based on the user's research seed about "${step.query}", generate a seeds-needs matching analysis.
