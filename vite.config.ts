@@ -15,4 +15,7 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    target: ["chrome89", "edge89", "firefox89", "safari15"],
+  },
 }));
