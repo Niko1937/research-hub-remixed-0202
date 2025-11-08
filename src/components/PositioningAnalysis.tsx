@@ -47,8 +47,8 @@ export function PositioningAnalysis({ data }: PositioningAnalysisProps) {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Positioning Chart */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+      {/* Positioning Chart - Left */}
       <Card className="bg-card border-border overflow-hidden">
         <div className="p-4 bg-muted/50 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -140,7 +140,7 @@ export function PositioningAnalysis({ data }: PositioningAnalysisProps) {
         </div>
       </Card>
 
-      {/* Insights */}
+      {/* Insights - Right */}
       <Card className="bg-card border-border">
         <div className="p-4 bg-muted/50 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">分析結果</h3>
