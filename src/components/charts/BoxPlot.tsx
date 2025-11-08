@@ -32,24 +32,30 @@ export function BoxPlot({ data, axisLabel }: BoxPlotProps) {
   return (
     <ResponsiveContainer width="100%" height={400}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} />
         <XAxis
           dataKey="category"
           stroke="hsl(var(--foreground))"
+          tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
         />
         <YAxis
-          label={{ value: axisLabel, angle: -90, position: "insideLeft", fill: "hsl(var(--foreground))" }}
+          label={{ value: axisLabel, angle: -90, position: "insideLeft", fill: "hsl(var(--foreground))", fontSize: 14, fontWeight: 500 }}
           stroke="hsl(var(--foreground))"
+          tick={{ fill: "hsl(var(--foreground))", fontSize: 13 }}
         />
         <Tooltip
           contentStyle={{
             backgroundColor: "hsl(var(--popover))",
             border: "1px solid hsl(var(--border))",
             borderRadius: "6px",
-            color: "hsl(var(--popover-foreground))"
+            color: "hsl(var(--popover-foreground))",
+            fontSize: "14px"
           }}
         />
-        <Legend />
+        <Legend 
+          wrapperStyle={{ fontSize: "14px" }}
+          iconSize={12}
+        />
         <Bar dataKey="median" name="中央値" radius={[4, 4, 0, 0]}>
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={getColor(entry.type)} />
