@@ -36,7 +36,6 @@ export function PDFViewer({
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [renderedPages, setRenderedPages] = useState<number[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
 
@@ -116,7 +115,7 @@ export function PDFViewer({
 
   // Render all pages at once for scrolling
   useEffect(() => {
-    if (!pdfDoc || !pdfContainerRef.current || totalPages === 0) return;
+    if (isLoading || !pdfDoc || !pdfContainerRef.current || totalPages === 0) return;
 
     const container = pdfContainerRef.current;
     container.innerHTML = "";
@@ -173,13 +172,12 @@ export function PDFViewer({
             textDivs: [],
           });
 
-          setRenderedPages(prev => [...prev, pageNum]);
         }
       } catch (error) {
         console.error("Page rendering error:", error);
       }
     })();
-  }, [pdfDoc, totalPages]);
+  }, [pdfDoc, totalPages, isLoading]);
 
   // Text selection detection
   useEffect(() => {
