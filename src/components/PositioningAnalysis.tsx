@@ -1,15 +1,25 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { X, Plus, RefreshCw } from "lucide-react";
+import { ScatterChart } from "@/components/charts/ScatterChart";
+import { BoxPlot } from "@/components/charts/BoxPlot";
+import { RadarChart } from "@/components/charts/RadarChart";
+import { useState } from "react";
+
+interface Axis {
+  name: string;
+  type: "quantitative" | "qualitative";
+}
 
 interface PositioningData {
-  axes: {
-    x: string;
-    y: string;
-  };
+  axes: Axis[];
+  suggestedChartType: "scatter" | "box" | "radar";
   items: {
     name: string;
-    x: number; // 0-100
-    y: number; // 0-100
+    values: Record<string, number>; // axis name -> value
     type: "internal" | "external" | "target";
   }[];
   insights: string[];
@@ -17,126 +27,144 @@ interface PositioningData {
 
 interface PositioningAnalysisProps {
   data: PositioningData;
+  onRegenerateAxis?: (axisName: string) => void;
+  onAddAxis?: (axisName: string, axisType: "quantitative" | "qualitative") => void;
+  onRemoveAxis?: (axisName: string) => void;
 }
 
-export function PositioningAnalysis({ data }: PositioningAnalysisProps) {
-  const getItemColor = (type: string) => {
-    switch (type) {
-      case "internal":
-        return "bg-blue-500";
-      case "external":
-        return "bg-amber-500";
-      case "target":
-        return "bg-green-500";
-      default:
-        return "bg-gray-500";
+export function PositioningAnalysis({ 
+  data, 
+  onRegenerateAxis, 
+  onAddAxis, 
+  onRemoveAxis 
+}: PositioningAnalysisProps) {
+  const [selectedChartType, setSelectedChartType] = useState<"scatter" | "box" | "radar">(data.suggestedChartType);
+  const [newAxisName, setNewAxisName] = useState("");
+  const [newAxisType, setNewAxisType] = useState<"quantitative" | "qualitative">("quantitative");
+
+  const handleAddAxis = () => {
+    if (newAxisName.trim() && onAddAxis) {
+      onAddAxis(newAxisName.trim(), newAxisType);
+      setNewAxisName("");
     }
   };
 
-  const getItemLabel = (type: string) => {
-    switch (type) {
-      case "internal":
-        return "社内研究";
-      case "external":
-        return "外部研究";
-      case "target":
-        return "目標位置";
-      default:
-        return "その他";
+  const renderChart = () => {
+    if (selectedChartType === "scatter" && data.axes.length >= 2) {
+      const xAxis = data.axes[0];
+      const yAxis = data.axes[1];
+      const scatterData = data.items.map(item => ({
+        name: item.name,
+        x: item.values[xAxis.name] || 0,
+        y: item.values[yAxis.name] || 0,
+        type: item.type
+      }));
+      return <ScatterChart data={scatterData} xAxisLabel={xAxis.name} yAxisLabel={yAxis.name} />;
     }
+
+    if (selectedChartType === "box" && data.axes.length >= 1) {
+      const axis = data.axes[0];
+      const boxData = data.items.map(item => ({
+        category: item.name,
+        min: (item.values[axis.name] || 0) * 0.8,
+        q1: (item.values[axis.name] || 0) * 0.9,
+        median: item.values[axis.name] || 0,
+        q3: (item.values[axis.name] || 0) * 1.1,
+        max: (item.values[axis.name] || 0) * 1.2,
+        type: item.type
+      }));
+      return <BoxPlot data={boxData} axisLabel={axis.name} />;
+    }
+
+    if (selectedChartType === "radar" && data.axes.length >= 3) {
+      const radarData = data.axes.map(axis => {
+        const dataPoint: any = { axis: axis.name };
+        data.items.forEach(item => {
+          dataPoint[item.type] = item.values[axis.name] || 0;
+        });
+        return dataPoint;
+      });
+      return <RadarChart data={radarData} />;
+    }
+
+    return <div className="text-muted-foreground text-sm">選択された図タイプに必要な軸が不足しています</div>;
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
       {/* Positioning Chart - Left */}
       <Card className="bg-card border-border overflow-hidden">
-        <div className="p-4 bg-muted/50 border-b border-border">
+        <div className="p-4 bg-muted/50 border-b border-border flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <span className="text-primary">📊</span>
             ポジショニング分析
           </h3>
+          <Select value={selectedChartType} onValueChange={(value: any) => setSelectedChartType(value)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="scatter">散布図</SelectItem>
+              <SelectItem value="box">箱ひげ図</SelectItem>
+              <SelectItem value="radar">レーダーチャート</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="p-8">
-          {/* Chart Container */}
-          <div className="relative w-full aspect-square max-w-3xl mx-auto bg-muted/20 rounded-lg p-8">
-            {/* Grid Background */}
-            <div className="absolute inset-8 grid grid-cols-5 grid-rows-5 gap-0">
-              {Array.from({ length: 25 }).map((_, i) => (
-                <div key={i} className="border border-border/20" />
-              ))}
-            </div>
-
-            {/* Quadrant Labels */}
-            <div className="absolute top-4 left-4 text-xs text-muted-foreground/60 font-medium">
-              高 {data.axes.y}
-            </div>
-            <div className="absolute bottom-4 left-4 text-xs text-muted-foreground/60 font-medium">
-              低 {data.axes.y}
-            </div>
-            <div className="absolute bottom-4 right-4 text-xs text-muted-foreground/60 font-medium">
-              高 {data.axes.x}
-            </div>
-            <div className="absolute bottom-4 left-4 text-xs text-muted-foreground/60 font-medium">
-              低 {data.axes.x}
-            </div>
-
-            {/* Axes Labels (Main) */}
-            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-sm font-semibold text-foreground">
-              {data.axes.x} →
-            </div>
-            <div className="absolute -left-6 top-1/2 -translate-y-1/2 -rotate-90 text-sm font-semibold text-foreground whitespace-nowrap">
-              {data.axes.y} →
-            </div>
-
-            {/* Axis Lines */}
-            <div className="absolute bottom-8 left-8 right-8 h-0.5 bg-border" />
-            <div className="absolute top-8 bottom-8 left-8 w-0.5 bg-border" />
-
-            {/* Data Points */}
-            {data.items && data.items.length > 0 ? (
-              data.items.map((item, index) => (
-                <div
-                  key={index}
-                  className="absolute group z-10"
-                  style={{
-                    left: `calc(8% + ${item.x}% * 0.84)`,
-                    bottom: `calc(8% + ${item.y}% * 0.84)`,
-                    transform: "translate(-50%, 50%)",
-                  }}
+        
+        {/* Axes Management */}
+        <div className="p-4 border-b border-border bg-muted/30">
+          <div className="text-xs font-semibold text-foreground mb-2">比較軸</div>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {data.axes.map((axis) => (
+              <Badge key={axis.name} variant="secondary" className="flex items-center gap-1 pl-3 pr-1.5 py-1">
+                <span className="text-xs">{axis.name}</span>
+                <span className="text-[10px] text-muted-foreground">({axis.type === "quantitative" ? "定量" : "定性"})</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-4 w-4 p-0 ml-1 hover:bg-destructive/20"
+                  onClick={() => onRemoveAxis?.(axis.name)}
                 >
-                  <div
-                    className={`w-4 h-4 rounded-full ${getItemColor(
-                      item.type
-                    )} shadow-lg cursor-pointer transition-all duration-300 hover:scale-[2.5] hover:shadow-xl border-2 border-background`}
-                  />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-popover text-popover-foreground text-xs rounded-md shadow-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20 border border-border">
-                    <div className="font-semibold">{item.name}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">
-                      {getItemLabel(item.type)}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                データポイントがありません
-              </div>
-            )}
-          </div>
-
-          {/* Legend */}
-          <div className="flex items-center justify-center gap-8 mt-8">
-            {["internal", "external", "target"].map((type) => (
-              <div key={type} className="flex items-center gap-2">
-                <div
-                  className={`w-4 h-4 rounded-full ${getItemColor(type)} border-2 border-background shadow-md`}
-                />
-                <span className="text-sm font-medium text-foreground">
-                  {getItemLabel(type)}
-                </span>
-              </div>
+                  <X className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-4 w-4 p-0 ml-0.5 hover:bg-primary/20"
+                  onClick={() => onRegenerateAxis?.(axis.name)}
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </Button>
+              </Badge>
             ))}
           </div>
+          
+          {/* Add New Axis */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="新しい比較軸を入力"
+              value={newAxisName}
+              onChange={(e) => setNewAxisName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddAxis()}
+              className="flex-1 h-8 text-xs"
+            />
+            <Select value={newAxisType} onValueChange={(value: any) => setNewAxisType(value)}>
+              <SelectTrigger className="w-[80px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="quantitative">定量</SelectItem>
+                <SelectItem value="qualitative">定性</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={handleAddAxis} className="h-8 px-2">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {renderChart()}
         </div>
       </Card>
 
