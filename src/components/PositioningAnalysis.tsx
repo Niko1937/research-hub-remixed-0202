@@ -8,6 +8,7 @@ import { ScatterChart } from "@/components/charts/ScatterChart";
 import { BoxPlot } from "@/components/charts/BoxPlot";
 import { RadarChart } from "@/components/charts/RadarChart";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface Axis {
   name: string;
@@ -27,9 +28,9 @@ interface PositioningData {
 
 interface PositioningAnalysisProps {
   data: PositioningData;
-  onRegenerateAxis?: (axisName: string) => void;
-  onAddAxis?: (axisName: string, axisType: "quantitative" | "qualitative") => void;
-  onRemoveAxis?: (axisName: string) => void;
+  onRegenerateAxis?: (axisName: string) => Promise<void>;
+  onAddAxis?: (axisName: string, axisType: "quantitative" | "qualitative") => Promise<void>;
+  onRemoveAxis?: (axisName: string) => Promise<void>;
 }
 
 export function PositioningAnalysis({ 
@@ -38,14 +39,61 @@ export function PositioningAnalysis({
   onAddAxis, 
   onRemoveAxis 
 }: PositioningAnalysisProps) {
+  const { toast } = useToast();
   const [selectedChartType, setSelectedChartType] = useState<"scatter" | "box" | "radar">(data.suggestedChartType);
   const [newAxisName, setNewAxisName] = useState("");
   const [newAxisType, setNewAxisType] = useState<"quantitative" | "qualitative">("quantitative");
 
-  const handleAddAxis = () => {
-    if (newAxisName.trim() && onAddAxis) {
-      onAddAxis(newAxisName.trim(), newAxisType);
+  const handleAddAxis = async () => {
+    if (!newAxisName.trim() || !onAddAxis) return;
+    
+    try {
+      await onAddAxis(newAxisName.trim(), newAxisType);
+      toast({
+        title: "軸を追加しました",
+        description: `「${newAxisName}」を追加しました。`,
+      });
       setNewAxisName("");
+    } catch (error) {
+      toast({
+        title: "エラー",
+        description: "軸の追加に失敗しました。",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveAxis = async (axisName: string) => {
+    if (!onRemoveAxis) return;
+    try {
+      await onRemoveAxis(axisName);
+      toast({
+        title: "軸を削除しました",
+        description: `「${axisName}」を削除しました。`,
+      });
+    } catch (error) {
+      toast({
+        title: "エラー",
+        description: "軸の削除に失敗しました。",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRegenerateAxis = async (axisName: string) => {
+    if (!onRegenerateAxis) return;
+    try {
+      await onRegenerateAxis(axisName);
+      toast({
+        title: "軸を再生成しました",
+        description: `「${axisName}」を再生成しました。`,
+      });
+    } catch (error) {
+      toast({
+        title: "エラー",
+        description: "軸の再生成に失敗しました。",
+        variant: "destructive",
+      });
     }
   };
 
@@ -123,7 +171,7 @@ export function PositioningAnalysis({
                   size="sm"
                   variant="ghost"
                   className="h-4 w-4 p-0 ml-1 hover:bg-destructive/20"
-                  onClick={() => onRemoveAxis?.(axis.name)}
+                  onClick={() => handleRemoveAxis(axis.name)}
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -131,7 +179,7 @@ export function PositioningAnalysis({
                   size="sm"
                   variant="ghost"
                   className="h-4 w-4 p-0 ml-0.5 hover:bg-primary/20"
-                  onClick={() => onRegenerateAxis?.(axis.name)}
+                  onClick={() => handleRegenerateAxis(axis.name)}
                 >
                   <RefreshCw className="h-3 w-3" />
                 </Button>

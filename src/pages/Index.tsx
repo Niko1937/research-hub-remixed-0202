@@ -117,7 +117,15 @@ type ActivePdfViewer = {
 
 const Index = () => {
   const [mode, setMode] = useState<"search" | "assistant">("search");
-  const { timeline, isLoading, sendMessage, clearMessages } = useResearchChat();
+  const { 
+    timeline, 
+    isLoading, 
+    sendMessage, 
+    clearMessages,
+    addAxis,
+    removeAxis,
+    regenerateAxis
+  } = useResearchChat();
   const [pdfViewer, setPdfViewer] = useState<ActivePdfViewer | null>(null);
   const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
   const [recommendedPapers, setRecommendedPapers] = useState<RecommendedPaper[]>(initialSearchResults);
@@ -153,6 +161,27 @@ const Index = () => {
     handleHtmlViewerClose();
     setLastHtmlItemTimestamp(null);
   }, [clearMessages, closePdfViewer, handleHtmlViewerClose]);
+
+  const handleAddAxis = useCallback(async (axisName: string, axisType: "quantitative" | "qualitative") => {
+    const lastPositioning = [...timeline].reverse().find(item => item.type === "positioning_analysis");
+    if (lastPositioning) {
+      await addAxis(lastPositioning.data, axisName, axisType);
+    }
+  }, [timeline, addAxis]);
+
+  const handleRemoveAxis = useCallback(async (axisName: string) => {
+    const lastPositioning = [...timeline].reverse().find(item => item.type === "positioning_analysis");
+    if (lastPositioning) {
+      await removeAxis(lastPositioning.data, axisName);
+    }
+  }, [timeline, removeAxis]);
+
+  const handleRegenerateAxis = useCallback(async (axisName: string) => {
+    const lastPositioning = [...timeline].reverse().find(item => item.type === "positioning_analysis");
+    if (lastPositioning) {
+      await regenerateAxis(lastPositioning.data, axisName);
+    }
+  }, [timeline, regenerateAxis]);
 
   // Fetch dynamic recommendations
   useEffect(() => {
@@ -422,6 +451,9 @@ const Index = () => {
                                 <PositioningAnalysis
                                   key={index}
                                   data={item.data}
+                                  onAddAxis={handleAddAxis}
+                                  onRemoveAxis={handleRemoveAxis}
+                                  onRegenerateAxis={handleRegenerateAxis}
                                 />
                               );
                             

@@ -498,10 +498,211 @@ export function useResearchChat() {
     setTimeline([]);
   }, []);
 
+  const addAxis = useCallback(
+    async (positioningData: any, axisName: string, axisType: "quantitative" | "qualitative") => {
+      setIsLoading(true);
+      try {
+        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
+        const response = await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: "add-axis" }],
+            mode: "assistant",
+            tool: "add-axis",
+            toolQuery: JSON.stringify({ positioningData, axisName, axisType }),
+          }),
+        });
+
+        if (!response.ok || !response.body) throw new Error("Failed to add axis");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let textBuffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          textBuffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex: number;
+          while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+            let line = textBuffer.slice(0, newlineIndex);
+            textBuffer = textBuffer.slice(newlineIndex + 1);
+
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (line.startsWith(":") || line.trim() === "") continue;
+            if (!line.startsWith("data: ")) continue;
+
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") break;
+
+            try {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.type === "positioning_analysis") {
+                setTimeline((prev) =>
+                  prev.map((item) =>
+                    item.type === "positioning_analysis" ? { ...item, data: parsed.data } : item
+                  )
+                );
+              }
+            } catch (e) {
+              textBuffer = line + "\n" + textBuffer;
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Add axis error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const removeAxis = useCallback(
+    async (positioningData: any, axisName: string) => {
+      setIsLoading(true);
+      try {
+        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
+        const response = await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: "remove-axis" }],
+            mode: "assistant",
+            tool: "remove-axis",
+            toolQuery: JSON.stringify({ positioningData, axisName }),
+          }),
+        });
+
+        if (!response.ok || !response.body) throw new Error("Failed to remove axis");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let textBuffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          textBuffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex: number;
+          while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+            let line = textBuffer.slice(0, newlineIndex);
+            textBuffer = textBuffer.slice(newlineIndex + 1);
+
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (line.startsWith(":") || line.trim() === "") continue;
+            if (!line.startsWith("data: ")) continue;
+
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") break;
+
+            try {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.type === "positioning_analysis") {
+                setTimeline((prev) =>
+                  prev.map((item) =>
+                    item.type === "positioning_analysis" ? { ...item, data: parsed.data } : item
+                  )
+                );
+              }
+            } catch (e) {
+              textBuffer = line + "\n" + textBuffer;
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Remove axis error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const regenerateAxis = useCallback(
+    async (positioningData: any, axisName: string) => {
+      setIsLoading(true);
+      try {
+        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
+        const response = await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: "regenerate-axis" }],
+            mode: "assistant",
+            tool: "regenerate-axis",
+            toolQuery: JSON.stringify({ positioningData, axisName }),
+          }),
+        });
+
+        if (!response.ok || !response.body) throw new Error("Failed to regenerate axis");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let textBuffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          textBuffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex: number;
+          while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+            let line = textBuffer.slice(0, newlineIndex);
+            textBuffer = textBuffer.slice(newlineIndex + 1);
+
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (line.startsWith(":") || line.trim() === "") continue;
+            if (!line.startsWith("data: ")) continue;
+
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") break;
+
+            try {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.type === "positioning_analysis") {
+                setTimeline((prev) =>
+                  prev.map((item) =>
+                    item.type === "positioning_analysis" ? { ...item, data: parsed.data } : item
+                  )
+                );
+              }
+            } catch (e) {
+              textBuffer = line + "\n" + textBuffer;
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Regenerate axis error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
   return {
     timeline,
     isLoading,
     sendMessage,
     clearMessages,
+    addAxis,
+    removeAxis,
+    regenerateAxis,
   };
 }

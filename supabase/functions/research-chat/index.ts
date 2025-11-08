@@ -163,7 +163,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode, tool, pdfContext, highlightedText } = await req.json();
+    const { messages, mode, tool, toolQuery, pdfContext, highlightedText } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -188,7 +188,7 @@ serve(async (req) => {
 
               steps = [{
                 tool: tool,
-                query: userMessage,
+                query: toolQuery || userMessage,
                 description: `Execute ${tool} tool with user query`
               }, {
                 tool: "chat",
@@ -431,6 +431,153 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                   );
                   
                   console.log("Positioning data sent successfully");
+                }
+              } else if (step.tool === "add-axis") {
+                console.log("[BACKEND] Executing add-axis tool");
+                const requestData = JSON.parse(step.query);
+                const { positioningData, axisName, axisType } = requestData;
+                
+                const addAxisPrompt = `既存のポジショニング分析に新しい軸「${axisName}」(${axisType})を追加します。
+既存データ: ${JSON.stringify(positioningData)}
+
+各項目(Internal Research, External Research, Target)に対して、新しい軸の評価値(0-100)を生成してください。
+既存データとの整合性を保ってください。
+
+JSON形式で出力:
+{
+  "Internal Research": 75,
+  "External Research": 85,
+  "Target": 90
+}`;
+
+                const addAxisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    model: "google/gemini-2.5-flash",
+                    messages: [{ role: "user", content: addAxisPrompt }],
+                    response_format: { type: "json_object" }
+                  }),
+                });
+
+                if (addAxisResponse.ok) {
+                  const addAxisData = await addAxisResponse.json();
+                  const addAxisContent = JSON.parse(stripCodeFence(addAxisData.choices?.[0]?.message?.content || "{}"));
+
+                  const updatedPositioning = {
+                    ...positioningData,
+                    axes: [...positioningData.axes, { name: axisName, type: axisType }],
+                    items: positioningData.items.map((item: any) => ({
+                      ...item,
+                      values: {
+                        ...item.values,
+                        [axisName]: addAxisContent[item.name] || 50
+                      }
+                    }))
+                  };
+
+                  const axisCount = updatedPositioning.axes?.length || 0;
+                  let suggestedChartType = "scatter";
+                  if (axisCount === 1) suggestedChartType = "box";
+                  else if (axisCount >= 3) suggestedChartType = "radar";
+                  updatedPositioning.suggestedChartType = suggestedChartType;
+
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "positioning_analysis",
+                        data: updatedPositioning
+                      })}\n\n`
+                    )
+                  );
+                }
+              } else if (step.tool === "remove-axis") {
+                console.log("[BACKEND] Executing remove-axis tool");
+                const requestData = JSON.parse(step.query);
+                const { positioningData, axisName } = requestData;
+                
+                const updatedPositioning = {
+                  ...positioningData,
+                  axes: positioningData.axes.filter((axis: any) => axis.name !== axisName),
+                  items: positioningData.items.map((item: any) => {
+                    const { [axisName]: removed, ...remainingValues } = item.values;
+                    return {
+                      ...item,
+                      values: remainingValues
+                    };
+                  })
+                };
+
+                const axisCount = updatedPositioning.axes?.length || 0;
+                let suggestedChartType = "scatter";
+                if (axisCount === 1) suggestedChartType = "box";
+                else if (axisCount >= 3) suggestedChartType = "radar";
+                updatedPositioning.suggestedChartType = suggestedChartType;
+
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "positioning_analysis",
+                      data: updatedPositioning
+                    })}\n\n`
+                  )
+                );
+              } else if (step.tool === "regenerate-axis") {
+                console.log("[BACKEND] Executing regenerate-axis tool");
+                const requestData = JSON.parse(step.query);
+                const { positioningData, axisName } = requestData;
+                
+                const regeneratePrompt = `ポジショニング分析の軸「${axisName}」の値を再生成します。
+既存データ: ${JSON.stringify(positioningData)}
+
+各項目に対して、新しい評価値(0-100)を生成してください。既存データとの整合性を保ってください。
+
+JSON形式で出力:
+{
+  "Internal Research": 75,
+  "External Research": 85,
+  "Target": 90
+}`;
+
+                const regenerateResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    model: "google/gemini-2.5-flash",
+                    messages: [{ role: "user", content: regeneratePrompt }],
+                    response_format: { type: "json_object" }
+                  }),
+                });
+
+                if (regenerateResponse.ok) {
+                  const regenerateData = await regenerateResponse.json();
+                  const regenerateContent = JSON.parse(stripCodeFence(regenerateData.choices?.[0]?.message?.content || "{}"));
+
+                  const updatedPositioning = {
+                    ...positioningData,
+                    items: positioningData.items.map((item: any) => ({
+                      ...item,
+                      values: {
+                        ...item.values,
+                        [axisName]: regenerateContent[item.name] || item.values[axisName]
+                      }
+                    }))
+                  };
+
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "positioning_analysis",
+                        data: updatedPositioning
+                      })}\n\n`
+                    )
+                  );
                 }
               } else if (step.tool === "seeds-needs-matching") {
                 // Generate seeds-needs matching with AI
