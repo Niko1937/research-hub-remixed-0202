@@ -70,7 +70,13 @@ export function useResearchChat() {
   const [isLoading, setIsLoading] = useState(false);
 
   const sendMessage = useCallback(
-    async (content: string, mode: "search" | "assistant", tool?: string) => {
+    async (
+      content: string,
+      mode: "search" | "assistant",
+      tool?: string,
+      pdfContext?: string,
+      highlightedText?: string
+    ) => {
       const userMessage = { role: "user" as const, content };
       const timestamp = Date.now();
       
@@ -109,6 +115,8 @@ export function useResearchChat() {
             messages: allMessages,
             mode,
             tool,
+            pdfContext,
+            highlightedText,
           }),
         });
 

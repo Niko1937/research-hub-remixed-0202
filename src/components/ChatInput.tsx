@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Send, Wrench, X, Search, MessageSquare } from "lucide-react";
+import { Send, Wrench, X, Search, MessageSquare, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,19 +9,29 @@ type Tool = "wide-knowledge" | "theme-evaluation" | "knowwho" | "html-generation
 type Mode = "search" | "assistant";
 
 interface ChatInputProps {
-  onSubmit: (message: string, tool?: Tool) => void;
+  onSubmit: (message: string, tool?: Tool, pdfContext?: string, highlightedText?: string) => void;
   mode: Mode;
   onModeChange: (mode: Mode) => void;
+  highlightedText?: string;
+  pdfContext?: string;
+  onClearHighlight?: () => void;
 }
 
-export function ChatInput({ onSubmit, mode, onModeChange }: ChatInputProps) {
+export function ChatInput({ 
+  onSubmit, 
+  mode, 
+  onModeChange,
+  highlightedText,
+  pdfContext,
+  onClearHighlight 
+}: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [toolPopoverOpen, setToolPopoverOpen] = useState(false);
 
   const handleSubmit = () => {
     if (message.trim()) {
-      onSubmit(message, selectedTool || undefined);
+      onSubmit(message, selectedTool || undefined, pdfContext, highlightedText);
       setMessage("");
     }
   };
@@ -54,6 +64,37 @@ export function ChatInput({ onSubmit, mode, onModeChange }: ChatInputProps) {
       <div className="max-w-4xl mx-auto">
         {/* Unified Chat Input Component */}
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          {/* PDF Context Indicators */}
+          {(highlightedText || pdfContext) && (
+            <div className="px-4 pt-3 pb-2 space-y-2">
+              {pdfContext && (
+                <Badge variant="secondary" className="gap-1.5">
+                  <FileText className="w-3 h-3" />
+                  <span className="text-xs">PDF参照中</span>
+                </Badge>
+              )}
+              {highlightedText && (
+                <Badge 
+                  className="gap-2 pr-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800 max-w-full"
+                >
+                  <FileText className="w-3 h-3 shrink-0" />
+                  <span className="text-xs truncate">
+                    選択中: {highlightedText.slice(0, 50)}
+                    {highlightedText.length > 50 ? "..." : ""}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 p-0 hover:bg-transparent shrink-0"
+                    onClick={onClearHighlight}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </Badge>
+              )}
+            </div>
+          )}
+
           {/* Text Input Area */}
           <div className="relative flex items-end gap-2 p-3">
             <div className="flex-1 relative">
@@ -71,7 +112,11 @@ export function ChatInput({ onSubmit, mode, onModeChange }: ChatInputProps) {
               onClick={handleSubmit}
               disabled={!message.trim()}
               size="icon"
-              className="shrink-0 h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg"
+              className={`shrink-0 h-10 w-10 rounded-lg ${
+                highlightedText 
+                  ? "bg-yellow-500 hover:bg-yellow-600" 
+                  : "bg-primary hover:bg-primary/90"
+              }`}
             >
               <Send className="w-4 h-4" />
             </Button>

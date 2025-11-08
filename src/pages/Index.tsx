@@ -107,6 +107,8 @@ const Index = () => {
   const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
   const [searchResults] = useState(initialSearchResults);
   const [viewerWidth, setViewerWidth] = useState(500);
+  const [selectedPdfText, setSelectedPdfText] = useState<string>("");
+  const [pdfContext, setPdfContext] = useState<string>("");
 
   // Auto-open HTML viewer when HTML generation starts and update in real-time
   useEffect(() => {
@@ -120,17 +122,25 @@ const Index = () => {
     }
   }, [timeline]);
 
-  const handleSubmit = (message: string, tool?: string) => {
+  const handleSubmit = (
+    message: string,
+    tool?: string,
+    pdfContext?: string,
+    highlightedText?: string
+  ) => {
     if (mode === "search") {
       setMode("assistant");
     }
-    sendMessage(message, "assistant", tool);
+    sendMessage(message, "assistant", tool, pdfContext, highlightedText);
   };
 
   const handleSearchResultClick = (url: string, title: string) => {
     setMode("assistant");
     setHtmlViewer(null);
     setPdfViewer({ url, title });
+    // Clear previous PDF context when opening new PDF
+    setSelectedPdfText("");
+    setPdfContext("");
   };
 
   const handleViewerWidthChange = (width: number) => {
@@ -151,7 +161,14 @@ const Index = () => {
           {mode === "search" ? (
             // Search Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
-              <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
+            <ChatInput 
+              onSubmit={handleSubmit}
+              mode={mode}
+              onModeChange={setMode}
+              highlightedText={selectedPdfText}
+              pdfContext={pdfContext}
+              onClearHighlight={() => setSelectedPdfText("")}
+            />
 
               {/* Search Results */}
               <ScrollArea className="flex-1">
@@ -300,7 +317,14 @@ const Index = () => {
               </ScrollArea>
 
               <div className="animate-slide-in-bottom">
-                <ChatInput onSubmit={handleSubmit} mode={mode} onModeChange={setMode} />
+                <ChatInput 
+                  onSubmit={handleSubmit}
+                  mode={mode}
+                  onModeChange={setMode}
+                  highlightedText={selectedPdfText}
+                  pdfContext={pdfContext}
+                  onClearHighlight={() => setSelectedPdfText("")}
+                />
               </div>
             </div>
           )}
@@ -310,8 +334,14 @@ const Index = () => {
         <PDFViewer 
           url={pdfViewer.url} 
           title={pdfViewer.title} 
-          onClose={() => setPdfViewer(null)}
+          onClose={() => {
+            setPdfViewer(null);
+            setSelectedPdfText("");
+            setPdfContext("");
+          }}
           onWidthChange={handleViewerWidthChange}
+          onTextSelect={(text) => setSelectedPdfText(text)}
+          onPdfLoaded={(fullText) => setPdfContext(fullText)}
         />
       )}
       

@@ -155,7 +155,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode, tool } = await req.json();
+    const { messages, mode, tool, pdfContext, highlightedText } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -434,7 +434,16 @@ Return ONLY the complete HTML code, nothing else.`;
               encoder.encode(`data: ${JSON.stringify({ type: "chat_start" })}\n\n`)
             );
 
-            const contextPrompt = `ユーザーの質問: ${userMessage}\n\n上記の検索結果とツール実行結果を踏まえて、R&D研究者向けに簡潔で実践的な回答を生成してください。`;
+            let contextPrompt = `ユーザーの質問: ${userMessage}\n\n上記の検索結果とツール実行結果を踏まえて、R&D研究者向けに簡潔で実践的な回答を生成してください。`;
+
+            // Add PDF context if available
+            if (pdfContext) {
+              contextPrompt += `\n\n## 参照中のPDF文書\nユーザーは現在、以下のPDF文書を参照しています：\n\n${pdfContext.slice(0, 10000)}\n\nこのPDFに関する質問には、上記の内容を元に答えてください。`;
+            }
+
+            if (highlightedText) {
+              contextPrompt += `\n\n## ユーザーがハイライトしているテキスト\nユーザーは現在、PDFの以下の部分を選択しています：\n\n「${highlightedText}」\n\nこの部分について質問されている可能性があります。`;
+            }
 
             const summaryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
@@ -501,7 +510,7 @@ Return ONLY the complete HTML code, nothing else.`;
       .slice(0, 5);
 
     // Build context for AI
-    const contextPrompt = `
+    let contextPrompt = `
 あなたはR&D研究者向けのアシスタントです。以下の3つの視点から回答してください：
 
 【社内研究との関連】
@@ -522,6 +531,15 @@ ${externalPapers.length > 0 ? externalPapers.map((p, i) =>
 ユーザーの質問: ${userMessage}
 
 上記の情報を踏まえて、R&D研究者が「提案フェーズ」と「実施フェーズ」の両方で活用できるよう、具体的で実践的な回答を提供してください。`;
+
+    // Add PDF context if available
+    if (pdfContext) {
+      contextPrompt += `\n\n## 参照中のPDF文書\nユーザーは現在、以下のPDF文書を参照しています：\n\n${pdfContext.slice(0, 10000)}\n\nこのPDFに関する質問には、上記の内容を元に答えてください。`;
+    }
+
+    if (highlightedText) {
+      contextPrompt += `\n\n## ユーザーがハイライトしているテキスト\nユーザーは現在、PDFの以下の部分を選択しています：\n\n「${highlightedText}」\n\nこの部分について質問されている可能性があります。`;
+    }
 
     // Stream AI response
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
