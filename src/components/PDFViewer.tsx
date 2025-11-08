@@ -67,7 +67,14 @@ export function PDFViewer({
     (async () => {
       try {
         setIsLoading(true);
-        const res = await fetch(url);
+        // Use proxy to fetch PDF to avoid CORS issues
+        const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pdf-proxy?url=${encodeURIComponent(url)}`;
+        const res = await fetch(proxyUrl);
+        
+        if (!res.ok) {
+          throw new Error(`Failed to load PDF: ${res.status} ${res.statusText}`);
+        }
+        
         const data = await res.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data }).promise;
 

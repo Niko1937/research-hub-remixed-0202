@@ -2,3 +2,6 @@ project_id = "kklhzvypgstdmucdkckr"
 
 [functions.research-chat]
 verify_jwt = false
+
+[functions.pdf-proxy]
+verify_jwt = false
