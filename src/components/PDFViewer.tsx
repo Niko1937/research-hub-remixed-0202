@@ -34,9 +34,9 @@ export function PDFViewer({
   const [width, setWidth] = useState(500);
   const [isDragging, setIsDragging] = useState(false);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [renderedPages, setRenderedPages] = useState<number[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
 
@@ -114,59 +114,72 @@ export function PDFViewer({
     };
   }, [url, onPdfLoaded]);
 
-  // Render current page
+  // Render all pages at once for scrolling
   useEffect(() => {
-    if (!pdfDoc || !pdfContainerRef.current) return;
+    if (!pdfDoc || !pdfContainerRef.current || totalPages === 0) return;
+
+    const container = pdfContainerRef.current;
+    container.innerHTML = "";
 
     (async () => {
       try {
-        const page = await pdfDoc.getPage(currentPage);
-        const viewport = page.getViewport({ scale: 1.5 });
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const page = await pdfDoc.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 1.5 });
 
-        // Create canvas
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+          // Create page wrapper
+          const pageWrapper = document.createElement("div");
+          pageWrapper.className = "pdf-page-wrapper";
+          pageWrapper.style.cssText = `
+            position: relative;
+            margin-bottom: 16px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          `;
 
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+          // Create canvas
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
 
-        // Create text layer
-        const textLayerDiv = document.createElement("div");
-        textLayerDiv.className = "textLayer";
-        textLayerDiv.style.cssText = `
-          position: absolute;
-          left: 0;
-          top: 0;
-          height: ${viewport.height}px;
-          width: ${viewport.width}px;
-          line-height: 1.0;
-        `;
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
 
-        const container = pdfContainerRef.current;
-        if (!container) return;
+          // Create text layer
+          const textLayerDiv = document.createElement("div");
+          textLayerDiv.className = "textLayer";
+          textLayerDiv.style.cssText = `
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: ${viewport.height}px;
+            width: ${viewport.width}px;
+            line-height: 1.0;
+          `;
 
-        container.innerHTML = "";
-        container.style.position = "relative";
-        container.appendChild(canvas);
-        container.appendChild(textLayerDiv);
+          pageWrapper.appendChild(canvas);
+          pageWrapper.appendChild(textLayerDiv);
+          container.appendChild(pageWrapper);
 
-        // Render PDF page
-        await page.render({ canvasContext: ctx, viewport }).promise;
+          // Render PDF page
+          await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // Render text layer
-        const textContent = await page.getTextContent();
-        await pdfjsLib.renderTextLayer({
-          textContentSource: textContent,
-          container: textLayerDiv,
-          viewport,
-          textDivs: [],
-        });
+          // Render text layer
+          const textContent = await page.getTextContent();
+          await pdfjsLib.renderTextLayer({
+            textContentSource: textContent,
+            container: textLayerDiv,
+            viewport,
+            textDivs: [],
+          });
+
+          setRenderedPages(prev => [...prev, pageNum]);
+        }
       } catch (error) {
         console.error("Page rendering error:", error);
       }
     })();
-  }, [pdfDoc, currentPage]);
+  }, [pdfDoc, totalPages]);
 
   // Text selection detection
   useEffect(() => {
@@ -182,17 +195,6 @@ export function PDFViewer({
     return () => document.removeEventListener("mouseup", handleMouseUp);
   }, [onTextSelect]);
 
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
 
   return (
     <div
@@ -225,39 +227,17 @@ export function PDFViewer({
 
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-muted-foreground">Loading PDF...</div>
+            <div className="text-muted-foreground">PDFを読み込み中...</div>
           </div>
         ) : (
-          <>
-            <div className="flex-1 overflow-auto p-4 bg-muted/30">
-              <div ref={pdfContainerRef} className="mx-auto" />
-            </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between p-4 border-t border-border bg-card">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 1}
-                >
-                  前へ
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  {currentPage} / {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                >
-                  次へ
-                </Button>
+          <div className="flex-1 overflow-auto p-4 bg-muted/30">
+            <div ref={pdfContainerRef} className="mx-auto flex flex-col items-center" />
+            {totalPages > 0 && (
+              <div className="text-center text-sm text-muted-foreground mt-4 pb-4">
+                全 {totalPages} ページ
               </div>
             )}
-          </>
+          </div>
         )}
       </Card>
     </div>
