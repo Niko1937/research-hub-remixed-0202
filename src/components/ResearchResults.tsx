@@ -6,7 +6,7 @@ import { ResearchData } from "@/hooks/useResearchChat";
 
 interface ResearchResultsProps {
   data: ResearchData;
-  onPdfClick?: (url: string, title: string) => void;
+  onPdfClick?: (paper: { url: string; title: string; authors?: string[]; source?: string }) => void;
 }
 
 export function ResearchResults({ data, onPdfClick }: ResearchResultsProps) {
@@ -38,7 +38,14 @@ export function ResearchResults({ data, onPdfClick }: ResearchResultsProps) {
               <Card
                 key={index}
                 className="p-4 bg-card border-border hover:bg-card-hover hover:shadow-hover transition-all group cursor-pointer"
-                onClick={() => onPdfClick?.(paper.url, paper.title)}
+                onClick={() =>
+                  onPdfClick?.({
+                    url: paper.url,
+                    title: paper.title,
+                    authors: paper.authors,
+                    source: paper.source,
+                  })
+                }
               >
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors shrink-0">

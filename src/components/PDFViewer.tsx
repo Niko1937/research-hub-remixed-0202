@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useEffect, useCallback } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import "pdfjs-dist/web/pdf_viewer.css";
@@ -17,6 +18,8 @@ if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
 interface PDFViewerProps {
   url: string;
   title: string;
+  authors?: string[];
+  source?: string;
   onClose: () => void;
   onWidthChange?: (width: number) => void;
   onTextSelect?: (text: string) => void;
@@ -48,6 +51,7 @@ function ensureHighlightLayer(pageWrapper: HTMLElement) {
       inset: 0;
       pointer-events: none;
       z-index: 5;
+      mix-blend-mode: multiply;
     `;
     pageWrapper.appendChild(highlightLayer);
   }
@@ -57,6 +61,8 @@ function ensureHighlightLayer(pageWrapper: HTMLElement) {
 export function PDFViewer({ 
   url, 
   title, 
+  authors,
+  source,
   onClose, 
   onWidthChange,
   onTextSelect,
@@ -128,15 +134,18 @@ export function PDFViewer({
       const pageWrapper = element.closest<HTMLElement>(".pdf-page-wrapper");
       if (!pageWrapper || !pageWrapper.dataset.pageNumber) return false;
 
-      const pageRect = pageWrapper.getBoundingClientRect();
-      if (pageRect.width === 0 || pageRect.height === 0) return false;
+      const highlightLayer = pageWrapper.querySelector<HTMLElement>(".pdf-highlight-layer");
+      const baseRect = highlightLayer?.getBoundingClientRect() ?? pageWrapper.getBoundingClientRect();
+      if (baseRect.width === 0 || baseRect.height === 0) return false;
+      const paddingX = 2 / baseRect.width;
+      const paddingY = 1 / baseRect.height;
 
       const rects = Array.from(range.getClientRects())
         .map((rect) => ({
-          topRatio: clamp((rect.top - pageRect.top) / pageRect.height),
-          leftRatio: clamp((rect.left - pageRect.left) / pageRect.width),
-          widthRatio: clamp(rect.width / pageRect.width),
-          heightRatio: clamp(rect.height / pageRect.height),
+          topRatio: clamp(((rect.top - baseRect.top) / baseRect.height) - paddingY, 0, 1),
+          leftRatio: clamp(((rect.left - baseRect.left) / baseRect.width) - paddingX, 0, 1),
+          widthRatio: clamp(rect.width / baseRect.width + paddingX * 2, 0, 1),
+          heightRatio: clamp(rect.height / baseRect.height + paddingY * 2, 0, 1),
         }))
         .filter((rect) => rect.widthRatio > 0 && rect.heightRatio > 0);
 
@@ -185,8 +194,13 @@ export function PDFViewer({
     (async () => {
       try {
         setIsLoading(true);
+        setPdfDoc(null);
+        setTotalPages(0);
         highlightDataRef.current = null;
         clearHighlightOverlays();
+        if (pdfContainerRef.current) {
+          pdfContainerRef.current.innerHTML = "";
+        }
         // Use proxy to fetch PDF to avoid CORS issues
         const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pdf-proxy?url=${encodeURIComponent(url)}`;
         const res = await fetch(proxyUrl);
@@ -269,6 +283,7 @@ export function PDFViewer({
             margin-bottom: 16px;
             background: white;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
             max-width: 100%;
             width: ${viewport.width}px;
           `;
@@ -368,18 +383,32 @@ export function PDFViewer({
       </div>
 
       <Card className="flex-1 flex flex-col rounded-none border-0">
-        <div className="flex items-center justify-between p-4 border-b border-border bg-card">
-          <h3 className="text-sm font-semibold text-foreground truncate flex-1 mr-2">
-            {title}
-          </h3>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="shrink-0 hover:bg-muted"
-          >
-            <X className="w-4 h-4" />
-          </Button>
+        <div className="flex items-center justify-between p-4 border-b border-border bg-card gap-3 flex-wrap">
+          <div className="flex flex-col flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-foreground truncate">
+              {title}
+            </h3>
+            {authors?.length ? (
+              <p className="text-xs text-muted-foreground truncate">
+                {authors.join(", ")}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {source ? (
+              <Badge variant="secondary" className="text-xs">
+                {source}
+              </Badge>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="shrink-0 hover:bg-muted"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (

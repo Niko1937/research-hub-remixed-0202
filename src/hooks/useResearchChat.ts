@@ -65,6 +65,12 @@ export interface Expert {
   email?: string;
 }
 
+const stripLeadingCodeFence = (input: string) =>
+  input.replace(/^\s*```[^\n]*\n?/, "");
+
+const stripTrailingCodeFence = (input: string) =>
+  input.replace(/\n?\s*```[^\n]*\s*$/i, "");
+
 export function useResearchChat() {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -299,25 +305,28 @@ export function useResearchChat() {
               // Handle HTML chunks
               if (parsed.type === "html_chunk") {
                 setTimeline((prev) => {
-                  const updated = [...prev];
-                  // Find last HTML generation item
+                  const newTimeline = [...prev];
                   let lastHtmlIndex = -1;
-                  for (let i = updated.length - 1; i >= 0; i--) {
-                    if (updated[i].type === "html_generation") {
+                  for (let i = newTimeline.length - 1; i >= 0; i--) {
+                    if (newTimeline[i].type === "html_generation") {
                       lastHtmlIndex = i;
                       break;
                     }
                   }
+
                   if (lastHtmlIndex !== -1) {
-                    updated[lastHtmlIndex] = {
-                      ...updated[lastHtmlIndex],
+                    const currentItem = newTimeline[lastHtmlIndex];
+                    let newContent = stripLeadingCodeFence(parsed.content);
+                    
+                    newTimeline[lastHtmlIndex] = {
+                      ...currentItem,
                       data: {
-                        html: updated[lastHtmlIndex].data.html + parsed.content,
-                        isComplete: false,
+                        ...currentItem.data,
+                        html: currentItem.data.html + newContent,
                       },
                     };
                   }
-                  return updated;
+                  return newTimeline;
                 });
                 continue;
               }
@@ -325,25 +334,30 @@ export function useResearchChat() {
               // Handle HTML complete
               if (parsed.type === "html_complete") {
                 setTimeline((prev) => {
-                  const updated = [...prev];
-                  // Find last HTML generation item
+                  const newTimeline = [...prev];
                   let lastHtmlIndex = -1;
-                  for (let i = updated.length - 1; i >= 0; i--) {
-                    if (updated[i].type === "html_generation") {
+                  for (let i = newTimeline.length - 1; i >= 0; i--) {
+                    if (newTimeline[i].type === "html_generation") {
                       lastHtmlIndex = i;
                       break;
                     }
                   }
+
                   if (lastHtmlIndex !== -1) {
-                    updated[lastHtmlIndex] = {
-                      ...updated[lastHtmlIndex],
+                    const currentItem = newTimeline[lastHtmlIndex];
+                    const trimmed = stripTrailingCodeFence(stripLeadingCodeFence(currentItem.data.html));
+                    const finalHtml = trimmed.trim();
+
+                    newTimeline[lastHtmlIndex] = {
+                      ...currentItem,
                       data: {
-                        ...updated[lastHtmlIndex].data,
+                        ...currentItem.data,
+                        html: finalHtml,
                         isComplete: true,
                       },
                     };
                   }
-                  return updated;
+                  return newTimeline;
                 });
                 continue;
               }
@@ -387,7 +401,7 @@ export function useResearchChat() {
 
         // Final flush
         if (textBuffer.trim()) {
-          for (let raw of textBuffer.split("\n")) {
+          for (const raw of textBuffer.split("\n")) {
             if (!raw || raw.startsWith(":") || !raw.startsWith("data: ")) continue;
             const jsonStr = raw.slice(6).trim();
             if (jsonStr === "[DONE]") continue;

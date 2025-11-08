@@ -20,6 +20,14 @@ interface ExternalPaper {
   citations?: number;
 }
 
+function stripCodeFence(content: string) {
+  return content
+    .replace(/^```json\s*/i, "")
+    .replace(/^```/i, "")
+    .replace(/```$/i, "")
+    .trim();
+}
+
 // Search OpenAlex
 async function searchOpenAlex(query: string): Promise<ExternalPaper[]> {
   try {
@@ -235,7 +243,8 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
               }
 
               const planData = await planResponse.json();
-              const planContent = JSON.parse(planData.choices[0].message.content);
+              const planRaw = planData.choices?.[0]?.message?.content || "{}";
+              const planContent = JSON.parse(stripCodeFence(planRaw));
               steps = planContent.steps || [];
 
               controller.enqueue(
@@ -351,18 +360,25 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                   encoder.encode(`data: ${JSON.stringify({ type: "html_start" })}\n\n`)
                 );
 
-                const htmlPrompt = `Create a beautiful, interactive HTML infographic summarizing our conversation about "${step.query}".
+                const htmlPrompt = `You are an expert HTML generator for an advanced research laboratory. Your sole purpose is to create a single, complete, and visually rich HTML file.
 
-Requirements:
-- Single HTML file with all CSS and JavaScript embedded
-- Modern, responsive design with animations
-- Use gradients, icons, and visual elements
-- Include key points, statistics, and insights
-- Make it visually engaging and professional
-- Use a dark theme to match the app
-- Ensure all content is in Japanese
+**CRITICAL INSTRUCTIONS**
+1. **NEVER** wrap the output in markdown code blocks (no \`\`\`, \`\`\`html, or similar). The first characters must be \`<!DOCTYPE html>\`.
+2. ALL CSS and JavaScript **must** live inside <style> and <script> tags in the same file. Do not reference external CSS/JS except well-known icon CDNs if absolutely necessary.
+3. Return only valid HTML. No explanations, no commentary, no markdown.
 
-Return ONLY the complete HTML code, nothing else.`;
+**VISUAL & CONTENT GUIDELINES**
+- Emulate a cutting-edge R&D lab briefing or infographic panel.
+- Include at least three distinct sections (e.g., overview, metrics, experiments, roadmap) with clear headings.
+- Provide multiple data-rich elements: metric cards, comparison tables, timelines, annotated diagrams, or faux sensor readouts. It is acceptable (encouraged) to include synthetic but plausible data/figures as long as they are clearly labeled.
+- Incorporate at least two visual flourishes such as SVG charts, CSS-driven graphs, or animated highlights to convey a "noisy", information-dense research environment.
+- Use a modern dark theme with gradients, neon accents, and smooth transitions. Icons from a CDN (Font Awesome) are allowed.
+- All copy must be in Japanese.
+
+**TASK**
+Create a beautiful, interactive HTML infographic summarizing our conversation about "${step.query}" that would impress researchers inside an innovation lab.
+
+Your final output will be rendered directly in a browser. Ensure it is flawless and self-contained.`;
 
                 const htmlResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                   method: "POST",
@@ -438,7 +454,8 @@ Return ONLY the complete HTML code, nothing else.`;
 
             // Add PDF context if available
             if (pdfContext) {
-              contextPrompt += `\n\n## 参照中のPDF文書\nユーザーは現在、以下のPDF文書を参照しています：\n\n${pdfContext.slice(0, 10000)}\n\nこのPDFに関する質問には、上記の内容を元に答えてください。`;
+              const pdfSnippet = pdfContext.slice(0, 10000);
+              contextPrompt += `\n\n<User is showing a document >${pdfSnippet}</User is showing a document >`;
             }
 
             if (highlightedText) {
@@ -534,7 +551,8 @@ ${externalPapers.length > 0 ? externalPapers.map((p, i) =>
 
     // Add PDF context if available
     if (pdfContext) {
-      contextPrompt += `\n\n## 参照中のPDF文書\nユーザーは現在、以下のPDF文書を参照しています：\n\n${pdfContext.slice(0, 10000)}\n\nこのPDFに関する質問には、上記の内容を元に答えてください。`;
+      const pdfSnippet = pdfContext.slice(0, 10000);
+      contextPrompt += `\n\n<User is showing a document >${pdfSnippet}</User is showing a document >`;
     }
 
     if (highlightedText) {

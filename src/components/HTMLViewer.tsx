@@ -1,4 +1,4 @@
-import { X, GripVertical } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState, useRef, useEffect } from "react";
@@ -13,32 +13,43 @@ export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
   const [width, setWidth] = useState(500);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     onWidthChange?.(width);
   }, [width, onWidthChange]);
 
+  // Handle resizing
   useEffect(() => {
     if (!isDragging) return;
-
     const handleMouseMove = (e: MouseEvent) => {
       const viewportWidth = window.innerWidth;
       const newWidth = Math.max(300, Math.min(viewportWidth - e.clientX, viewportWidth * 0.9));
       setWidth(newWidth);
     };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
+    const handleMouseUp = () => setIsDragging(false);
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
-
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDragging]);
+
+  // Use document.write to update iframe content, which allows scripts to run
+  useEffect(() => {
+    if (!iframeRef.current) return;
+    const doc = iframeRef.current.contentDocument;
+    if (!doc) return;
+
+    const fallback = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8" /><style>
+      body { font-family: "Inter", "Hiragino Sans", sans-serif; padding: 2rem; background: #0f172a; color: #e2e8f0; }
+    </style></head><body><p>現在表示できるHTML資料がありません。</p></body></html>`;
+
+    doc.open();
+    doc.write(html?.trim() ? html : fallback);
+    doc.close();
+  }, [html]);
 
   return (
     <div
@@ -70,10 +81,10 @@ export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
         </div>
         <div className="flex-1 overflow-auto">
           <iframe
-            srcDoc={html}
+            ref={iframeRef}
             className="w-full h-full border-0"
             title="HTML Preview"
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-same-origin"
             style={{ minHeight: '100%' }}
           />
         </div>

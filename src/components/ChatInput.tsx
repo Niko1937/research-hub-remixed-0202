@@ -61,7 +61,7 @@ export function ChatInput({
 
   return (
     <div className="sticky bottom-0 bg-background border-t border-border p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Unified Chat Input Component */}
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           {/* PDF Context Indicators */}

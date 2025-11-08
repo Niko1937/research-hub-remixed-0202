@@ -16,6 +16,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
+interface ResearchSidebarProps {
+  onExplorerClick?: () => void;
+}
+
 interface Thread {
   id: string;
   title: string;
@@ -28,7 +32,7 @@ const mockThreads: Thread[] = [
   { id: "3", title: "バイオインフォマティクスの応用", timestamp: "3日前" },
 ];
 
-export function ResearchSidebar() {
+export function ResearchSidebar({ onExplorerClick }: ResearchSidebarProps) {
   const { open } = useSidebar();
 
   return (
@@ -60,6 +64,7 @@ export function ResearchSidebar() {
                   to="/"
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
                   activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                  onClick={() => onExplorerClick?.()}
                 >
                   <Compass className="w-5 h-5 shrink-0" />
                   {open && <span className="text-sm font-medium">Explorer</span>}

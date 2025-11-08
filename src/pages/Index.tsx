@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ResearchSidebar } from "@/components/ResearchSidebar";
@@ -10,6 +10,7 @@ import { HTMLViewer } from "@/components/HTMLViewer";
 import { ThemeEvaluation } from "@/components/ThemeEvaluation";
 import { KnowWhoResults } from "@/components/KnowWhoResults";
 import { SearchResultItem } from "@/components/SearchResultItem";
+import { UseCaseCards } from "@/components/UseCaseCards";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,33 +101,176 @@ const initialSearchResults = [
   },
 ];
 
+const DEFAULT_RECOMMEND_QUERY = "AI machine learning";
+
+type RecommendedPaper = typeof initialSearchResults[number];
+
+type ActivePdfViewer = {
+  url: string;
+  title: string;
+  authors?: string[];
+  source?: string;
+  openedAt: number;
+};
+
 const Index = () => {
   const [mode, setMode] = useState<"search" | "assistant">("search");
-  const { timeline, isLoading, sendMessage } = useResearchChat();
-  const [pdfViewer, setPdfViewer] = useState<{ url: string; title: string } | null>(null);
+  const { timeline, isLoading, sendMessage, clearMessages } = useResearchChat();
+  const [pdfViewer, setPdfViewer] = useState<ActivePdfViewer | null>(null);
   const [htmlViewer, setHtmlViewer] = useState<string | null>(null);
-  const [searchResults] = useState(initialSearchResults);
+  const [recommendedPapers, setRecommendedPapers] = useState<RecommendedPaper[]>(initialSearchResults);
+  const [recommendedLoading, setRecommendedLoading] = useState(false);
+  const [recommendedError, setRecommendedError] = useState<string | null>(null);
   const [viewerWidth, setViewerWidth] = useState(500);
   const [selectedPdfText, setSelectedPdfText] = useState<string>("");
   const [pdfContext, setPdfContext] = useState<string>("");
   const [clearHighlightSignal, setClearHighlightSignal] = useState(0);
+  const [pendingHtmlAutoOpen, setPendingHtmlAutoOpen] = useState(false);
+  const [lastHtmlItemTimestamp, setLastHtmlItemTimestamp] = useState<number | null>(null);
 
-  const clearHighlight = () => {
+  const clearHighlight = useCallback(() => {
     setSelectedPdfText("");
     setClearHighlightSignal((prev) => prev + 1);
-  };
+  }, []);
+
+  const closePdfViewer = useCallback(() => {
+    setPdfViewer(null);
+    clearHighlight();
+    setPdfContext("");
+  }, [clearHighlight]);
+
+  const handleHtmlViewerClose = useCallback(() => {
+    setHtmlViewer(null);
+    setPendingHtmlAutoOpen(false);
+  }, []);
+
+  const handleResetToExplorer = useCallback(() => {
+    clearMessages();
+    setMode("search");
+    closePdfViewer();
+    handleHtmlViewerClose();
+    setLastHtmlItemTimestamp(null);
+  }, [clearMessages, closePdfViewer, handleHtmlViewerClose]);
+
+  // Fetch dynamic recommendations
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchRecommendations = async () => {
+      try {
+        setRecommendedLoading(true);
+        setRecommendedError(null);
+
+        const response = await fetch(
+          `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(
+            DEFAULT_RECOMMEND_QUERY
+          )}&start=0&max_results=8`
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch recommendations: ${response.status}`);
+        }
+        const feed = await response.text();
+        if (cancelled) return;
+
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(feed, "text/xml");
+        const entries = Array.from(xml.getElementsByTagName("entry"));
+
+        const mapped: RecommendedPaper[] = entries
+          .map((entry) => {
+            const text = (tag: string) =>
+              entry.getElementsByTagName(tag)[0]?.textContent?.replace(/\s+/g, " ").trim() || "";
+            const title = text("title");
+            const abstract = text("summary");
+            const published = entry.getElementsByTagName("published")[0]?.textContent?.slice(0, 4) || "N/A";
+            const id = text("id");
+            const pdfUrl = id ? id.replace("/abs/", "/pdf/") + ".pdf" : "";
+            if (!pdfUrl) return null;
+            const authors = Array.from(entry.getElementsByTagName("name"))
+              .map((node) => node.textContent || "Unknown")
+              .slice(0, 4);
+
+            return {
+              title: title || "Untitled",
+              authors: authors.length ? authors : ["Unknown"],
+              year: published,
+              source: "arXiv",
+              citations: undefined,
+              url: pdfUrl,
+              query: DEFAULT_RECOMMEND_QUERY,
+              abstract,
+            };
+          })
+          .filter(Boolean) as RecommendedPaper[];
+
+        if (!mapped.length) {
+          throw new Error("No recommendations returned from API");
+        }
+
+        setRecommendedPapers(mapped as RecommendedPaper[]);
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setRecommendedError("本日のおすすめを取得できませんでした。しばらく経ってから再度お試しください。");
+        }
+      } finally {
+        if (!cancelled) {
+          setRecommendedLoading(false);
+        }
+      }
+    };
+
+    fetchRecommendations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-open HTML viewer when HTML generation starts and update in real-time
   useEffect(() => {
     const lastHtmlItem = [...timeline]
       .reverse()
       .find(item => item.type === "html_generation");
-    
-    if (lastHtmlItem && lastHtmlItem.data.html) {
-      setPdfViewer(null);
-      setHtmlViewer(lastHtmlItem.data.html);
+
+    if (!lastHtmlItem || !lastHtmlItem.data?.html) {
+      return;
     }
-  }, [timeline]);
+
+    const htmlContent = lastHtmlItem.data.html;
+    const isNewHtmlItem = lastHtmlItem.timestamp !== lastHtmlItemTimestamp;
+
+    if (htmlViewer !== null) {
+      setHtmlViewer((prev) => (prev === htmlContent ? prev : htmlContent));
+      if (isNewHtmlItem) {
+        setLastHtmlItemTimestamp(lastHtmlItem.timestamp);
+      }
+      return;
+    }
+
+    if (pendingHtmlAutoOpen && isNewHtmlItem) {
+      closePdfViewer();
+      setHtmlViewer(htmlContent);
+      setLastHtmlItemTimestamp(lastHtmlItem.timestamp);
+      setPendingHtmlAutoOpen(false);
+    }
+  }, [timeline, htmlViewer, pendingHtmlAutoOpen, lastHtmlItemTimestamp, closePdfViewer]);
+
+  const openPdfDocument = useCallback(
+    (doc: { url: string; title: string; authors?: string[]; source?: string }) => {
+      setMode("assistant");
+      handleHtmlViewerClose();
+      setPdfViewer({
+        url: doc.url,
+        title: doc.title,
+        authors: doc.authors,
+        source: doc.source,
+        openedAt: Date.now(),
+      });
+      clearHighlight();
+      setPdfContext("");
+    },
+    [clearHighlight, handleHtmlViewerClose]
+  );
 
   const handleSubmit = (
     message: string,
@@ -134,19 +278,21 @@ const Index = () => {
     pdfContext?: string,
     highlightedText?: string
   ) => {
+    if (tool === "html-generation") {
+      const lastHtmlItem = [...timeline]
+        .reverse()
+        .find(item => item.type === "html_generation");
+      setLastHtmlItemTimestamp(lastHtmlItem?.timestamp ?? null);
+      setPendingHtmlAutoOpen(true);
+    }
     if (mode === "search") {
       setMode("assistant");
     }
     sendMessage(message, "assistant", tool, pdfContext, highlightedText);
   };
 
-  const handleSearchResultClick = (url: string, title: string) => {
-    setMode("assistant");
-    setHtmlViewer(null);
-    setPdfViewer({ url, title });
-    // Clear previous PDF context when opening new PDF
-    clearHighlight();
-    setPdfContext("");
+  const handleSearchResultClick = (result: { url: string; title: string; authors?: string[]; source?: string }) => {
+    openPdfDocument(result);
   };
 
   const handleViewerWidthChange = (width: number) => {
@@ -156,7 +302,7 @@ const Index = () => {
   return (
     <SidebarProvider>
       <div className="flex h-screen bg-background w-full">
-        <ResearchSidebar />
+        <ResearchSidebar onExplorerClick={handleResetToExplorer} />
 
         <main 
           className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
@@ -167,32 +313,43 @@ const Index = () => {
           {mode === "search" ? (
             // Search Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
-            <ChatInput 
-              onSubmit={handleSubmit}
-              mode={mode}
-              onModeChange={setMode}
-              highlightedText={selectedPdfText}
-              pdfContext={pdfContext}
-              onClearHighlight={clearHighlight}
-            />
+              {/* Use Case Cards */}
+              <UseCaseCards />
+
+              <div className="max-w-6xl mx-auto w-full">
+                <ChatInput 
+                  onSubmit={handleSubmit}
+                  mode={mode}
+                  onModeChange={setMode}
+                  highlightedText={selectedPdfText}
+                  pdfContext={pdfContext}
+                  onClearHighlight={clearHighlight}
+                />
+              </div>
 
               {/* Search Results */}
               <ScrollArea className="flex-1">
                 <div className="max-w-6xl mx-auto">
                   <div className="p-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-semibold text-foreground">検索結果</h2>
+                      <h2 className="text-lg font-semibold text-foreground">本日のおすすめ</h2>
                     </div>
                     
-                    <Card className="bg-card border-border overflow-hidden">
-                      {searchResults.map((result, index) => (
-                        <SearchResultItem
-                          key={index}
-                          {...result}
-                          onClick={() => handleSearchResultClick(result.url, result.title)}
-                        />
-                      ))}
-                    </Card>
+                      <Card className="bg-card border-border overflow-hidden">
+                        {recommendedLoading ? (
+                          <div className="p-6 text-center text-muted-foreground">本日のおすすめを取得しています...</div>
+                        ) : recommendedError ? (
+                          <div className="p-6 text-center text-destructive">{recommendedError}</div>
+                        ) : (
+                          recommendedPapers.map((result, index) => (
+                            <SearchResultItem
+                              key={index}
+                              {...result}
+                              onClick={() => handleSearchResultClick(result)}
+                            />
+                          ))
+                        )}
+                      </Card>
                   </div>
                 </div>
               </ScrollArea>
@@ -242,10 +399,7 @@ const Index = () => {
                                 <ResearchResults
                                   key={index}
                                   data={item.data}
-                                  onPdfClick={(url, title) => {
-                                    setHtmlViewer(null);
-                                    setPdfViewer({ url, title });
-                                  }}
+                                  onPdfClick={openPdfDocument}
                                 />
                               );
                             
@@ -268,8 +422,10 @@ const Index = () => {
                                   className="p-4 bg-card border-border cursor-pointer hover:bg-card-hover transition-colors"
                                   onClick={() => {
                                     if (item.data.isComplete) {
-                                      setPdfViewer(null);
+                                      closePdfViewer();
                                       setHtmlViewer(item.data.html);
+                                      setLastHtmlItemTimestamp(item.timestamp);
+                                      setPendingHtmlAutoOpen(false);
                                     }
                                   }}
                                 >
@@ -338,13 +494,12 @@ const Index = () => {
 
       {pdfViewer && !htmlViewer && (
         <PDFViewer 
+          key={`${pdfViewer.url}-${pdfViewer.openedAt}`}
           url={pdfViewer.url} 
           title={pdfViewer.title} 
-          onClose={() => {
-            setPdfViewer(null);
-            clearHighlight();
-            setPdfContext("");
-          }}
+          authors={pdfViewer.authors}
+          source={pdfViewer.source}
+          onClose={closePdfViewer}
           onWidthChange={handleViewerWidthChange}
           onTextSelect={(text) => setSelectedPdfText(text)}
           onPdfLoaded={(fullText) => setPdfContext(fullText)}
@@ -355,7 +510,7 @@ const Index = () => {
       {htmlViewer && (
         <HTMLViewer 
           html={htmlViewer} 
-          onClose={() => setHtmlViewer(null)}
+          onClose={handleHtmlViewerClose}
           onWidthChange={handleViewerWidthChange}
         />
       )}
