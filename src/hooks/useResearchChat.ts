@@ -290,16 +290,27 @@ export function useResearchChat() {
 
               // Handle positioning analysis
               if (parsed.type === "positioning_analysis") {
-                console.log("Received positioning_analysis event:", parsed);
-                console.log("Positioning data:", parsed.data);
-                setTimeline((prev) => [
-                  ...prev,
-                  {
-                    type: "positioning_analysis",
-                    timestamp: Date.now(),
-                    data: parsed.data || {},
-                  },
-                ]);
+                console.log("[FRONTEND] Received positioning_analysis event:", parsed);
+                console.log("[FRONTEND] Positioning data:", parsed.data);
+                console.log("[FRONTEND] Data structure:", {
+                  hasAxes: !!parsed.data?.axes,
+                  hasItems: !!parsed.data?.items,
+                  itemsLength: parsed.data?.items?.length,
+                  hasInsights: !!parsed.data?.insights,
+                  insightsLength: parsed.data?.insights?.length
+                });
+                setTimeline((prev) => {
+                  const newTimeline: TimelineItem[] = [
+                    ...prev,
+                    {
+                      type: "positioning_analysis" as const,
+                      timestamp: Date.now(),
+                      data: parsed.data || {},
+                    },
+                  ];
+                  console.log("[FRONTEND] Updated timeline with positioning analysis");
+                  return newTimeline;
+                });
                 continue;
               }
 
