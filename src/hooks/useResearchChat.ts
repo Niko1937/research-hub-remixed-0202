@@ -6,7 +6,7 @@ export interface Message {
 }
 
 export interface TimelineItem {
-  type: "user_message" | "thinking" | "research_result" | "theme_evaluation" | "knowwho_result" | "html_generation" | "assistant_message";
+  type: "user_message" | "thinking" | "research_result" | "theme_evaluation" | "knowwho_result" | "positioning_analysis" | "seeds_needs_matching" | "html_generation" | "assistant_message";
   timestamp: number;
   data: any;
 }
@@ -283,6 +283,38 @@ export function useResearchChat() {
                     type: "knowwho_result",
                     timestamp: Date.now(),
                     data: { experts: parsed.experts || [] },
+                  },
+                ]);
+                continue;
+              }
+
+              // Handle positioning analysis
+              if (parsed.type === "positioning_analysis") {
+                console.log("Received positioning_analysis event:", parsed);
+                console.log("Positioning data:", parsed.data);
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "positioning_analysis",
+                    timestamp: Date.now(),
+                    data: parsed.data || {},
+                  },
+                ]);
+                continue;
+              }
+
+              // Handle seeds-needs matching
+              if (parsed.type === "seeds_needs_matching") {
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "seeds_needs_matching",
+                    timestamp: Date.now(),
+                    data: {
+                      seedTitle: parsed.seedTitle || "",
+                      seedDescription: parsed.seedDescription || "",
+                      candidates: parsed.candidates || [],
+                    },
                   },
                 ]);
                 continue;

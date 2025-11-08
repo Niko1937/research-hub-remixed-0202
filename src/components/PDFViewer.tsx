@@ -40,9 +40,13 @@ interface HighlightData {
 }
 
 const clamp = (value: number, min = 0, max = 1) => Math.min(Math.max(value, min), max);
+const DEBUG_PDF_HIGHLIGHT = Boolean(import.meta.env.DEV);
 
 function ensureHighlightLayer(pageWrapper: HTMLElement) {
-  let highlightLayer = pageWrapper.querySelector<HTMLDivElement>(".pdf-highlight-layer");
+  const textLayer = pageWrapper.querySelector<HTMLElement>(".textLayer");
+  if (!textLayer) return null;
+
+  let highlightLayer = textLayer.querySelector<HTMLDivElement>(".pdf-highlight-layer");
   if (!highlightLayer) {
     highlightLayer = document.createElement("div");
     highlightLayer.className = "pdf-highlight-layer";
@@ -53,8 +57,11 @@ function ensureHighlightLayer(pageWrapper: HTMLElement) {
       z-index: 5;
       mix-blend-mode: multiply;
     `;
-    pageWrapper.appendChild(highlightLayer);
+    textLayer.appendChild(highlightLayer);
   }
+  highlightLayer.style.transform = textLayer.style.transform;
+  highlightLayer.style.transformOrigin = textLayer.style.transformOrigin;
+
   return highlightLayer;
 }
 
@@ -99,7 +106,21 @@ export function PDFViewer({
     if (!pageWrapper) return;
 
     const highlightLayer = ensureHighlightLayer(pageWrapper);
-    highlightData.rects.forEach((rect) => {
+    if (!highlightLayer) return;
+    const padX = 2;
+    const padY = 1;
+
+    const toPercent = (value: number) => `${(value * 100).toFixed(4)}%`;
+
+    highlightData.rects.forEach((rect, idx) => {
+      const startX = clamp(rect.leftRatio);
+      const endX = clamp(rect.leftRatio + rect.widthRatio);
+      const startY = clamp(rect.topRatio);
+      const endY = clamp(rect.topRatio + rect.heightRatio);
+
+      const widthPercent = Math.max(endX - startX, 0);
+      const heightPercent = Math.max(endY - startY, 0);
+
       const highlight = document.createElement("div");
       highlight.className = "pdf-highlight-block";
       highlight.style.cssText = `
@@ -107,12 +128,21 @@ export function PDFViewer({
         pointer-events: none;
         background: rgba(250, 204, 21, 0.35);
         border-radius: 4px;
-        left: ${rect.leftRatio * 100}%;
-        top: ${rect.topRatio * 100}%;
-        width: ${rect.widthRatio * 100}%;
-        height: ${rect.heightRatio * 100}%;
+        left: max(0px, calc(${toPercent(startX)} - ${padX}px));
+        top: max(0px, calc(${toPercent(startY)} - ${padY}px));
+        width: calc(${toPercent(widthPercent)} + ${padX * 2}px);
+        height: calc(${toPercent(heightPercent)} + ${padY * 2}px);
       `;
       highlightLayer.appendChild(highlight);
+
+      if (DEBUG_PDF_HIGHLIGHT && idx === 0) {
+        const { width, height } = highlightLayer.getBoundingClientRect();
+        console.debug("[PDF][Highlight][render]", {
+          page: highlightData.pageNumber,
+          layerSize: { width, height },
+          rect: highlight.style.cssText,
+        });
+      }
     });
   }, [clearHighlightOverlays]);
 
@@ -134,22 +164,39 @@ export function PDFViewer({
       const pageWrapper = element.closest<HTMLElement>(".pdf-page-wrapper");
       if (!pageWrapper || !pageWrapper.dataset.pageNumber) return false;
 
-      const highlightLayer = pageWrapper.querySelector<HTMLElement>(".pdf-highlight-layer");
-      const baseRect = highlightLayer?.getBoundingClientRect() ?? pageWrapper.getBoundingClientRect();
+      const textLayer = pageWrapper.querySelector<HTMLElement>(".textLayer");
+      const baseRect = textLayer?.getBoundingClientRect() ?? pageWrapper.getBoundingClientRect();
       if (baseRect.width === 0 || baseRect.height === 0) return false;
-      const paddingX = 2 / baseRect.width;
-      const paddingY = 1 / baseRect.height;
 
       const rects = Array.from(range.getClientRects())
         .map((rect) => ({
-          topRatio: clamp(((rect.top - baseRect.top) / baseRect.height) - paddingY, 0, 1),
-          leftRatio: clamp(((rect.left - baseRect.left) / baseRect.width) - paddingX, 0, 1),
-          widthRatio: clamp(rect.width / baseRect.width + paddingX * 2, 0, 1),
-          heightRatio: clamp(rect.height / baseRect.height + paddingY * 2, 0, 1),
+          topRatio: clamp((rect.top - baseRect.top) / baseRect.height),
+          leftRatio: clamp((rect.left - baseRect.left) / baseRect.width),
+          widthRatio: clamp(rect.width / baseRect.width),
+          heightRatio: clamp(rect.height / baseRect.height),
         }))
         .filter((rect) => rect.widthRatio > 0 && rect.heightRatio > 0);
 
       if (!rects.length) return false;
+
+      if (DEBUG_PDF_HIGHLIGHT) {
+        console.debug("[PDF][Highlight][selection]", {
+          page: pageWrapper.dataset.pageNumber,
+          baseRect: {
+            top: baseRect.top,
+            left: baseRect.left,
+            width: baseRect.width,
+            height: baseRect.height,
+          },
+          firstClientRect: {
+            top: range.getClientRects()[0]?.top,
+            left: range.getClientRects()[0]?.left,
+            width: range.getClientRects()[0]?.width,
+            height: range.getClientRects()[0]?.height,
+          },
+          ratios: rects[0],
+        });
+      }
 
       highlightDataRef.current = {
         pageNumber: Number(pageWrapper.dataset.pageNumber),

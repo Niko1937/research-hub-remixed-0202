@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 
-type Tool = "wide-knowledge" | "theme-evaluation" | "knowwho" | "html-generation";
+type Tool = "wide-knowledge" | "theme-evaluation" | "knowwho" | "positioning-analysis" | "seeds-needs-matching" | "html-generation";
 type Mode = "search" | "assistant";
 
 interface ChatInputProps {
@@ -47,6 +47,8 @@ export function ChatInput({
     "wide-knowledge": "ワイドナレッジ検索",
     "theme-evaluation": "テーマ評価",
     "knowwho": "KnowWho検索",
+    "positioning-analysis": "ポジショニング分析",
+    "seeds-needs-matching": "シーズ・ニーズマッチング",
     "html-generation": "HTML資料生成",
   };
 
@@ -179,6 +181,20 @@ export function ChatInput({
                         >
                           <div className="text-sm font-medium">KnowWho検索</div>
                           <div className="text-xs text-muted-foreground">専門家・研究者を検索</div>
+                        </button>
+                        <button
+                          onClick={() => handleToolSelect("positioning-analysis")}
+                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                        >
+                          <div className="text-sm font-medium">ポジショニング分析</div>
+                          <div className="text-xs text-muted-foreground">比較検討軸でビジュアル分析</div>
+                        </button>
+                        <button
+                          onClick={() => handleToolSelect("seeds-needs-matching")}
+                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                        >
+                          <div className="text-sm font-medium">シーズ・ニーズマッチング</div>
+                          <div className="text-xs text-muted-foreground">研究シーズとニーズ候補を評価</div>
                         </button>
                         <button
                           onClick={() => handleToolSelect("html-generation")}

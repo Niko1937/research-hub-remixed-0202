@@ -11,6 +11,8 @@ import { ThemeEvaluation } from "@/components/ThemeEvaluation";
 import { KnowWhoResults } from "@/components/KnowWhoResults";
 import { SearchResultItem } from "@/components/SearchResultItem";
 import { UseCaseCards } from "@/components/UseCaseCards";
+import { PositioningAnalysis } from "@/components/PositioningAnalysis";
+import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -414,6 +416,24 @@ const Index = () => {
                             
                             case "knowwho_result":
                               return <KnowWhoResults key={index} experts={item.data.experts} />;
+                            
+                            case "positioning_analysis":
+                              return (
+                                <PositioningAnalysis
+                                  key={index}
+                                  data={item.data}
+                                />
+                              );
+                            
+                            case "seeds_needs_matching":
+                              return (
+                                <SeedsNeedsMatching
+                                  key={index}
+                                  seedTitle={item.data.seedTitle}
+                                  seedDescription={item.data.seedDescription}
+                                  candidates={item.data.candidates}
+                                />
+                              );
                             
                             case "html_generation":
                               return (
