@@ -1,6 +1,23 @@
-import { FileText, Target, FileSpreadsheet } from "lucide-react";
+import { FileText, Target, FileSpreadsheet, ChevronLeft, ChevronRight } from "lucide-react";
+import useEmblaCarousel from "embla-carousel-react";
+import { useCallback } from "react";
+import { Button } from "@/components/ui/button";
 
 export function UseCaseCards() {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ 
+    align: "start",
+    loop: false,
+    slidesToScroll: 1,
+  });
+
+  const scrollPrev = useCallback(() => {
+    if (emblaApi) emblaApi.scrollPrev();
+  }, [emblaApi]);
+
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext();
+  }, [emblaApi]);
+
   const useCases = [
     {
       icon: FileText,
@@ -20,40 +37,70 @@ export function UseCaseCards() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-12 pb-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {useCases.map((useCase, index) => {
-          const Icon = useCase.icon;
-          return (
-            <div
-              key={index}
-              className="group relative overflow-hidden rounded-2xl bg-card/50 
-                border border-border
-                transition-all duration-300 ease-out
-                hover:bg-card hover:shadow-lg hover:border-primary/20
-                cursor-pointer"
-            >
-              <div className="relative p-10">
-                {/* Icon */}
-                <div className="mb-6">
-                  <div className="text-primary transition-transform duration-300 group-hover:scale-110">
-                    <Icon className="w-12 h-12" strokeWidth={1.5} />
+    <div className="max-w-6xl mx-auto px-6 py-6">
+      <div className="relative">
+        <div className="overflow-hidden" ref={emblaRef}>
+          <div className="flex gap-4">
+            {useCases.map((useCase, index) => {
+              const Icon = useCase.icon;
+              return (
+                <div
+                  key={index}
+                  className="flex-[0_0_100%] md:flex-[0_0_calc(33.333%-0.67rem)] min-w-0"
+                >
+                  <div
+                    className="group relative overflow-hidden rounded-2xl bg-card/50 
+                      border border-border h-full
+                      transition-all duration-300 ease-out
+                      hover:bg-card hover:shadow-lg hover:border-primary/20
+                      cursor-pointer"
+                  >
+                    <div className="relative p-8">
+                      {/* Icon */}
+                      <div className="mb-4">
+                        <div className="text-primary transition-transform duration-300 group-hover:scale-110">
+                          <Icon className="w-10 h-10" strokeWidth={1.5} />
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold text-foreground">
+                          {useCase.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {useCase.description}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        </div>
 
-                {/* Content */}
-                <div className="space-y-3">
-                  <h3 className="text-xl font-semibold text-foreground">
-                    {useCase.title}
-                  </h3>
-                  <p className="text-base text-muted-foreground leading-relaxed">
-                    {useCase.description}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {/* Navigation Buttons */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={scrollPrev}
+          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 
+            hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity
+            bg-background/80 backdrop-blur-sm"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={scrollNext}
+          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 
+            hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity
+            bg-background/80 backdrop-blur-sm"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

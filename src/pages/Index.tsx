@@ -11,6 +11,8 @@ import { ThemeEvaluation } from "@/components/ThemeEvaluation";
 import { KnowWhoResults } from "@/components/KnowWhoResults";
 import { SearchResultItem } from "@/components/SearchResultItem";
 import { UseCaseCards } from "@/components/UseCaseCards";
+import { HeroSection } from "@/components/HeroSection";
+import { ConceptSections } from "@/components/ConceptSections";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
 import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -344,8 +346,9 @@ const Index = () => {
           {mode === "search" ? (
             // Search Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
-              {/* Use Case Cards */}
+              <HeroSection />
               <UseCaseCards />
+              <ConceptSections />
 
               <div className="max-w-6xl mx-auto w-full">
                 <ChatInput 
