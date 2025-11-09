@@ -19,7 +19,7 @@ import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, FileText, Search, MessageSquare } from "lucide-react";
+import { Sparkles, Loader2, FileText, Search, MessageSquare, X, ChevronDown } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
@@ -140,6 +140,7 @@ const Index = () => {
   const [clearHighlightSignal, setClearHighlightSignal] = useState(0);
   const [pendingHtmlAutoOpen, setPendingHtmlAutoOpen] = useState(false);
   const [lastHtmlItemTimestamp, setLastHtmlItemTimestamp] = useState<number | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
 
   const clearHighlight = useCallback(() => {
     setSelectedPdfText("");
@@ -348,8 +349,33 @@ const Index = () => {
             // Search Mode Layout
             <ScrollArea className="flex-1">
               <div className="animate-fade-in">
-                <HeroSection />
-                <InformationCarousel />
+                {showIntro ? (
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowIntro(false)}
+                      className="absolute top-4 right-4 z-10 hover:bg-muted/80"
+                      aria-label="イントロを閉じる"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                    <HeroSection />
+                    <InformationCarousel />
+                  </div>
+                ) : (
+                  <div className="max-w-6xl mx-auto px-6 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowIntro(true)}
+                      className="gap-2"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                      イントロを表示
+                    </Button>
+                  </div>
+                )}
 
                 <div className="max-w-6xl mx-auto px-6 py-5">
                   <ChatInput 
