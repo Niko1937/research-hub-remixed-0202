@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState, useRef, useEffect } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface HTMLViewerProps {
   html: string;
@@ -14,6 +15,7 @@ export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     onWidthChange?.(width);
@@ -54,12 +56,13 @@ export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
   return (
     <div
       ref={containerRef}
-      className="fixed right-0 top-0 h-screen bg-background border-l border-border shadow-2xl z-50 animate-slide-in-right flex"
-      style={{ width: `${width}px` }}
+      className="fixed right-0 top-0 h-screen bg-background border-l border-border shadow-2xl z-50 animate-slide-in-right flex
+        max-md:left-0 max-md:right-0 max-md:w-full"
+      style={{ width: isMobile ? '100%' : `${width}px` }}
     >
-      {/* Resize Handle */}
+      {/* Resize Handle - Hidden on mobile */}
       <div
-        className="w-2 h-full cursor-col-resize hover:bg-primary/20 transition-colors flex items-center justify-center group"
+        className="w-2 h-full cursor-col-resize hover:bg-primary/20 transition-colors flex items-center justify-center group max-md:hidden"
         onMouseDown={() => setIsDragging(true)}
       >
         <div className="h-12 w-1 bg-border group-hover:bg-primary rounded-full transition-colors" />

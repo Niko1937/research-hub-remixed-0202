@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, FileText, Search, MessageSquare, X, ChevronDown } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const initialSearchResults = [
   { 
@@ -141,6 +142,7 @@ const Index = () => {
   const [pendingHtmlAutoOpen, setPendingHtmlAutoOpen] = useState(false);
   const [lastHtmlItemTimestamp, setLastHtmlItemTimestamp] = useState<number | null>(null);
   const [showIntro, setShowIntro] = useState(true);
+  const isMobile = useIsMobile();
 
   const clearHighlight = useCallback(() => {
     setSelectedPdfText("");
@@ -342,7 +344,7 @@ const Index = () => {
         <main 
           className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
           style={{
-            marginRight: (pdfViewer || htmlViewer) ? `${viewerWidth}px` : 0
+            marginRight: (pdfViewer || htmlViewer) && !isMobile ? `${viewerWidth}px` : 0
           }}
         >
           {mode === "search" ? (
@@ -364,7 +366,7 @@ const Index = () => {
                     <InformationCarousel />
                   </div>
                 ) : (
-                  <div className="max-w-6xl mx-auto px-6 pt-4">
+                  <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
                     <Button
                       variant="outline"
                       size="sm"
@@ -377,7 +379,7 @@ const Index = () => {
                   </div>
                 )}
 
-                <div className="max-w-6xl mx-auto px-6 py-5">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5">
                   <ChatInput 
                     onSubmit={handleSubmit}
                     mode={mode}
@@ -389,7 +391,7 @@ const Index = () => {
                 </div>
 
                 {/* Recommended Papers */}
-                <div className="max-w-6xl mx-auto px-6 pb-8">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-8">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-foreground">本日のおすすめ</h2>
                   </div>
@@ -416,7 +418,7 @@ const Index = () => {
             // Assistant Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
               <ScrollArea className="flex-1">
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                   <div className="max-w-4xl mx-auto space-y-6 pb-32">
                     {timeline.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-[50vh] text-center">

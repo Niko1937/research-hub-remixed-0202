@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import * as pdfjsLib from "pdfjs-dist";
 import "pdfjs-dist/web/pdf_viewer.css";
 
@@ -84,6 +85,7 @@ export function PDFViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const highlightDataRef = useRef<HighlightData | null>(null);
+  const isMobile = useIsMobile();
 
   const clearHighlightOverlays = useCallback(() => {
     if (!pdfContainerRef.current) return;
@@ -418,12 +420,13 @@ export function PDFViewer({
   return (
     <div
       ref={containerRef}
-      className="fixed right-0 top-0 h-screen bg-background border-l border-border shadow-2xl z-50 animate-slide-in-right flex"
-      style={{ width: `${width}px` }}
+      className="fixed right-0 top-0 h-screen bg-background border-l border-border shadow-2xl z-50 animate-slide-in-right flex
+        max-md:left-0 max-md:right-0 max-md:w-full"
+      style={{ width: isMobile ? '100%' : `${width}px` }}
     >
-      {/* Resize Handle */}
+      {/* Resize Handle - Hidden on mobile */}
       <div
-        className="w-2 h-full cursor-col-resize hover:bg-primary/20 transition-colors flex items-center justify-center group"
+        className="w-2 h-full cursor-col-resize hover:bg-primary/20 transition-colors flex items-center justify-center group max-md:hidden"
         onMouseDown={() => setIsDragging(true)}
       >
         <div className="h-12 w-1 bg-border group-hover:bg-primary rounded-full transition-colors" />
