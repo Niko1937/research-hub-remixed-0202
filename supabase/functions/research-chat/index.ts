@@ -469,34 +469,47 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                   )
                 );
               } else if (step.tool === "knowwho") {
-                // Build context from previous tool results
-                let knowWhoContext = `You are an expert finder. Based on the query "${step.query}", generate a list of relevant experts.`;
+                // Build context from conversation history and previous tool results
+                let knowWhoContext = `ユーザーの質問「${userMessage}」に関連する専門家・研究者を検索します。`;
                 
+                // Add conversation history context
+                if (messages.length > 1) {
+                  knowWhoContext += `\n\n## 会話の経緯:\n`;
+                  messages.slice(-5).forEach((msg: Message) => {
+                    knowWhoContext += `${msg.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${msg.content.substring(0, 200)}...\n`;
+                  });
+                }
+                
+                // Add previous tool results
                 if (toolResults.length > 0) {
-                  knowWhoContext += `\n\n## Previous Research Results:\n`;
+                  knowWhoContext += `\n\n## これまでに実行したツールの結果:\n`;
                   for (const result of toolResults) {
                     knowWhoContext += `\n### ${result.tool} (Query: ${result.query})\n`;
                     if (result.tool === "wide-knowledge" && result.results) {
-                      // Summarize paper authors and topics
-                      knowWhoContext += `Papers found:\n`;
+                      knowWhoContext += `検索された論文:\n`;
                       for (const paper of result.results.slice(0, 3)) {
                         knowWhoContext += `- "${paper.title}" by ${paper.authors.join(", ")}\n`;
                       }
                     } else {
-                      knowWhoContext += JSON.stringify(result.results, null, 2) + "\n";
+                      knowWhoContext += JSON.stringify(result.results, null, 2).substring(0, 500) + "...\n";
                     }
                   }
-                  knowWhoContext += `\nUse the above research findings to suggest relevant experts in this field.`;
+                  knowWhoContext += `\n上記の研究結果や分析を踏まえて、最も関連性の高い専門家を検索してください。`;
                 }
 
-                const knowWhoPrompt = `${knowWhoContext}
+                const knowWhoPrompt = `あなたは日本の研究機関や大学の専門家データベースにアクセスできるシステムです。${knowWhoContext}
 
-Return a JSON object with this structure:
+現在の検索クエリ: ${step.query}
+
+**重要**: 会話履歴とツール実行結果を参考に、ユーザーの研究テーマに最も適した専門家を選定してください。
+
+以下のJSON形式で専門家リストを返してください：
+
 {
   "experts": [
     {
-      "name": "Dr. 名前",
-      "affiliation": "所属機関",
+      "name": "専門家の名前",
+      "affiliation": "所属機関（大学名・研究機関名）",
       "expertise": ["専門分野1", "専門分野2", "専門分野3"],
       "publications": 論文数(整数),
       "h_index": h-index値(整数),
@@ -505,10 +518,13 @@ Return a JSON object with this structure:
   ]
 }
 
-- experts配列には3-5名の専門家を含めてください
-- 実在しそうな日本の大学・研究機関を使用
-- 専門分野は検索クエリと研究結果に基づいて設定
-- publications と h_index は専門家のレベルに応じた妥当な数値を`;
+**指示:**
+- experts配列には4-6名の専門家を含めてください
+- 会話内容とツール結果から研究分野を特定し、その分野のトップ研究者を選定
+- 実在しそうな日本の大学・研究機関を使用（東京大学、京都大学、理化学研究所、産総研など）
+- 専門分野は検索クエリと研究結果に基づいて具体的に設定
+- publications と h_index は専門家のレベルに応じた妥当な数値を（h-index: 20-80, publications: 50-300）
+- 各専門家の専門性が少しずつ異なるようにバリエーションを持たせる`;
 
                 const knowWhoResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                   method: "POST",
@@ -807,41 +823,60 @@ JSON形式で出力:
                   );
                 }
               } else if (step.tool === "seeds-needs-matching") {
-                // Build context from previous tool results
-                let matchingContext = `Based on the user's research seed about "${step.query}", generate a seeds-needs matching analysis.`;
+                // Build comprehensive context from conversation and tool results
+                let matchingContext = `ユーザーの質問「${userMessage}」に基づき、研究シーズとニーズのマッチング分析を行います。`;
                 
+                // Add conversation history
+                if (messages.length > 1) {
+                  matchingContext += `\n\n## 会話の経緯:\n`;
+                  messages.slice(-5).forEach((msg: Message) => {
+                    matchingContext += `${msg.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${msg.content.substring(0, 300)}...\n`;
+                  });
+                }
+                
+                // Add previous tool results with more detail
                 if (toolResults.length > 0) {
-                  matchingContext += `\n\n## Previous Tool Results:\n`;
+                  matchingContext += `\n\n## これまでに実行したツールの結果:\n`;
                   for (const result of toolResults) {
-                    matchingContext += `\n### ${result.tool} (Query: ${result.query})\n`;
-                    matchingContext += JSON.stringify(result.results, null, 2) + "\n";
+                    matchingContext += `\n### ${result.tool}\n`;
+                    matchingContext += `検索クエリ: ${result.query}\n`;
+                    matchingContext += `結果:\n${JSON.stringify(result.results, null, 2)}\n\n`;
                   }
-                  matchingContext += `\nUse the above research findings to inform your seeds-needs matching analysis.`;
+                  matchingContext += `\n上記の研究結果、専門家情報、ポジショニング分析を踏まえて、実践的なシーズニーズマッチングを行ってください。`;
                 }
                 
                 // Generate seeds-needs matching with AI
-                const matchingPrompt = `You are a technology transfer analyst. ${matchingContext}
+                const matchingPrompt = `あなたは技術移転・産学連携の専門家です。${matchingContext}
 
-Return a JSON object with this structure:
+現在の分析対象: ${step.query}
+
+**重要**: 会話履歴とツール実行結果（外部論文、社内研究、専門家情報、ポジショニング分析など）を総合的に活用し、実現可能性の高いニーズ候補を提案してください。
+
+以下のJSON形式で出力してください：
+
 {
-  "seedTitle": "研究シーズのタイトル",
-  "seedDescription": "研究シーズの詳細説明（2-3文）",
+  "seedTitle": "研究シーズのタイトル（会話内容から具体的に）",
+  "seedDescription": "研究シーズの詳細説明（3-4文、技術的特徴と強みを含む）",
   "candidates": [
     {
-      "title": "ニーズ候補のタイトル",
-      "description": "ニーズの詳細（1-2文）",
-      "department": "部門名",
+      "title": "ニーズ候補のタイトル（具体的な適用先）",
+      "description": "ニーズの詳細（2-3文、なぜこのニーズに適合するか）",
+      "department": "想定される事業部門名（製造、エネルギー、ヘルスケア等）",
       "evaluation": "high" | "medium" | "low",
-      "reason": "評価理由の詳細説明",
+      "reason": "評価理由の詳細説明（技術的適合性、市場性、実現可能性を含む、3-4文）",
       "score": 0-100の適合度スコア
     }
   ]
 }
 
-- candidates配列には必ず5個のニーズ候補を含めてください
-- evaluationは high:2個、medium:2個、low:1個 の配分で
-- reasonは具体的で説得力のある評価理由を記述
-- scoreはevaluationと整合性を持たせる（high:75-95, medium:50-74, low:30-49）`;
+**指示:**
+- candidates配列には必ず6個のニーズ候補を含めてください
+- evaluationは high:2個、medium:3個、low:1個 の配分で
+- seedDescriptionには、ツール結果から得られた技術的洞察を反映
+- 各candidateは、会話やツール結果で言及された具体的な課題や応用分野に基づく
+- reasonは、なぜこのシーズがこのニーズに適合するのか、技術的・ビジネス的観点から説得力のある説明
+- scoreはevaluationと整合性を持たせる（high:80-95, medium:55-79, low:35-54）
+- 全て日本語で記述`;
 
                 const matchingResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                   method: "POST",
