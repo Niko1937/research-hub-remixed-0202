@@ -11,6 +11,7 @@ import { ThemeEvaluation } from "@/components/ThemeEvaluation";
 import { KnowWhoResults } from "@/components/KnowWhoResults";
 import { SearchResultItem } from "@/components/SearchResultItem";
 import { UseCaseCards } from "@/components/UseCaseCards";
+import { HeroSection } from "@/components/HeroSection";
 import { ConceptSections } from "@/components/ConceptSections";
 import { InformationCarousel } from "@/components/InformationCarousel";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
@@ -347,6 +348,7 @@ const Index = () => {
             // Search Mode Layout
             <ScrollArea className="flex-1">
               <div className="animate-fade-in">
+                <HeroSection />
                 <InformationCarousel />
 
                 <div className="max-w-6xl mx-auto px-6 py-5">

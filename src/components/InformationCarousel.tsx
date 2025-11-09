@@ -160,32 +160,15 @@ export function InformationCarousel() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 lg:py-10">
-      <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-6 lg:gap-8">
-        {/* Left: Fixed Description */}
-        <div className="flex items-center">
-          <div className="space-y-4 text-left">
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground leading-relaxed">
-              対話的な研究支援AIの
-            </p>
-            <p className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-primary leading-tight">
-              拡張性を示す
-            </p>
-            <p className="text-xl md:text-2xl lg:text-3xl text-foreground font-semibold">
-              AgentChatプロトタイプ
-            </p>
-          </div>
-        </div>
-
-        {/* Right: Carousel */}
-        <div 
-          className="relative" 
-          role="region" 
-          aria-label="情報カルーセル"
-          aria-roledescription="carousel"
-        >
-          <div className="overflow-hidden" ref={emblaRef}>
-            <div className="flex">
-              {items.map((item, index) => (
+      <div 
+        className="relative" 
+        role="region" 
+        aria-label="情報カルーセル"
+        aria-roledescription="carousel"
+      >
+        <div className="overflow-hidden" ref={emblaRef}>
+          <div className="flex">
+            {items.map((item, index) => (
               <div
                 key={index}
                 className="flex-[0_0_100%] min-w-0 px-2 md:px-3"
@@ -323,7 +306,6 @@ export function InformationCarousel() {
               )}
             />
           ))}
-        </div>
         </div>
       </div>
     </div>
