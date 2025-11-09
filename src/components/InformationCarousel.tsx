@@ -39,19 +39,19 @@ export function InformationCarousel() {
       detail: "AIの進化は凄まじく、Microsoft DiscoveryやAlphaEvolveのようにAIが研究プロセスそのものを実行する段階に入っています。しかし多くの組織では「過去の社内資料はどこに？」「誰が詳しい？」といったナレッジの把握と、AIが出した成果を報告書に言語化する作業が依然として最大の課題です。\n\nこのプロトタイプは、これら複雑に絡み合う課題を対話的に解決するアプローチを示します。"
     },
     {
-      title: "現在の機能",
+      title: "実装済み機能と制約",
       layout: "list",
-      subtitle: "今できること（最小構成の7機能）",
+      subtitle: "現在実装されている機能と、その実装方式",
       items: [
-        "論文検索 - 外部API連携で関連文献を収集",
-        "テーマ評価 - 社内 vs 外部の研究動向を分析",
-        "専門家検索 - 関連分野の専門家を推薦",
-        "ポジショニング分析 - 動的軸生成と3種類のチャート",
-        "シーズ・ニーズマッチング - 技術と課題の接続",
-        "HTML報告書生成 - インフォグラフィック自動作成",
-        "PDF閲覧・対話 - 文献との対話的学習"
+        "論文検索 - OpenAlex/Semantic Scholar/arXiv APIから最大5件取得（モック無し）",
+        "テーマ評価 - モックの社内研究データ2件 + モックのビジネス課題2件（実データベース接続無し）",
+        "専門家検索 - ハードコードされた3名のモック専門家データ（検索機能無し）",
+        "ポジショニング分析 - Gemini 2.5 flashで動的にJSON生成（軸数・項目数は可変）",
+        "シーズ・ニーズマッチング - モックデータによるマッチングスコア算出（実データベース接続無し）",
+        "HTML報告書生成 - Gemini 2.5 flashでインフォグラフィックHTMLコード生成",
+        "PDF閲覧 - 外部PDFをプロキシ経由で取得・表示（テキスト抽出やハイライトは未対応）"
       ],
-      note: "現在は外部の論文APIを叩くAgentとLLMで整えるAgentしか実装されていないため、社内ドキュメントや共有フォルダには接続していません。"
+      note: "Edge Function実装: research-chat（926行）とpdf-proxy（61行）。社内ドキュメント検索、共有フォルダ接続、ベクトル検索、RAG等は未実装。全てLovable AI（Gemini 2.5 flash固定）で処理。"
     },
     {
       title: "本質は拡張性",
@@ -282,24 +282,6 @@ export function InformationCarousel() {
           <ChevronRight className="h-5 w-5" />
         </Button>
 
-        {/* Dot Indicators */}
-        <div className="flex justify-center gap-2 mt-6 md:mt-8" role="tablist" aria-label="スライド選択">
-          {items.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => scrollTo(index)}
-              aria-label={`スライド ${index + 1} へ移動`}
-              aria-current={selectedIndex === index ? 'true' : 'false'}
-              role="tab"
-              className={cn(
-                "h-2 rounded-full transition-all duration-300",
-                selectedIndex === index 
-                  ? "w-8 bg-primary" 
-                  : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
-              )}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );
