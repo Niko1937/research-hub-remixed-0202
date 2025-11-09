@@ -226,9 +226,9 @@ serve(async (req) => {
                       content: `You are a research planning assistant. Analyze the user query and create a step-by-step execution plan.
 Available tools:
 - wide-knowledge: Search external papers and research (SKIP if user is viewing a PDF unless they explicitly ask for additional research)
-- theme-evaluation: Evaluate research themes against internal research and business needs
 - knowwho: Search for experts and researchers
 - positioning-analysis: Create positioning analysis comparing research items across multiple axes
+- seeds-needs-matching: Match research seeds with business needs
 - html-generation: Generate HTML infographics summarizing the conversation
 - chat: Use AI to summarize or format results
 
