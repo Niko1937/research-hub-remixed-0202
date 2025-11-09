@@ -34,9 +34,25 @@ export function InformationCarousel() {
   const items = [
     {
       title: "背景と課題",
-      layout: "split",
-      subtitle: "AIは「研究実行」へ。しかし現場は「過去の把握」と「結果の言語化」に追われている",
-      detail: "AIの進化は凄まじく、Microsoft DiscoveryやAlphaEvolveのようにAIが研究プロセスそのものを実行する段階に入っています。しかし多くの組織では「過去の社内資料はどこに？」「誰が詳しい？」といったナレッジの把握と、AIが出した成果を報告書に言語化する作業が依然として最大の課題です。\n\nこのプロトタイプは、これら複雑に絡み合う課題を対話的に解決するアプローチを示します。"
+      layout: "paragraph",
+      content: [
+        {
+          type: "heading",
+          text: "AIは「研究実行」へ。しかし現場は「過去の把握」と「結果の言語化」に追われている"
+        },
+        {
+          type: "text",
+          html: "AIの進化は凄まじく、<span class='text-primary font-semibold'>Microsoft Discovery</span>や<span class='text-primary font-semibold'>AlphaEvolve</span>のようにAIが研究プロセスそのものを実行する段階に入っています。"
+        },
+        {
+          type: "text",
+          html: "しかし多くの組織では「過去の社内資料はどこに？」「誰が詳しい？」といったナレッジの把握と、AIが出した成果を報告書に言語化する作業が依然として最大の課題です。"
+        },
+        {
+          type: "text",
+          html: "このプロトタイプは、これら複雑に絡み合う課題を対話的に解決するアプローチを示します。"
+        }
+      ]
     },
     {
       title: "実装済み機能と制約",
@@ -154,19 +170,24 @@ export function InformationCarousel() {
 
                   {/* Scrollable Content Area */}
                   <div className="flex-1 overflow-y-auto px-6 md:px-8 lg:px-10 py-6">
-                    {/* Split Layout */}
-                    {item.layout === 'split' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-                        <div className="space-y-4">
-                          <p className="text-base md:text-lg font-medium text-primary leading-relaxed">
-                            {item.subtitle}
-                          </p>
-                        </div>
-                        <div className="border-t md:border-t-0 md:border-l border-border/40 pt-4 md:pt-0 md:pl-6">
-                          <p className="text-sm text-muted-foreground leading-loose">
-                            {item.detail}
-                          </p>
-                        </div>
+                    {/* Paragraph Layout */}
+                    {item.layout === 'paragraph' && (
+                      <div className="max-w-4xl space-y-6">
+                        {item.content?.map((block: any, idx: number) => (
+                          <div key={idx}>
+                            {block.type === 'heading' && (
+                              <h3 className="text-base md:text-lg font-semibold text-primary leading-relaxed mb-4">
+                                {block.text}
+                              </h3>
+                            )}
+                            {block.type === 'text' && (
+                              <p 
+                                className="text-sm text-muted-foreground leading-loose"
+                                dangerouslySetInnerHTML={{ __html: block.html }}
+                              />
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
 
