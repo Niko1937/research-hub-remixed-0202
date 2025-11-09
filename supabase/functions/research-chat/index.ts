@@ -28,29 +28,141 @@ function stripCodeFence(content: string) {
     .trim();
 }
 
+// Error handling utilities
+function isRetryableError(error: any): boolean {
+  // Network errors, timeouts, and 5xx errors are retryable
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return true;
+  }
+  if (error.name === 'AbortError') {
+    return true;
+  }
+  if (error.status && error.status >= 500 && error.status < 600) {
+    return true;
+  }
+  // Rate limiting
+  if (error.status === 429) {
+    return true;
+  }
+  return false;
+}
+
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    initialDelay?: number;
+    maxDelay?: number;
+    onRetry?: (error: any, attempt: number) => void;
+  } = {}
+): Promise<T> {
+  const {
+    maxRetries = 3,
+    initialDelay = 1000,
+    maxDelay = 10000,
+    onRetry = () => {},
+  } = options;
+
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry if error is not retryable or if we've exhausted retries
+      if (!isRetryableError(error) || attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Calculate delay with exponential backoff
+      const delay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
+      
+      console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`, {
+        error: (error as any).message || error,
+        status: (error as any).status,
+      });
+      
+      onRetry(error, attempt + 1);
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit & { timeout?: number } = {}
+): Promise<Response> {
+  const { timeout = 30000, ...fetchOptions } = options;
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
 // Search OpenAlex
 async function searchOpenAlex(query: string): Promise<ExternalPaper[]> {
   try {
-    const response = await fetch(
-      `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=10&sort=cited_by_count:desc`,
-      { headers: { "User-Agent": "Research-Hub/1.0 (mailto:research@example.com)" } }
+    return await retryWithBackoff(
+      async () => {
+        const response = await fetchWithTimeout(
+          `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=10&sort=cited_by_count:desc`,
+          { 
+            headers: { "User-Agent": "Research-Hub/1.0 (mailto:research@example.com)" },
+            timeout: 15000
+          }
+        );
+        
+        if (!response.ok) {
+          const error: any = new Error(`OpenAlex API error: ${response.status}`);
+          error.status = response.status;
+          throw error;
+        }
+        
+        const data = await response.json();
+        
+        return (data.results || [])
+          .filter((work: any) => work.open_access?.oa_url)
+          .slice(0, 3)
+          .map((work: any) => ({
+            title: work.title || "No title",
+            abstract: work.abstract || work.display_name || "",
+            authors: (work.authorships || []).slice(0, 3).map((a: any) => a.author?.display_name || "Unknown"),
+            year: work.publication_year?.toString() || "N/A",
+            source: "OpenAlex",
+            url: work.open_access.oa_url,
+            citations: work.cited_by_count,
+          }));
+      },
+      {
+        maxRetries: 3,
+        onRetry: (error, attempt) => {
+          console.log(`OpenAlex retry ${attempt}/3:`, (error as any).message);
+        }
+      }
     );
-    const data = await response.json();
-    
-    return (data.results || [])
-      .filter((work: any) => work.open_access?.oa_url)
-      .slice(0, 3)
-      .map((work: any) => ({
-        title: work.title || "No title",
-        abstract: work.abstract || work.display_name || "",
-        authors: (work.authorships || []).slice(0, 3).map((a: any) => a.author?.display_name || "Unknown"),
-        year: work.publication_year?.toString() || "N/A",
-        source: "OpenAlex",
-        url: work.open_access.oa_url,
-        citations: work.cited_by_count,
-      }));
   } catch (error) {
-    console.error("OpenAlex search error:", error);
+    console.error("OpenAlex search failed after retries:", {
+      error: (error as any).message,
+      query,
+      stack: (error as any).stack,
+    });
     return [];
   }
 }
@@ -58,26 +170,50 @@ async function searchOpenAlex(query: string): Promise<ExternalPaper[]> {
 // Search Semantic Scholar
 async function searchSemanticScholar(query: string): Promise<ExternalPaper[]> {
   try {
-    const response = await fetch(
-      `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10&fields=title,abstract,year,authors,venue,citationCount,openAccessPdf`,
-      { headers: { "User-Agent": "Research-Hub/1.0" } }
+    return await retryWithBackoff(
+      async () => {
+        const response = await fetchWithTimeout(
+          `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10&fields=title,abstract,year,authors,venue,citationCount,openAccessPdf`,
+          { 
+            headers: { "User-Agent": "Research-Hub/1.0" },
+            timeout: 15000
+          }
+        );
+        
+        if (!response.ok) {
+          const error: any = new Error(`Semantic Scholar API error: ${response.status}`);
+          error.status = response.status;
+          throw error;
+        }
+        
+        const data = await response.json();
+        
+        return (data.data || [])
+          .filter((paper: any) => paper.openAccessPdf?.url)
+          .slice(0, 3)
+          .map((paper: any) => ({
+            title: paper.title || "No title",
+            abstract: paper.abstract || "",
+            authors: (paper.authors || []).slice(0, 3).map((a: any) => a.name),
+            year: paper.year?.toString() || "N/A",
+            source: "Semantic Scholar",
+            url: paper.openAccessPdf.url,
+            citations: paper.citationCount,
+          }));
+      },
+      {
+        maxRetries: 3,
+        onRetry: (error, attempt) => {
+          console.log(`Semantic Scholar retry ${attempt}/3:`, (error as any).message);
+        }
+      }
     );
-    const data = await response.json();
-    
-    return (data.data || [])
-      .filter((paper: any) => paper.openAccessPdf?.url)
-      .slice(0, 3)
-      .map((paper: any) => ({
-        title: paper.title || "No title",
-        abstract: paper.abstract || "",
-        authors: (paper.authors || []).slice(0, 3).map((a: any) => a.name),
-        year: paper.year?.toString() || "N/A",
-        source: "Semantic Scholar",
-        url: paper.openAccessPdf.url,
-        citations: paper.citationCount,
-      }));
   } catch (error) {
-    console.error("Semantic Scholar search error:", error);
+    console.error("Semantic Scholar search failed after retries:", {
+      error: (error as any).message,
+      query,
+      stack: (error as any).stack,
+    });
     return [];
   }
 }
@@ -85,30 +221,52 @@ async function searchSemanticScholar(query: string): Promise<ExternalPaper[]> {
 // Search arXiv
 async function searchArXiv(query: string): Promise<ExternalPaper[]> {
   try {
-    const response = await fetch(
-      `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=3`
+    return await retryWithBackoff(
+      async () => {
+        const response = await fetchWithTimeout(
+          `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=3`,
+          { timeout: 15000 }
+        );
+        
+        if (!response.ok) {
+          const error: any = new Error(`arXiv API error: ${response.status}`);
+          error.status = response.status;
+          throw error;
+        }
+        
+        const text = await response.text();
+        
+        const entries = text.match(/<entry>[\s\S]*?<\/entry>/g) || [];
+        return entries.map(entry => {
+          const title = entry.match(/<title>(.*?)<\/title>/)?.[1] || "No title";
+          const abstract = entry.match(/<summary>(.*?)<\/summary>/)?.[1]?.replace(/\n/g, " ").trim() || "";
+          const authors = [...entry.matchAll(/<name>(.*?)<\/name>/g)].map(m => m[1]);
+          const published = entry.match(/<published>(.*?)<\/published>/)?.[1]?.slice(0, 4) || "N/A";
+          const id = entry.match(/<id>(.*?)<\/id>/)?.[1] || "";
+          
+          return {
+            title: title.replace(/\n/g, " ").trim(),
+            abstract,
+            authors: authors.slice(0, 3),
+            year: published,
+            source: "arXiv",
+            url: id.replace('/abs/', '/pdf/') + '.pdf',
+          };
+        });
+      },
+      {
+        maxRetries: 3,
+        onRetry: (error, attempt) => {
+          console.log(`arXiv retry ${attempt}/3:`, (error as any).message);
+        }
+      }
     );
-    const text = await response.text();
-    
-    const entries = text.match(/<entry>[\s\S]*?<\/entry>/g) || [];
-    return entries.map(entry => {
-      const title = entry.match(/<title>(.*?)<\/title>/)?.[1] || "No title";
-      const abstract = entry.match(/<summary>(.*?)<\/summary>/)?.[1]?.replace(/\n/g, " ").trim() || "";
-      const authors = [...entry.matchAll(/<name>(.*?)<\/name>/g)].map(m => m[1]);
-      const published = entry.match(/<published>(.*?)<\/published>/)?.[1]?.slice(0, 4) || "N/A";
-      const id = entry.match(/<id>(.*?)<\/id>/)?.[1] || "";
-      
-      return {
-        title: title.replace(/\n/g, " ").trim(),
-        abstract,
-        authors: authors.slice(0, 3),
-        year: published,
-        source: "arXiv",
-        url: id.replace('/abs/', '/pdf/') + '.pdf',
-      };
-    });
   } catch (error) {
-    console.error("arXiv search error:", error);
+    console.error("arXiv search failed after retries:", {
+      error: (error as any).message,
+      query,
+      stack: (error as any).stack,
+    });
     return [];
   }
 }
@@ -212,18 +370,20 @@ serve(async (req) => {
                 planningContext += `\n\n**IMPORTANT**: User is currently viewing a PDF document. Unless they explicitly ask "他に何か研究はあるか" or similar requests for additional research, DO NOT use the wide-knowledge tool. Focus on analyzing the PDF content they are viewing.`;
               }
 
-              const planResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  model: "google/gemini-2.5-flash",
-                  messages: [
-                    {
-                      role: "system",
-                      content: `You are a research planning assistant. Analyze the user query and create a step-by-step execution plan.
+              const planResponse = await retryWithBackoff(
+                async () => {
+                  const response = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      model: "google/gemini-2.5-flash",
+                      messages: [
+                        {
+                          role: "system",
+                          content: `You are a research planning assistant. Analyze the user query and create a step-by-step execution plan.
 Available tools:
 - wide-knowledge: Search external papers and research (SKIP if user is viewing a PDF unless they explicitly ask for additional research)
 - knowwho: Search for experts and researchers
@@ -239,16 +399,29 @@ Return a JSON object with "steps" array containing objects with this structure:
 ]}
 
 Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
-                    },
-                    { role: "user", content: planningContext }
-                  ],
-                  response_format: { type: "json_object" }
-                }),
-              });
-
-              if (!planResponse.ok) {
-                throw new Error("Failed to generate plan");
-              }
+                        },
+                        { role: "user", content: planningContext }
+                      ],
+                      response_format: { type: "json_object" }
+                    }),
+                    timeout: 30000
+                  });
+                  
+                  if (!response.ok) {
+                    const error: any = new Error(`AI API error: ${response.status}`);
+                    error.status = response.status;
+                    throw error;
+                  }
+                  
+                  return response;
+                },
+                {
+                  maxRetries: 2,
+                  onRetry: (error, attempt) => {
+                    console.log(`Plan generation retry ${attempt}/2:`, (error as any).message);
+                  }
+                }
+              );
 
               const planData = await planResponse.json();
               const planRaw = planData.choices?.[0]?.message?.content || "{}";
