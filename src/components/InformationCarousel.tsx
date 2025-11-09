@@ -33,7 +33,7 @@ export function InformationCarousel() {
 
   const items = [
     {
-      title: "背景と課題",
+      title: "昨今の研究支援AI",
       layout: "paragraph",
       content: [
         {
@@ -46,7 +46,11 @@ export function InformationCarousel() {
         },
         {
           type: "text",
-          html: "しかし多くの組織では「過去の社内資料はどこに？」「誰が詳しい？」といったナレッジの把握と、AIが出した成果を報告書に言語化する作業が依然として最大の課題です。"
+          html: "一方で、<span class='text-primary font-semibold'>Elicit</span>や<span class='text-primary font-semibold'>Consensus</span>、<span class='text-primary font-semibold'>Scite</span>といった研究系AI SaaSは、論文検索・要約・引用分析に特化し、研究者の文献調査を効率化しています。<span class='text-primary font-semibold'>ResearchRabbit</span>や<span class='text-primary font-semibold'>Connected Papers</span>は文献間の関連性を可視化し、新たな研究の糸口を発見する支援をしています。"
+        },
+        {
+          type: "text",
+          html: "しかし多くの組織では「過去の社内資料はどこに？」「誰が詳しい？」といったナレッジの把握と、AIが出した成果を報告書に言語化する作業が依然として最大の課題です。既存の研究系AI SaaSは外部文献に強いものの、社内ナレッジとの統合や、組織固有の研究戦略立案には対応していません。"
         },
         {
           type: "text",
