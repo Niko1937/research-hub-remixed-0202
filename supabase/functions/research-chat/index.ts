@@ -1110,11 +1110,20 @@ ${toolResultsContext}
               encoder.encode(`data: ${JSON.stringify({ type: "chat_start" })}\n\n`)
             );
 
-            let contextPrompt = `ユーザーの質問: ${userMessage}`;
+            // Build comprehensive context including current and historical tool results
+            let contextPrompt = `あなたはR&D研究支援AIアシスタントです。
+
+## 重要な指示:
+- これまでの会話履歴全体を参照して、過去の検索結果やツール実行結果を活用してください
+- ユーザーが「これまでの議論」「前回の結果」などと言及した場合、会話履歴に含まれる過去の検索結果や分析結果を必ず参照してください
+- 会話履歴に含まれる情報を総合的に活用して、一貫性のある回答を提供してください
+
+## 現在のリクエスト:
+ユーザーの質問: ${userMessage}`;
             
-            // Add accumulated tool results
+            // Add accumulated tool results from current request
             if (toolResults.length > 0) {
-              contextPrompt += `\n\n## これまでに実行したツールの結果:\n`;
+              contextPrompt += `\n\n## 今回実行したツールの結果:\n`;
               for (const result of toolResults) {
                 contextPrompt += `\n### ${result.tool} (Query: ${result.query})\n`;
                 contextPrompt += JSON.stringify(result.results, null, 2) + "\n";
@@ -1124,7 +1133,10 @@ ${toolResultsContext}
             // Check if HTML was generated
             const htmlWasGenerated = toolResults.some((result: any) => result.tool === "html-generation");
             
-            contextPrompt += `\n\n上記の検索結果とツール実行結果を踏まえて、R&D研究者向けに簡潔で実践的な回答を生成してください。`;
+            contextPrompt += `\n\n## 回答方針:
+- 会話履歴と今回のツール実行結果を統合して、簡潔で実践的な回答を生成してください
+- 過去の検索結果や分析内容を適切に参照してください
+- R&D研究者向けに、アクションにつながる具体的な情報を提供してください`;
             
             if (htmlWasGenerated) {
               contextPrompt += `\n\n**重要な指示**: すでにビジュアル資料（HTML）の生成が完了しています。
