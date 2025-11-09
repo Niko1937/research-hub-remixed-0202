@@ -3,7 +3,7 @@ import researchHeroImage from "@/assets/research-hero.jpg";
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pt-8 sm:pt-10 md:pt-12 pb-3 sm:pb-4 md:pb-6">
         <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-4 sm:gap-5 lg:gap-8 items-center">
           {/* Left: Description */}
           <div className="space-y-2 sm:space-y-3 text-left animate-fade-in">
