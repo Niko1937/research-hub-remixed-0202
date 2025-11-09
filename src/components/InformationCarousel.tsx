@@ -42,9 +42,15 @@ export function InformationCarousel() {
     const emblaNode = emblaApi.rootNode();
     emblaNode.addEventListener('wheel', handleWheel, { passive: false });
     
+    // Auto-scroll every 10 seconds
+    const autoScroll = setInterval(() => {
+      emblaApi.scrollNext();
+    }, 10000);
+    
     return () => {
       emblaApi.off('select', onSelect);
       emblaNode.removeEventListener('wheel', handleWheel);
+      clearInterval(autoScroll);
     };
   }, [emblaApi, onSelect]);
 
@@ -300,7 +306,7 @@ export function InformationCarousel() {
           onClick={scrollPrev}
           aria-label="前のスライドへ"
           className="absolute left-2 top-1/2 -translate-y-1/2 
-            opacity-0 hover:opacity-60 transition-opacity duration-300
+            opacity-30 hover:opacity-100 transition-opacity duration-300
             bg-background/50 backdrop-blur-sm z-10 h-8 w-8"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -311,7 +317,7 @@ export function InformationCarousel() {
           onClick={scrollNext}
           aria-label="次のスライドへ"
           className="absolute right-2 top-1/2 -translate-y-1/2 
-            opacity-0 hover:opacity-60 transition-opacity duration-300
+            opacity-30 hover:opacity-100 transition-opacity duration-300
             bg-background/50 backdrop-blur-sm z-10 h-8 w-8"
         >
           <ChevronRight className="h-4 w-4" />
