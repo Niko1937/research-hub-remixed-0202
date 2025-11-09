@@ -205,6 +205,13 @@ serve(async (req) => {
                 encoder.encode(`data: ${JSON.stringify({ type: "thinking_start" })}\n\n`)
               );
 
+              // Build context-aware planning prompt
+              let planningContext = `User query: ${userMessage}\nSelected tool: ${tool || "none"}`;
+              
+              if (pdfContext) {
+                planningContext += `\n\n**IMPORTANT**: User is currently viewing a PDF document. Unless they explicitly ask "他に何か研究はあるか" or similar requests for additional research, DO NOT use the wide-knowledge tool. Focus on analyzing the PDF content they are viewing.`;
+              }
+
               const planResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -218,7 +225,7 @@ serve(async (req) => {
                       role: "system",
                       content: `You are a research planning assistant. Analyze the user query and create a step-by-step execution plan.
 Available tools:
-- wide-knowledge: Search external papers and research
+- wide-knowledge: Search external papers and research (SKIP if user is viewing a PDF unless they explicitly ask for additional research)
 - theme-evaluation: Evaluate research themes against internal research and business needs
 - knowwho: Search for experts and researchers
 - positioning-analysis: Create positioning analysis comparing research items across multiple axes
@@ -233,7 +240,7 @@ Return a JSON object with "steps" array containing objects with this structure:
 
 Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                     },
-                    { role: "user", content: `User query: ${userMessage}\nSelected tool: ${tool || "none"}` }
+                    { role: "user", content: planningContext }
                   ],
                   response_format: { type: "json_object" }
                 }),
@@ -253,7 +260,9 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
               );
             }
 
-            // Step 2: Execute each tool in the plan
+            // Step 2: Execute each tool in the plan and accumulate results
+            let toolResults: any[] = [];
+            
             for (let i = 0; i < steps.length; i++) {
               const step = steps[i];
               controller.enqueue(
@@ -270,6 +279,13 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                 const externalPapers = [...openAlexResults, ...semanticResults, ...arxivResults]
                   .sort((a, b) => (b.citations || 0) - (a.citations || 0))
                   .slice(0, 5);
+
+                // Store results for later use
+                toolResults.push({
+                  tool: "wide-knowledge",
+                  query: step.query,
+                  results: externalPapers
+                });
 
                 controller.enqueue(
                   encoder.encode(
@@ -311,6 +327,13 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                   match_score: Math.floor(Math.random() * 30) + 65
                 }));
 
+                // Store results
+                toolResults.push({
+                  tool: "theme-evaluation",
+                  query: step.query,
+                  results: { comparison, needs }
+                });
+
                 controller.enqueue(
                   encoder.encode(
                     `data: ${JSON.stringify({
@@ -346,6 +369,13 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                     h_index: 16
                   }
                 ];
+
+                // Store results
+                toolResults.push({
+                  tool: "knowwho",
+                  query: step.query,
+                  results: experts
+                });
 
                 controller.enqueue(
                   encoder.encode(
@@ -418,6 +448,13 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                     items: positioningContent.items || [],
                     insights: positioningContent.insights || []
                   };
+                  
+                  // Store results
+                  toolResults.push({
+                    tool: "positioning-analysis",
+                    query: step.query,
+                    results: positioningData
+                  });
                   
                   console.log("Sending dynamic positioning data:", positioningData);
                   
@@ -624,22 +661,40 @@ Return a JSON object with this structure:
                   const matchData = await matchingResponse.json();
                   const matchContent = JSON.parse(stripCodeFence(matchData.choices?.[0]?.message?.content || "{}"));
                   
+                  const matchingData = {
+                    seedTitle: matchContent.seedTitle || "",
+                    seedDescription: matchContent.seedDescription || "",
+                    candidates: matchContent.candidates || []
+                  };
+                  
+                  // Store results
+                  toolResults.push({
+                    tool: "seeds-needs-matching",
+                    query: step.query,
+                    results: matchingData
+                  });
+                  
                   controller.enqueue(
                     encoder.encode(
                       `data: ${JSON.stringify({
                         type: "seeds_needs_matching",
-                        seedTitle: matchContent.seedTitle || "",
-                        seedDescription: matchContent.seedDescription || "",
-                        candidates: matchContent.candidates || [],
+                        ...matchingData,
                       })}\n\n`
                     )
                   );
                 }
               } else if (step.tool === "html-generation") {
-                // Generate HTML infographic
+                // Generate HTML infographic with all accumulated tool results
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ type: "html_start" })}\n\n`)
                 );
+
+                // Build context from accumulated tool results
+                let toolResultsContext = "\n\n**これまでに実行したツールの結果:**\n";
+                for (const result of toolResults) {
+                  toolResultsContext += `\n### ${result.tool} (Query: ${result.query})\n`;
+                  toolResultsContext += JSON.stringify(result.results, null, 2) + "\n";
+                }
 
                 const htmlPrompt = `You are an expert HTML generator for an advanced research laboratory. Your sole purpose is to create a single, complete, and visually rich HTML file.
 
@@ -657,7 +712,10 @@ Return a JSON object with this structure:
 - All copy must be in Japanese.
 
 **TASK**
-Create a beautiful, interactive HTML infographic summarizing our conversation about "${step.query}" that would impress researchers inside an innovation lab.
+Create a beautiful, interactive HTML infographic summarizing our conversation and all tool results.
+
+**User Query:** ${userMessage}
+${toolResultsContext}
 
 Your final output will be rendered directly in a browser. Ensure it is flawless and self-contained.`;
 
@@ -726,17 +784,29 @@ Your final output will be rendered directly in a browser. Ensure it is flawless 
               );
             }
 
-            // Step 3: Generate final AI summary
+            // Step 3: Generate final AI summary with all tool results
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ type: "chat_start" })}\n\n`)
             );
 
-            let contextPrompt = `ユーザーの質問: ${userMessage}\n\n上記の検索結果とツール実行結果を踏まえて、R&D研究者向けに簡潔で実践的な回答を生成してください。`;
+            let contextPrompt = `ユーザーの質問: ${userMessage}`;
+            
+            // Add accumulated tool results
+            if (toolResults.length > 0) {
+              contextPrompt += `\n\n## これまでに実行したツールの結果:\n`;
+              for (const result of toolResults) {
+                contextPrompt += `\n### ${result.tool} (Query: ${result.query})\n`;
+                contextPrompt += JSON.stringify(result.results, null, 2) + "\n";
+              }
+            }
+            
+            contextPrompt += `\n\n上記の検索結果とツール実行結果を踏まえて、R&D研究者向けに簡潔で実践的な回答を生成してください。`;
 
             // Add PDF context if available
             if (pdfContext) {
               const pdfSnippet = pdfContext.slice(0, 10000);
-              contextPrompt += `\n\n<User is showing a document >${pdfSnippet}</User is showing a document >`;
+              contextPrompt += `\n\n<User is showing a document>${pdfSnippet}</User is showing a document>`;
+              contextPrompt += `\n\n**重要**: ユーザーは現在PDFを参照しています。このPDFの内容に基づいて回答してください。`;
             }
 
             if (highlightedText) {
