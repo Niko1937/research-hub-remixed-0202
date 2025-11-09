@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 
 export function InformationCarousel() {
@@ -13,8 +11,6 @@ export function InformationCarousel() {
   
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
-  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
   const scrollTo = useCallback((index: number) => emblaApi?.scrollTo(index), [emblaApi]);
 
   const onSelect = useCallback(() => {
@@ -26,8 +22,25 @@ export function InformationCarousel() {
     if (!emblaApi) return;
     onSelect();
     emblaApi.on('select', onSelect);
+    
+    // Add mouse wheel support
+    const handleWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        if (e.deltaX > 0) {
+          emblaApi.scrollNext();
+        } else {
+          emblaApi.scrollPrev();
+        }
+      }
+    };
+    
+    const emblaNode = emblaApi.rootNode();
+    emblaNode.addEventListener('wheel', handleWheel, { passive: false });
+    
     return () => {
       emblaApi.off('select', onSelect);
+      emblaNode.removeEventListener('wheel', handleWheel);
     };
   }, [emblaApi, onSelect]);
 
@@ -299,30 +312,6 @@ export function InformationCarousel() {
             ))}
           </div>
         </div>
-
-        {/* Navigation Buttons - Always visible */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={scrollPrev}
-          aria-label="前のスライドへ"
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 md:-translate-x-4 
-            opacity-70 hover:opacity-100 transition-all duration-200
-            bg-background/95 backdrop-blur-sm z-10 hover:bg-background hover:scale-110 shadow-lg"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={scrollNext}
-          aria-label="次のスライドへ"
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 md:translate-x-4 
-            opacity-70 hover:opacity-100 transition-all duration-200
-            bg-background/95 backdrop-blur-sm z-10 hover:bg-background hover:scale-110 shadow-lg"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </Button>
 
         {/* Dot Indicators */}
         <div className="flex justify-center gap-2 mt-6" role="tablist" aria-label="スライド選択">
