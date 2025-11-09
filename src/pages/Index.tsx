@@ -195,7 +195,7 @@ const Index = () => {
         const response = await fetch(
           `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(
             DEFAULT_RECOMMEND_QUERY
-          )}&start=0&max_results=8`
+          )}&start=0&max_results=4`
         );
         if (!response.ok) {
           throw new Error(`Failed to fetch recommendations: ${response.status}`);
