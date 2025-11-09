@@ -165,11 +165,28 @@ export function InformationCarousel() {
                 aria-current={selectedIndex === index ? 'true' : 'false'}
               >
                 <div className="rounded-2xl bg-card/50 border border-border h-[500px] md:h-[450px] transition-all duration-300 hover:bg-card hover:shadow-lg hover:border-primary/20 overflow-hidden flex flex-col">
-                  {/* Fixed Header */}
-                  <div className="px-6 md:px-8 lg:px-10 pt-6 md:pt-8 pb-4 border-b border-border/40 bg-gradient-to-b from-card/80 to-transparent">
-                    <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight">
-                      {item.title}
-                    </h2>
+                  {/* Banner Header */}
+                  <div className="px-6 md:px-8 lg:px-10 py-8 md:py-10 border-b border-border/40 bg-gradient-to-b from-card/80 to-transparent">
+                    <div className="grid grid-cols-1 md:grid-cols-[30%_70%] gap-4 md:gap-6 items-center">
+                      {/* Left: Description */}
+                      <div className="space-y-1">
+                        <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+                          対話的な研究支援の
+                        </p>
+                        <p className="text-sm md:text-base font-semibold text-primary leading-tight">
+                          「拡張性」を示す
+                        </p>
+                        <p className="text-xs md:text-sm text-muted-foreground">
+                          AgentChatプロトタイプ
+                        </p>
+                      </div>
+                      {/* Right: Title */}
+                      <div className="border-t md:border-t-0 md:border-l border-border/40 pt-4 md:pt-0 md:pl-6">
+                        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-tight">
+                          {item.title}
+                        </h2>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Scrollable Content Area */}
