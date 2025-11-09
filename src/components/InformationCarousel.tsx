@@ -182,13 +182,13 @@ export function InformationCarousel() {
                         {item.content?.map((block: any, idx: number) => (
                           <div key={idx}>
                             {block.type === 'heading' && (
-                              <h3 className="text-base md:text-lg font-semibold text-primary leading-relaxed mb-4">
+                              <h3 className="text-lg md:text-xl lg:text-2xl font-semibold text-primary leading-relaxed mb-4">
                                 {block.text}
                               </h3>
                             )}
                             {block.type === 'text' && (
                               <p 
-                                className="text-sm text-muted-foreground leading-loose"
+                                className="text-base md:text-lg text-muted-foreground leading-loose"
                                 dangerouslySetInnerHTML={{ __html: block.html }}
                               />
                             )}
@@ -200,19 +200,19 @@ export function InformationCarousel() {
                     {/* List Layout */}
                     {item.layout === 'list' && (
                       <div className="space-y-6">
-                        <p className="text-base md:text-lg font-medium text-primary leading-relaxed">
+                        <p className="text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed">
                           {item.subtitle}
                         </p>
                         <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {item.items?.map((listItem: string, idx: number) => (
                             <li key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-accent/5 border border-border/50 hover:bg-accent/10 transition-colors">
-                              <span className="text-primary mt-0.5 font-bold">•</span>
-                              <span className="text-sm text-foreground leading-relaxed flex-1">{listItem}</span>
+                              <span className="text-primary mt-0.5 font-bold text-base">•</span>
+                              <span className="text-base md:text-lg text-foreground leading-relaxed flex-1">{listItem}</span>
                             </li>
                           ))}
                         </ul>
                         {item.note && (
-                          <p className="text-xs text-muted-foreground leading-relaxed p-4 bg-muted/30 rounded-lg border-l-2 border-primary/50">
+                          <p className="text-sm md:text-base text-muted-foreground leading-relaxed p-4 bg-muted/30 rounded-lg border-l-2 border-primary/50">
                             {item.note}
                           </p>
                         )}
@@ -222,16 +222,16 @@ export function InformationCarousel() {
                     {/* Center Layout */}
                     {item.layout === 'center' && (
                       <div className="max-w-3xl mx-auto space-y-6 text-center">
-                        <p className="text-base md:text-lg font-medium text-primary leading-relaxed">
+                        <p className="text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed">
                           {item.subtitle}
                         </p>
-                        <p className="text-sm text-muted-foreground leading-loose">
+                        <p className="text-base md:text-lg text-muted-foreground leading-loose">
                           {item.detail}
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6 text-left">
                           {item.items?.map((listItem: string, idx: number) => (
                             <div key={idx} className="p-3 rounded-lg bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors">
-                              <span className="text-sm text-foreground leading-relaxed block">{listItem}</span>
+                              <span className="text-base md:text-lg text-foreground leading-relaxed block">{listItem}</span>
                             </div>
                           ))}
                         </div>
@@ -243,11 +243,11 @@ export function InformationCarousel() {
                       <div className="space-y-5 max-w-4xl mx-auto">
                         {item.questions?.map((qa: any, idx: number) => (
                           <div key={idx} className="space-y-2">
-                            <p className="text-sm font-semibold text-foreground flex items-start gap-2">
+                            <p className="text-base md:text-lg font-semibold text-foreground flex items-start gap-2">
                               <span className="text-primary">Q.</span>
                               <span>{qa.q}</span>
                             </p>
-                            <p className="text-sm text-muted-foreground leading-loose pl-6 py-3 px-4 bg-accent/10 rounded-lg border-l-2 border-primary/30">
+                            <p className="text-base md:text-lg text-muted-foreground leading-loose pl-6 py-3 px-4 bg-accent/10 rounded-lg border-l-2 border-primary/30">
                               <span className="font-medium text-primary">A. </span>
                               {qa.a}
                             </p>
@@ -259,7 +259,7 @@ export function InformationCarousel() {
                     {/* User Story Layout */}
                     {item.layout === 'user-story' && (
                       <div className="space-y-6">
-                        <p className="text-base md:text-lg font-medium text-primary leading-relaxed mb-6">
+                        <p className="text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed mb-6">
                           {item.subtitle}
                         </p>
                         <div className="space-y-6">
@@ -270,11 +270,11 @@ export function InformationCarousel() {
                                   {idx + 1}
                                 </div>
                                 <div className="flex-1 space-y-2">
-                                  <p className="text-sm">
+                                  <p className="text-base md:text-lg">
                                     <span className="font-semibold text-foreground">{story.persona}</span>
                                     <span className="text-muted-foreground">、{story.action}、</span>
                                   </p>
-                                  <p className="text-sm text-primary font-medium pl-4 border-l-2 border-primary/30">
+                                  <p className="text-base md:text-lg text-primary font-medium pl-4 border-l-2 border-primary/30">
                                     {story.outcome}
                                   </p>
                                 </div>
