@@ -86,15 +86,15 @@ export function InformationCarousel() {
       layout: "list",
       subtitle: "現在実装されている機能と、その実装方式",
       items: [
-        "論文検索 - 外部API（OpenAlex/Semantic Scholar/arXiv）から実際に取得し、LLMが要約・解釈",
-        "テーマ評価 - <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モック社内研究データ2件</span>と<span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モックビジネス課題2件</span>を使用。LLMが両者を分析し評価スコアを算出",
-        "専門家検索 - <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>3名のハードコードされたモック専門家データ</span>を表示（検索機能なし）",
-        "ポジショニング分析 - LLMが論文データを分析し、評価軸（2〜4軸）と競合の位置を動的に生成・可視化",
-        "シーズ・ニーズマッチング - <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モックデータ</span>を使用。LLMがマッチングスコアと理由を定性・定量の両面から算出",
-        "HTML報告書生成 - LLMが対話履歴全体を解釈し、インフォグラフィック形式のHTMLコードを生成",
-        "PDF閲覧 - 外部PDFをプロキシ経由で取得・表示（テキスト抽出やハイライトは未対応）"
+        "<strong>wide-knowledge</strong>（外部論文検索）- OpenAlex/Semantic Scholar/arXivの実APIから取得し、LLMが要約・解釈",
+        "<strong>theme-evaluation</strong>（テーマ評価）- <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モック社内研究2件</span>と<span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モックビジネス課題2件</span>を使用。LLMが評価スコアを算出",
+        "<strong>knowwho</strong>（専門家発見）- コンテクスト（検索した論文の著者等）からLLMが3-5名の関連専門家を動的に生成",
+        "<strong>positioning-analysis</strong>（ポジショニング分析）- コンテクストからLLMが比較対象（論文・研究テーマ等）と比較軸（2-5軸）を動的に生成・可視化。軸の追加/削除/再生成も対話的に実行可能",
+        "<strong>seeds-needs-matching</strong>（シーズ・ニーズマッチング）- <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モックデータ</span>を使用。LLMがマッチングスコアと理由を定性・定量の両面から算出",
+        "<strong>html-generation</strong>（HTML報告書生成）- LLMが全ツール実行結果を統合し、インフォグラフィック形式のHTMLを生成",
+        "<strong>PDF閲覧</strong> - 外部PDFをプロキシ経由で取得・表示（テキスト抽出やハイライトは未対応）"
       ],
-      note: "社内ドキュメント検索、共有フォルダ接続、ベクトル検索、RAG等は未実装。全ての分析・解釈はLovable AI（Gemini 2.5 flash固定）が実行。"
+      note: "社内ドキュメント検索、共有フォルダ接続、ベクトル検索、RAG等は未実装。全ての分析・解釈はLovable AI（Gemini 2.5 flash固定）が実行。各ツールは前ツール結果をコンテクストとして受け取り、段階的に分析を深化させる設計。"
     },
     {
       title: "本質は拡張性",
@@ -207,7 +207,7 @@ export function InformationCarousel() {
                           {item.items?.map((listItem: string, idx: number) => (
                             <li key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-accent/5 border border-border/50 hover:bg-accent/10 transition-colors">
                               <span className="text-primary mt-0.5 font-bold text-base">•</span>
-                              <span className="text-base md:text-lg text-foreground leading-relaxed flex-1">{listItem}</span>
+                              <span className="text-base md:text-lg text-foreground leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: listItem }} />
                             </li>
                           ))}
                         </ul>
