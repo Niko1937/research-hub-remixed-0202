@@ -1,5 +1,4 @@
-import { ScatterChart as RechartsScatter, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
-import { Card } from "@/components/ui/card";
+import { ScatterChart as RechartsScatter, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from "recharts";
 
 interface DataPoint {
   name: string;
@@ -27,7 +26,29 @@ const getColor = (type: string) => {
   }
 };
 
+const getTypeName = (type: string) => {
+  switch (type) {
+    case "internal":
+      return "社内";
+    case "external":
+      return "外部";
+    case "target":
+      return "目標";
+    default:
+      return type;
+  }
+};
+
 export function ScatterChart({ data, xAxisLabel, yAxisLabel }: ScatterChartProps) {
+  // Group data by type for legend
+  const groupedData: Record<string, DataPoint[]> = {};
+  data.forEach(point => {
+    if (!groupedData[point.type]) {
+      groupedData[point.type] = [];
+    }
+    groupedData[point.type].push(point);
+  });
+
   return (
     <ResponsiveContainer width="100%" height={400}>
       <RechartsScatter>
@@ -56,17 +77,35 @@ export function ScatterChart({ data, xAxisLabel, yAxisLabel }: ScatterChartProps
             color: "hsl(var(--popover-foreground))",
             fontSize: "14px"
           }}
+          content={({ payload }) => {
+            if (!payload || !payload[0]) return null;
+            const data = payload[0].payload as DataPoint;
+            return (
+              <div className="bg-popover border border-border rounded-md p-3 shadow-lg">
+                <p className="font-semibold text-foreground text-sm mb-1">{data.name}</p>
+                <p className="text-xs text-muted-foreground">{getTypeName(data.type)}</p>
+                <div className="mt-2 text-xs space-y-0.5">
+                  <p>{xAxisLabel}: {data.x}</p>
+                  <p>{yAxisLabel}: {data.y}</p>
+                </div>
+              </div>
+            );
+          }}
           cursor={{ strokeDasharray: "3 3" }}
         />
         <Legend 
           wrapperStyle={{ fontSize: "14px" }}
           iconSize={12}
         />
-        <Scatter name="データポイント" data={data} fill="hsl(var(--primary))" shape="circle">
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={getColor(entry.type)} />
-          ))}
-        </Scatter>
+        {Object.entries(groupedData).map(([type, points]) => (
+          <Scatter
+            key={type}
+            name={points.map(p => p.name).join(", ")}
+            data={points}
+            fill={getColor(type)}
+            shape="circle"
+          />
+        ))}
       </RechartsScatter>
     </ResponsiveContainer>
   );

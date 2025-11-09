@@ -2,16 +2,33 @@ import { RadarChart as RechartsRadar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 
 interface RadarDataPoint {
   axis: string;
-  internal?: number;
-  external?: number;
-  target?: number;
+  [key: string]: string | number;
+}
+
+interface RadarItem {
+  name: string;
+  type: "internal" | "external" | "target";
 }
 
 interface RadarChartProps {
   data: RadarDataPoint[];
+  items: RadarItem[];
 }
 
-export function RadarChart({ data }: RadarChartProps) {
+const getColor = (type: string) => {
+  switch (type) {
+    case "internal":
+      return "hsl(var(--chart-1))";
+    case "external":
+      return "hsl(var(--chart-2))";
+    case "target":
+      return "hsl(var(--chart-3))";
+    default:
+      return "hsl(var(--muted))";
+  }
+};
+
+export function RadarChart({ data, items }: RadarChartProps) {
   return (
     <ResponsiveContainer width="100%" height={400}>
       <RechartsRadar data={data}>
@@ -25,30 +42,17 @@ export function RadarChart({ data }: RadarChartProps) {
           stroke="hsl(var(--muted-foreground))" 
           tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
         />
-        <Radar
-          name="社内研究"
-          dataKey="internal"
-          stroke="hsl(var(--chart-1))"
-          fill="hsl(var(--chart-1))"
-          fillOpacity={0.3}
-          strokeWidth={2}
-        />
-        <Radar
-          name="外部研究"
-          dataKey="external"
-          stroke="hsl(var(--chart-2))"
-          fill="hsl(var(--chart-2))"
-          fillOpacity={0.3}
-          strokeWidth={2}
-        />
-        <Radar
-          name="目標位置"
-          dataKey="target"
-          stroke="hsl(var(--chart-3))"
-          fill="hsl(var(--chart-3))"
-          fillOpacity={0.3}
-          strokeWidth={2}
-        />
+        {items.map((item, index) => (
+          <Radar
+            key={index}
+            name={item.name}
+            dataKey={item.type}
+            stroke={getColor(item.type)}
+            fill={getColor(item.type)}
+            fillOpacity={0.3}
+            strokeWidth={2}
+          />
+        ))}
         <Tooltip
           contentStyle={{
             backgroundColor: "hsl(var(--popover))",

@@ -117,6 +117,7 @@ export function PositioningAnalysis({
       const axis = data.axes[0];
       const boxData = data.items.map(item => ({
         category: item.name,
+        name: item.name,
         min: (item.values[axis.name] || 0) * 0.8,
         q1: (item.values[axis.name] || 0) * 0.9,
         median: item.values[axis.name] || 0,
@@ -135,7 +136,17 @@ export function PositioningAnalysis({
         });
         return dataPoint;
       });
-      return <RadarChart data={radarData} />;
+      
+      // Create items list for legend
+      const uniqueItems = data.items.reduce((acc, item) => {
+        const existingType = acc.find(i => i.type === item.type);
+        if (!existingType) {
+          acc.push({ name: item.name, type: item.type });
+        }
+        return acc;
+      }, [] as Array<{ name: string; type: "internal" | "external" | "target" }>);
+      
+      return <RadarChart data={radarData} items={uniqueItems} />;
     }
 
     return <div className="text-muted-foreground text-sm">選択された図タイプに必要な軸が不足しています</div>;
