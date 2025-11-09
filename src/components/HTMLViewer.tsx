@@ -95,7 +95,12 @@ export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
             className="w-full h-full border-0 bg-white"
             title="HTML Preview"
             sandbox="allow-scripts allow-same-origin"
-            style={{ minHeight: '100%', backgroundColor: '#ffffff' }}
+            style={{ 
+              minHeight: '100%', 
+              backgroundColor: '#ffffff',
+              width: '100%',
+              maxWidth: '100%'
+            }}
           />
         </div>
       </Card>
