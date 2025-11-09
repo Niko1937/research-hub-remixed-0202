@@ -346,47 +346,84 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                   )
                 );
               } else if (step.tool === "knowwho") {
-                const experts = [
-                  {
-                    name: "Dr. 山田太郎",
-                    affiliation: "東京大学 情報理工学研究科",
-                    expertise: ["機械学習", "深層学習", "自然言語処理"],
-                    publications: 87,
-                    h_index: 24,
-                    email: "yamada@example.jp"
-                  },
-                  {
-                    name: "Dr. 佐藤花子",
-                    affiliation: "京都大学 工学研究科",
-                    expertise: ["推薦システム", "情報検索", "Two-Tower Model"],
-                    publications: 62,
-                    h_index: 19,
-                    email: "sato@example.jp"
-                  },
-                  {
-                    name: "Dr. 田中直人",
-                    affiliation: "大阪大学 基礎工学研究科",
-                    expertise: ["ニューラルネットワーク", "表現学習"],
-                    publications: 45,
-                    h_index: 16
+                // Build context from previous tool results
+                let knowWhoContext = `You are an expert finder. Based on the query "${step.query}", generate a list of relevant experts.`;
+                
+                if (toolResults.length > 0) {
+                  knowWhoContext += `\n\n## Previous Research Results:\n`;
+                  for (const result of toolResults) {
+                    knowWhoContext += `\n### ${result.tool} (Query: ${result.query})\n`;
+                    if (result.tool === "wide-knowledge" && result.results) {
+                      // Summarize paper authors and topics
+                      knowWhoContext += `Papers found:\n`;
+                      for (const paper of result.results.slice(0, 3)) {
+                        knowWhoContext += `- "${paper.title}" by ${paper.authors.join(", ")}\n`;
+                      }
+                    } else {
+                      knowWhoContext += JSON.stringify(result.results, null, 2) + "\n";
+                    }
                   }
-                ];
+                  knowWhoContext += `\nUse the above research findings to suggest relevant experts in this field.`;
+                }
 
-                // Store results
-                toolResults.push({
-                  tool: "knowwho",
-                  query: step.query,
-                  results: experts
+                const knowWhoPrompt = `${knowWhoContext}
+
+Return a JSON object with this structure:
+{
+  "experts": [
+    {
+      "name": "Dr. 名前",
+      "affiliation": "所属機関",
+      "expertise": ["専門分野1", "専門分野2", "専門分野3"],
+      "publications": 論文数(整数),
+      "h_index": h-index値(整数),
+      "email": "example@university.jp"
+    }
+  ]
+}
+
+- experts配列には3-5名の専門家を含めてください
+- 実在しそうな日本の大学・研究機関を使用
+- 専門分野は検索クエリと研究結果に基づいて設定
+- publications と h_index は専門家のレベルに応じた妥当な数値を`;
+
+                const knowWhoResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    model: "google/gemini-2.5-flash",
+                    messages: [
+                      { role: "system", content: knowWhoPrompt },
+                      { role: "user", content: step.query }
+                    ],
+                    response_format: { type: "json_object" }
+                  }),
                 });
 
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "knowwho_results",
-                      experts,
-                    })}\n\n`
-                  )
-                );
+                if (knowWhoResponse.ok) {
+                  const knowWhoData = await knowWhoResponse.json();
+                  const knowWhoContent = JSON.parse(stripCodeFence(knowWhoData.choices?.[0]?.message?.content || "{}"));
+                  const experts = knowWhoContent.experts || [];
+
+                  // Store results
+                  toolResults.push({
+                    tool: "knowwho",
+                    query: step.query,
+                    results: experts
+                  });
+
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "knowwho_results",
+                        experts,
+                      })}\n\n`
+                    )
+                  );
+                }
               } else if (step.tool === "positioning-analysis") {
                 console.log("Starting positioning-analysis tool execution");
                 
