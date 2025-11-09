@@ -1,3 +1,5 @@
+import researchHeroImage from "@/assets/research-hero.jpg";
+
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden">
@@ -17,22 +19,12 @@ export function HeroSection() {
           </div>
           
           {/* Right: Research Image */}
-          <div className="relative rounded-2xl overflow-hidden aspect-video bg-gradient-to-br from-primary/10 via-accent/5 to-background animate-fade-in">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center space-y-4 p-8">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/20 mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl md:text-2xl font-bold text-foreground">
-                  AI-Powered Research
-                </h3>
-                <p className="text-sm md:text-base text-muted-foreground max-w-md">
-                  エージェントベースの研究支援システム
-                </p>
-              </div>
-            </div>
+          <div className="relative rounded-2xl overflow-hidden aspect-video animate-fade-in shadow-2xl">
+            <img 
+              src={researchHeroImage} 
+              alt="AI-powered research visualization with holographic data displays"
+              className="w-full h-full object-cover"
+            />
           </div>
         </div>
       </div>

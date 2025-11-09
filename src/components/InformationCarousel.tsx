@@ -42,10 +42,10 @@ export function InformationCarousel() {
     const emblaNode = emblaApi.rootNode();
     emblaNode.addEventListener('wheel', handleWheel, { passive: false });
     
-    // Auto-scroll every 10 seconds
+    // Auto-scroll every 15 seconds
     const autoScroll = setInterval(() => {
       emblaApi.scrollNext();
-    }, 10000);
+    }, 15000);
     
     return () => {
       emblaApi.off('select', onSelect);
