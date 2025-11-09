@@ -345,49 +345,47 @@ const Index = () => {
         >
           {mode === "search" ? (
             // Search Mode Layout
-            <div className="flex flex-col h-full animate-fade-in">
-              <HeroSection />
-              <UseCaseCards />
-              <ConceptSections />
+            <ScrollArea className="flex-1">
+              <div className="animate-fade-in">
+                <HeroSection />
+                <UseCaseCards />
+                <ConceptSections />
 
-              <div className="max-w-6xl mx-auto w-full">
-                <ChatInput 
-                  onSubmit={handleSubmit}
-                  mode={mode}
-                  onModeChange={setMode}
-                  highlightedText={selectedPdfText}
-                  pdfContext={pdfContext}
-                  onClearHighlight={clearHighlight}
-                />
-              </div>
-
-              {/* Search Results */}
-              <ScrollArea className="flex-1">
-                <div className="max-w-6xl mx-auto">
-                  <div className="p-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-semibold text-foreground">本日のおすすめ</h2>
-                    </div>
-                    
-                      <Card className="bg-card border-border overflow-hidden">
-                        {recommendedLoading ? (
-                          <div className="p-6 text-center text-muted-foreground">本日のおすすめを取得しています...</div>
-                        ) : recommendedError ? (
-                          <div className="p-6 text-center text-destructive">{recommendedError}</div>
-                        ) : (
-                          recommendedPapers.map((result, index) => (
-                            <SearchResultItem
-                              key={index}
-                              {...result}
-                              onClick={() => handleSearchResultClick(result)}
-                            />
-                          ))
-                        )}
-                      </Card>
-                  </div>
+                <div className="max-w-6xl mx-auto px-6 py-6">
+                  <ChatInput 
+                    onSubmit={handleSubmit}
+                    mode={mode}
+                    onModeChange={setMode}
+                    highlightedText={selectedPdfText}
+                    pdfContext={pdfContext}
+                    onClearHighlight={clearHighlight}
+                  />
                 </div>
-              </ScrollArea>
-            </div>
+
+                {/* Recommended Papers */}
+                <div className="max-w-6xl mx-auto px-6 pb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-foreground">本日のおすすめ</h2>
+                  </div>
+                  
+                  <Card className="bg-card border-border overflow-hidden">
+                    {recommendedLoading ? (
+                      <div className="p-6 text-center text-muted-foreground">本日のおすすめを取得しています...</div>
+                    ) : recommendedError ? (
+                      <div className="p-6 text-center text-destructive">{recommendedError}</div>
+                    ) : (
+                      recommendedPapers.map((result, index) => (
+                        <SearchResultItem
+                          key={index}
+                          {...result}
+                          onClick={() => handleSearchResultClick(result)}
+                        />
+                      ))
+                    )}
+                  </Card>
+                </div>
+              </div>
+            </ScrollArea>
           ) : (
             // Assistant Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
