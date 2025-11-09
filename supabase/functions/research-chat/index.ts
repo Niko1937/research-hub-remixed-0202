@@ -992,6 +992,20 @@ JSON形式で出力:
 - body: 16px, line-height: 1.6, color: #1f2937
 - 小見出し・キャプション: 14px, color: #4b5563
 
+**必須のHTML/Bodyスタイル設定**
+<style>タグ内に以下を必ず含めること:
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: #ffffff;
+  }
+  body {
+    color: #1f2937;
+  }
+
 **レスポンシブ対応**
 - @media (max-width: 768px)でモバイル最適化
 - padding、font-sizeを画面幅に応じて調整

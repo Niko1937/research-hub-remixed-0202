@@ -89,17 +89,18 @@ export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
             <X className="w-4 h-4" />
           </Button>
         </div>
-        <div className="flex-1 bg-white" style={{ overflow: 'hidden' }}>
+        <div className="flex-1 bg-white overflow-auto">
           <iframe
             ref={iframeRef}
-            className="w-full h-full border-0 bg-white"
+            className="w-full border-0 bg-white"
             title="HTML Preview"
             sandbox="allow-scripts allow-same-origin"
             style={{ 
-              height: '100%',
+              minHeight: '100%',
               width: '100%',
               backgroundColor: '#ffffff',
-              display: 'block'
+              display: 'block',
+              border: 'none'
             }}
           />
         </div>
