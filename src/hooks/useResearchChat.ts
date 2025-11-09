@@ -195,6 +195,23 @@ export function useResearchChat() {
                 continue;
               }
 
+              // Handle research data from search mode
+              if (parsed.type === "research_data") {
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "research_result",
+                    timestamp: Date.now(),
+                    data: {
+                      internal: parsed.internal || [],
+                      business: parsed.business || [],
+                      external: parsed.external || [],
+                    },
+                  },
+                ]);
+                continue;
+              }
+
               // Handle step start
               if (parsed.type === "step_start") {
                 if (thinkingItemId !== null) {
