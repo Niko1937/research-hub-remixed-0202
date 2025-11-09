@@ -86,15 +86,15 @@ export function InformationCarousel() {
       layout: "list",
       subtitle: "現在実装されている機能と、その実装方式",
       items: [
-        "論文検索 - OpenAlex/Semantic Scholar/arXiv APIから最大5件取得（モック無し）",
-        "テーマ評価 - モックの社内研究データ2件 + モックのビジネス課題2件（実データベース接続無し）",
-        "専門家検索 - ハードコードされた3名のモック専門家データ（検索機能無し）",
-        "ポジショニング分析 - Gemini 2.5 flashで動的にJSON生成（軸数・項目数は可変）",
-        "シーズ・ニーズマッチング - モックデータによるマッチングスコア算出（実データベース接続無し）",
-        "HTML報告書生成 - Gemini 2.5 flashでインフォグラフィックHTMLコード生成",
+        "論文検索 - 外部API（OpenAlex/Semantic Scholar/arXiv）から実際に取得し、LLMが要約・解釈",
+        "テーマ評価 - <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モック社内研究データ2件</span>と<span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モックビジネス課題2件</span>を使用。LLMが両者を分析し評価スコアを算出",
+        "専門家検索 - <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>3名のハードコードされたモック専門家データ</span>を表示（検索機能なし）",
+        "ポジショニング分析 - LLMが論文データを分析し、評価軸（2〜4軸）と競合の位置を動的に生成・可視化",
+        "シーズ・ニーズマッチング - <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モックデータ</span>を使用。LLMがマッチングスコアと理由を定性・定量の両面から算出",
+        "HTML報告書生成 - LLMが対話履歴全体を解釈し、インフォグラフィック形式のHTMLコードを生成",
         "PDF閲覧 - 外部PDFをプロキシ経由で取得・表示（テキスト抽出やハイライトは未対応）"
       ],
-      note: "Edge Function実装: research-chat（926行）とpdf-proxy（61行）。社内ドキュメント検索、共有フォルダ接続、ベクトル検索、RAG等は未実装。全てLovable AI（Gemini 2.5 flash固定）で処理。"
+      note: "社内ドキュメント検索、共有フォルダ接続、ベクトル検索、RAG等は未実装。全ての分析・解釈はLovable AI（Gemini 2.5 flash固定）が実行。"
     },
     {
       title: "本質は拡張性",
