@@ -298,6 +298,8 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
               } else if (step.tool === "theme-evaluation") {
                 const internalResearch = searchInternalResearch(step.query);
                 const businessChallenges = searchBusinessChallenges(step.query);
+                
+                // Note: theme-evaluation uses mock data, but context is still useful for AI interpretation
 
                 const comparison = [
                   {
@@ -388,7 +390,19 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
               } else if (step.tool === "positioning-analysis") {
                 console.log("Starting positioning-analysis tool execution");
                 
-                const positioningPrompt = `あなたは研究ポジショニング分析の専門家です。ユーザーの質問「${step.query}」に基づき、研究のポジショニング分析を行ってください。
+                // Build context from previous tool results
+                let positioningContext = `ユーザーの質問「${step.query}」に基づき、研究のポジショニング分析を行ってください。`;
+                
+                if (toolResults.length > 0) {
+                  positioningContext += `\n\n## これまでに実行したツールの結果:\n`;
+                  for (const result of toolResults) {
+                    positioningContext += `\n### ${result.tool} (Query: ${result.query})\n`;
+                    positioningContext += JSON.stringify(result.results, null, 2) + "\n";
+                  }
+                  positioningContext += `\n上記の結果を踏まえて分析を行ってください。特に外部研究データがある場合は、それらを活用してください。`;
+                }
+                
+                const positioningPrompt = `あなたは研究ポジショニング分析の専門家です。${positioningContext}
 
 以下のJSON形式で出力してください：
 
@@ -617,8 +631,20 @@ JSON形式で出力:
                   );
                 }
               } else if (step.tool === "seeds-needs-matching") {
+                // Build context from previous tool results
+                let matchingContext = `Based on the user's research seed about "${step.query}", generate a seeds-needs matching analysis.`;
+                
+                if (toolResults.length > 0) {
+                  matchingContext += `\n\n## Previous Tool Results:\n`;
+                  for (const result of toolResults) {
+                    matchingContext += `\n### ${result.tool} (Query: ${result.query})\n`;
+                    matchingContext += JSON.stringify(result.results, null, 2) + "\n";
+                  }
+                  matchingContext += `\nUse the above research findings to inform your seeds-needs matching analysis.`;
+                }
+                
                 // Generate seeds-needs matching with AI
-                const matchingPrompt = `You are a technology transfer analyst. Based on the user's research seed about "${step.query}", generate a seeds-needs matching analysis.
+                const matchingPrompt = `You are a technology transfer analyst. ${matchingContext}
 
 Return a JSON object with this structure:
 {
