@@ -135,6 +135,7 @@ const Index = () => {
   const [recommendedPapers, setRecommendedPapers] = useState<RecommendedPaper[]>(initialSearchResults);
   const [recommendedLoading, setRecommendedLoading] = useState(false);
   const [recommendedError, setRecommendedError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [viewerWidth, setViewerWidth] = useState(500);
   const [selectedPdfText, setSelectedPdfText] = useState<string>("");
   const [pdfContext, setPdfContext] = useState<string>("");
@@ -166,6 +167,50 @@ const Index = () => {
     closePdfViewer();
     handleHtmlViewerClose();
     setLastHtmlItemTimestamp(null);
+    setSearchQuery(null);
+    // Reset to initial recommendations
+    setRecommendedLoading(true);
+    fetch(
+      `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(
+        DEFAULT_RECOMMEND_QUERY
+      )}&start=0&max_results=7`
+    )
+      .then((response) => response.text())
+      .then((feed) => {
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(feed, "text/xml");
+        const entries = Array.from(xml.getElementsByTagName("entry"));
+
+        const mapped: RecommendedPaper[] = entries
+          .map((entry) => {
+            const text = (tag: string) =>
+              entry.getElementsByTagName(tag)[0]?.textContent?.replace(/\s+/g, " ").trim() || "";
+            const title = text("title");
+            const abstract = text("summary");
+            const published = entry.getElementsByTagName("published")[0]?.textContent?.slice(0, 4) || "N/A";
+            const id = text("id");
+            const pdfUrl = id ? id.replace("/abs/", "/pdf/") + ".pdf" : "";
+            if (!pdfUrl) return null;
+            const authors = Array.from(entry.getElementsByTagName("name"))
+              .map((node) => node.textContent || "Unknown")
+              .slice(0, 4);
+
+            return {
+              title: title || "Untitled",
+              authors: authors.length ? authors : ["Unknown"],
+              year: published,
+              source: "arXiv",
+              citations: undefined,
+              url: pdfUrl,
+              query: DEFAULT_RECOMMEND_QUERY,
+              abstract,
+            };
+          })
+          .filter(Boolean) as RecommendedPaper[];
+
+        setRecommendedPapers(mapped);
+      })
+      .finally(() => setRecommendedLoading(false));
   }, [clearMessages, closePdfViewer, handleHtmlViewerClose]);
 
   const handleAddAxis = useCallback(async (axisName: string, axisType: "quantitative" | "qualitative") => {
@@ -271,6 +316,18 @@ const Index = () => {
     
     if (latestResearchResult && latestResearchResult.data?.external) {
       const externalPapers = latestResearchResult.data.external;
+      
+      // Find the user message before this research result to get the query
+      const resultIndex = [...timeline].reverse().findIndex(item => item.type === "research_result");
+      const userMessageBeforeResult = [...timeline]
+        .reverse()
+        .slice(resultIndex)
+        .find(item => item.type === "user_message");
+      
+      if (userMessageBeforeResult) {
+        setSearchQuery(userMessageBeforeResult.data.content);
+      }
+      
       if (externalPapers.length > 0) {
         const mapped: RecommendedPaper[] = externalPapers.map((paper: any) => ({
           title: paper.title || "Untitled",
@@ -422,12 +479,32 @@ const Index = () => {
                 {/* Recommended Papers */}
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-foreground">本日のおすすめ</h2>
+                    {searchQuery ? (
+                      <div className="flex items-center gap-3 flex-1">
+                        <h2 className="text-lg font-semibold text-foreground">検索結果</h2>
+                        <span className="text-sm text-muted-foreground">
+                          「{searchQuery}」
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleResetToExplorer}
+                          className="ml-auto"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <h2 className="text-lg font-semibold text-foreground">本日のおすすめ</h2>
+                    )}
                   </div>
                   
                   <Card className="bg-card border-border overflow-hidden">
-                    {recommendedLoading ? (
-                      <div className="p-6 text-center text-muted-foreground">本日のおすすめを取得しています...</div>
+                    {recommendedLoading || isLoading ? (
+                      <div className="p-6 flex items-center justify-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {searchQuery ? "検索中..." : "本日のおすすめを取得しています..."}
+                      </div>
                     ) : recommendedError ? (
                       <div className="p-6 text-center text-destructive">{recommendedError}</div>
                     ) : (
