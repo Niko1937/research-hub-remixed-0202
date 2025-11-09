@@ -52,6 +52,13 @@ All colors MUST be HSL.
     --highlight: 210 95% 65%;
     --gradient-start: 210 90% 58%;
     --gradient-end: 230 85% 60%;
+
+    /* Chart colors for data visualization */
+    --chart-1: 210 90% 58%; /* Blue - Internal */
+    --chart-2: 150 70% 55%; /* Green - External */
+    --chart-3: 35 95% 60%;  /* Orange - Target */
+    --chart-4: 280 75% 65%; /* Purple */
+    --chart-5: 340 85% 60%; /* Pink */
     
     /* Shadows */
     --shadow-card: 0 4px 12px -2px hsl(220 25% 5% / 0.4);

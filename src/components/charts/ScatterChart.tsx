@@ -94,7 +94,7 @@ export function ScatterChart({ data, xAxisLabel, yAxisLabel }: ScatterChartProps
           cursor={{ strokeDasharray: "3 3" }}
         />
         <Legend 
-          wrapperStyle={{ fontSize: "14px" }}
+          wrapperStyle={{ fontSize: "14px", color: "hsl(var(--foreground))" }}
           iconSize={12}
         />
         {Object.entries(groupedData).map(([type, points]) => (

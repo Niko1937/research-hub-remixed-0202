@@ -62,7 +62,7 @@ export function RadarChart({ data, items }: RadarChartProps) {
           }}
         />
         <Legend 
-          wrapperStyle={{ fontSize: "14px" }}
+          wrapperStyle={{ fontSize: "14px", color: "hsl(var(--foreground))" }}
           iconSize={12}
         />
       </RechartsRadar>

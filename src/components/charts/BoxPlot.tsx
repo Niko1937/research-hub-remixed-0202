@@ -84,7 +84,7 @@ export function BoxPlot({ data, axisLabel }: BoxPlotProps) {
           }}
         />
         <Legend 
-          wrapperStyle={{ fontSize: "14px" }}
+          wrapperStyle={{ fontSize: "14px", color: "hsl(var(--foreground))" }}
           iconSize={12}
           payload={data.map((entry, index) => ({
             value: entry.name,
