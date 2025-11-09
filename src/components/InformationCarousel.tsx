@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 
 export function InformationCarousel() {
@@ -11,6 +13,8 @@ export function InformationCarousel() {
   
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
+  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
   const scrollTo = useCallback((index: number) => emblaApi?.scrollTo(index), [emblaApi]);
 
   const onSelect = useCallback(() => {
@@ -288,6 +292,30 @@ export function InformationCarousel() {
             ))}
           </div>
         </div>
+
+        {/* Navigation Buttons - Subtle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={scrollPrev}
+          aria-label="前のスライドへ"
+          className="absolute left-2 top-1/2 -translate-y-1/2 
+            opacity-0 hover:opacity-60 transition-opacity duration-300
+            bg-background/50 backdrop-blur-sm z-10 h-8 w-8"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={scrollNext}
+          aria-label="次のスライドへ"
+          className="absolute right-2 top-1/2 -translate-y-1/2 
+            opacity-0 hover:opacity-60 transition-opacity duration-300
+            bg-background/50 backdrop-blur-sm z-10 h-8 w-8"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
 
         {/* Dot Indicators */}
         <div className="flex justify-center gap-2 mt-6" role="tablist" aria-label="スライド選択">
