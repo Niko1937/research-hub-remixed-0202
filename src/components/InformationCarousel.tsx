@@ -173,7 +173,7 @@ export function InformationCarousel() {
                   </div>
 
                   {/* Scrollable Content Area */}
-                  <div className="flex-1 overflow-y-auto px-6 md:px-8 lg:px-10 py-6">
+                  <div className="flex-1 overflow-y-auto px-6 md:px-8 lg:px-10 py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     {/* Paragraph Layout */}
                     {item.layout === 'paragraph' && (
                       <div className="max-w-4xl space-y-6">
