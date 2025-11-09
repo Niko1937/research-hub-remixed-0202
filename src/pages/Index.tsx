@@ -263,6 +263,30 @@ const Index = () => {
     };
   }, []);
 
+  // Update recommended papers when research results are received
+  useEffect(() => {
+    const latestResearchResult = [...timeline]
+      .reverse()
+      .find(item => item.type === "research_result");
+    
+    if (latestResearchResult && latestResearchResult.data?.external) {
+      const externalPapers = latestResearchResult.data.external;
+      if (externalPapers.length > 0) {
+        const mapped: RecommendedPaper[] = externalPapers.map((paper: any) => ({
+          title: paper.title || "Untitled",
+          authors: paper.authors || ["Unknown"],
+          year: paper.year || "N/A",
+          source: paper.source || "Unknown",
+          citations: paper.citations,
+          url: paper.url || "",
+          query: "",
+          abstract: paper.abstract || "",
+        }));
+        setRecommendedPapers(mapped);
+      }
+    }
+  }, [timeline]);
+
   // Auto-open HTML viewer when HTML generation starts and update in real-time
   useEffect(() => {
     const lastHtmlItem = [...timeline]
@@ -322,10 +346,15 @@ const Index = () => {
       setLastHtmlItemTimestamp(lastHtmlItem?.timestamp ?? null);
       setPendingHtmlAutoOpen(true);
     }
-    if (mode === "search") {
-      setMode("assistant");
+    // Don't change mode when in search mode without a tool selected
+    if (mode === "search" && !tool) {
+      sendMessage(message, "search", tool, pdfContext, highlightedText);
+    } else {
+      if (mode === "search") {
+        setMode("assistant");
+      }
+      sendMessage(message, "assistant", tool, pdfContext, highlightedText);
     }
-    sendMessage(message, "assistant", tool, pdfContext, highlightedText);
   };
 
   const handleSearchResultClick = (result: { url: string; title: string; authors?: string[]; source?: string }) => {
