@@ -45,7 +45,14 @@ export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
     if (!doc) return;
 
     const fallback = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8" /><style>
-      body { font-family: "Inter", "Hiragino Sans", sans-serif; padding: 2rem; background: #0f172a; color: #e2e8f0; }
+      body { 
+        font-family: "Inter", "Hiragino Sans", "Noto Sans JP", sans-serif; 
+        padding: 2rem; 
+        background: #ffffff; 
+        color: #1f2937; 
+        margin: 0;
+        line-height: 1.6;
+      }
     </style></head><body><p>現在表示できるHTML資料がありません。</p></body></html>`;
 
     doc.open();
@@ -82,13 +89,13 @@ export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
             <X className="w-4 h-4" />
           </Button>
         </div>
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto bg-white">
           <iframe
             ref={iframeRef}
-            className="w-full h-full border-0"
+            className="w-full h-full border-0 bg-white"
             title="HTML Preview"
             sandbox="allow-scripts allow-same-origin"
-            style={{ minHeight: '100%' }}
+            style={{ minHeight: '100%', backgroundColor: '#ffffff' }}
           />
         </div>
       </Card>

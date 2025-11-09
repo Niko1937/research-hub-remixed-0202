@@ -933,28 +933,51 @@ JSON形式で出力:
                   toolResultsContext += JSON.stringify(result.results, null, 2) + "\n";
                 }
 
-                const htmlPrompt = `You are an expert HTML generator for an advanced research laboratory. Your sole purpose is to create a single, complete, and visually rich HTML file.
+                const htmlPrompt = `あなたは研究レポート作成の専門家です。プロフェッショナルで読みやすいHTML資料を生成します。
 
-**CRITICAL INSTRUCTIONS**
-1. **NEVER** wrap the output in markdown code blocks (no \`\`\`, \`\`\`html, or similar). The first characters must be \`<!DOCTYPE html>\`.
-2. ALL CSS and JavaScript **must** live inside <style> and <script> tags in the same file. Do not reference external CSS/JS except well-known icon CDNs if absolutely necessary.
-3. Return only valid HTML. No explanations, no commentary, no markdown.
+**絶対に守るべき指示**
+1. **絶対に**マークdownコードブロック(\`\`\`, \`\`\`html等)で囲まない。最初の文字は必ず\`<!DOCTYPE html>\`で始める
+2. すべてのCSSとJavaScriptは<style>と<script>タグ内に記述。外部CSSは不可（アイコンCDNは可）
+3. 有効なHTMLのみを返す。説明文やコメントは不要
 
-**VISUAL & CONTENT GUIDELINES**
-- Emulate a cutting-edge R&D lab briefing or infographic panel.
-- Include at least three distinct sections (e.g., overview, metrics, experiments, roadmap) with clear headings.
-- Provide multiple data-rich elements: metric cards, comparison tables, timelines, annotated diagrams, or faux sensor readouts. It is acceptable (encouraged) to include synthetic but plausible data/figures as long as they are clearly labeled.
-- Incorporate at least two visual flourishes such as SVG charts, CSS-driven graphs, or animated highlights to convey a "noisy", information-dense research environment.
-- Use a modern dark theme with gradients, neon accents, and smooth transitions. Icons from a CDN (Font Awesome) are allowed.
-- All copy must be in Japanese.
+**デザイン指針**
+- **背景色**: 白ベース（#ffffff または #f8f9fa）
+- **カラーパレット**: 
+  * メインカラー: #2563eb（青）
+  * アクセント: #10b981（緑）
+  * 強調: #f59e0b（オレンジ）
+  * テキスト: #1f2937（濃いグレー）
+  * サブテキスト: #6b7280（グレー）
+- **レイアウト**: 縦スクロール型、情報密度が高いインフォグラフィック
+- **構成要素**: 
+  * ヘッダーセクション（タイトル・概要）
+  * データ可視化セクション（チャート・グラフ・表）
+  * 主要な発見・インサイトセクション
+  * 詳細データセクション
+- **ビジュアル要素**:
+  * SVGチャート、CSSグラフ、アイコンを活用
+  * セクション間に適切な余白と境界線
+  * カードレイアウトで情報を整理
+  * グラデーションやシャドウで視覚的階層を作る
+- **フォント**: 
+  * Google Fonts（Noto Sans JP、Inter等）を使用
+  * 見出し: 24-36px、本文: 14-16px
+- **レスポンシブ**: モバイルでも読みやすいデザイン
 
-**TASK**
-Create a beautiful, interactive HTML infographic summarizing our conversation and all tool results.
+**タスク**
+ユーザーの質問とツール実行結果を基に、研究レポートとしての価値が高い、構造的で読みやすいHTML資料を作成してください。
 
-**User Query:** ${userMessage}
+**ユーザーの質問:** ${userMessage}
 ${toolResultsContext}
 
-Your final output will be rendered directly in a browser. Ensure it is flawless and self-contained.`;
+**重要**: 
+- すべてのコンテンツは日本語で記述
+- データは実行結果から引用し、視覚的に整理して表示
+- 情報は論理的な順序で配置（概要→詳細→インサイト）
+- 各セクションに適切な見出しとアイコンを付ける
+- スクロールしながら読み進められる構成にする
+
+出力は直接ブラウザで表示されます。完璧で自己完結したHTMLを生成してください。`;
 
                 const htmlResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                   method: "POST",
@@ -1037,7 +1060,14 @@ Your final output will be rendered directly in a browser. Ensure it is flawless 
               }
             }
             
+            // Check if HTML was generated
+            const htmlWasGenerated = toolResults.some((result: any) => result.tool === "html-generation");
+            
             contextPrompt += `\n\n上記の検索結果とツール実行結果を踏まえて、R&D研究者向けに簡潔で実践的な回答を生成してください。`;
+            
+            if (htmlWasGenerated) {
+              contextPrompt += `\n\n**重要**: 本分析のビジュアル資料（HTML）を生成しました。この回答では、資料の生成完了を自然な形で報告し（例：「〇〇についてのビジュアル資料を作成しました」）、資料の内容の概要を簡潔に説明してください。HTMLコードやマークアップを記載する必要はありません。`;
+            }
 
             // Add PDF context if available
             if (pdfContext) {
