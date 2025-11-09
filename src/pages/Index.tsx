@@ -13,6 +13,7 @@ import { SearchResultItem } from "@/components/SearchResultItem";
 import { UseCaseCards } from "@/components/UseCaseCards";
 import { HeroSection } from "@/components/HeroSection";
 import { ConceptSections } from "@/components/ConceptSections";
+import { InformationCarousel } from "@/components/InformationCarousel";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
 import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -348,8 +349,7 @@ const Index = () => {
             <ScrollArea className="flex-1">
               <div className="animate-fade-in">
                 <HeroSection />
-                <ConceptSections />
-                <UseCaseCards />
+                <InformationCarousel />
 
                 <div className="max-w-6xl mx-auto px-6 py-5">
                   <ChatInput 
