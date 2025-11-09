@@ -37,7 +37,7 @@ export function UseCaseCards() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-6">
+    <div className="max-w-6xl mx-auto px-6 py-5">
       <div className="relative">
         <div className="overflow-hidden" ref={emblaRef}>
           <div className="flex gap-4">
@@ -55,20 +55,20 @@ export function UseCaseCards() {
                       hover:bg-card hover:shadow-lg hover:border-primary/20
                       cursor-pointer"
                   >
-                    <div className="relative p-8">
+                    <div className="relative p-6">
                       {/* Icon */}
-                      <div className="mb-4">
+                      <div className="mb-3">
                         <div className="text-primary transition-transform duration-300 group-hover:scale-110">
-                          <Icon className="w-10 h-10" strokeWidth={1.5} />
+                          <Icon className="w-8 h-8" strokeWidth={1.5} />
                         </div>
                       </div>
 
                       {/* Content */}
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold text-foreground">
+                      <div className="space-y-1.5">
+                        <h3 className="text-base font-semibold text-foreground">
                           {useCase.title}
                         </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
                           {useCase.description}
                         </p>
                       </div>
