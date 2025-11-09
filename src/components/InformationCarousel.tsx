@@ -155,7 +155,7 @@ export function InformationCarousel() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 lg:py-10">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 lg:py-10">
       <div 
         className="relative" 
         role="region" 
@@ -167,28 +167,28 @@ export function InformationCarousel() {
             {items.map((item, index) => (
               <div
                 key={index}
-                className="flex-[0_0_100%] min-w-0 px-2 md:px-3"
+                className="flex-[0_0_100%] min-w-0 px-1 sm:px-2 md:px-3"
                 role="group"
                 aria-roledescription="slide"
                 aria-label={`${index + 1} / ${items.length}`}
                 aria-current={selectedIndex === index ? 'true' : 'false'}
               >
-                <div className="rounded-2xl h-[500px] md:h-[450px] transition-all duration-300 overflow-hidden flex flex-col">
+                <div className="rounded-xl sm:rounded-2xl h-[600px] sm:h-[550px] md:h-[500px] lg:h-[450px] transition-all duration-300 overflow-hidden flex flex-col">
                   {/* Content Area */}
-                  <div className="flex-1 overflow-y-auto px-6 md:px-8 lg:px-10 py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 lg:px-10 py-4 sm:py-5 md:py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     {/* Paragraph Layout */}
                     {item.layout === 'paragraph' && (
-                      <div className="max-w-4xl space-y-6">
+                      <div className="max-w-4xl space-y-4 sm:space-y-6">
                         {item.content?.map((block: any, idx: number) => (
                           <div key={idx}>
                             {block.type === 'heading' && (
-                              <h3 className="text-lg md:text-xl lg:text-2xl font-semibold text-primary leading-relaxed mb-4">
+                              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-primary leading-relaxed mb-3 sm:mb-4">
                                 {block.text}
                               </h3>
                             )}
                             {block.type === 'text' && (
                               <p 
-                                className="text-base md:text-lg text-muted-foreground leading-loose"
+                                className="text-sm sm:text-base md:text-lg text-muted-foreground leading-loose"
                                 dangerouslySetInnerHTML={{ __html: block.html }}
                               />
                             )}
@@ -199,20 +199,20 @@ export function InformationCarousel() {
 
                     {/* List Layout */}
                     {item.layout === 'list' && (
-                      <div className="space-y-6">
-                        <p className="text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed">
+                      <div className="space-y-4 sm:space-y-6">
+                        <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed">
                           {item.subtitle}
                         </p>
-                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <ul className="grid grid-cols-1 gap-2.5 sm:gap-3">
                           {item.items?.map((listItem: string, idx: number) => (
-                            <li key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-accent/5 border border-border/50 hover:bg-accent/10 transition-colors">
-                              <span className="text-primary mt-0.5 font-bold text-base">•</span>
-                              <span className="text-base md:text-lg text-foreground leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: listItem }} />
+                            <li key={idx} className="flex items-start gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-accent/5 border border-border/50 hover:bg-accent/10 transition-colors">
+                              <span className="text-primary mt-0.5 font-bold text-sm sm:text-base">•</span>
+                              <span className="text-sm sm:text-base md:text-lg text-foreground leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: listItem }} />
                             </li>
                           ))}
                         </ul>
                         {item.note && (
-                          <p className="text-sm md:text-base text-muted-foreground leading-relaxed p-4 bg-muted/30 rounded-lg border-l-2 border-primary/50">
+                          <p className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed p-3 sm:p-4 bg-muted/30 rounded-lg border-l-2 border-primary/50">
                             {item.note}
                           </p>
                         )}
@@ -221,17 +221,17 @@ export function InformationCarousel() {
 
                     {/* Center Layout */}
                     {item.layout === 'center' && (
-                      <div className="max-w-3xl mx-auto space-y-6 text-center">
-                        <p className="text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed">
+                      <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6 text-center">
+                        <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed">
                           {item.subtitle}
                         </p>
-                        <p className="text-base md:text-lg text-muted-foreground leading-loose">
+                        <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-loose">
                           {item.detail}
                         </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6 text-left">
+                        <div className="grid grid-cols-1 gap-2.5 sm:gap-3 mt-4 sm:mt-6 text-left">
                           {item.items?.map((listItem: string, idx: number) => (
-                            <div key={idx} className="p-3 rounded-lg bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors">
-                              <span className="text-base md:text-lg text-foreground leading-relaxed block">{listItem}</span>
+                            <div key={idx} className="p-2.5 sm:p-3 rounded-lg bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors">
+                              <span className="text-sm sm:text-base md:text-lg text-foreground leading-relaxed block">{listItem}</span>
                             </div>
                           ))}
                         </div>
@@ -240,14 +240,14 @@ export function InformationCarousel() {
 
                     {/* Q&A Layout */}
                     {item.layout === 'qa' && (
-                      <div className="space-y-5 max-w-4xl mx-auto">
+                      <div className="space-y-4 sm:space-y-5 max-w-4xl mx-auto">
                         {item.questions?.map((qa: any, idx: number) => (
                           <div key={idx} className="space-y-2">
-                            <p className="text-base md:text-lg font-semibold text-foreground flex items-start gap-2">
+                            <p className="text-sm sm:text-base md:text-lg font-semibold text-foreground flex items-start gap-2">
                               <span className="text-primary">Q.</span>
                               <span>{qa.q}</span>
                             </p>
-                            <p className="text-base md:text-lg text-muted-foreground leading-loose pl-6 py-3 px-4 bg-accent/10 rounded-lg border-l-2 border-primary/30">
+                            <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-loose pl-4 sm:pl-6 py-2.5 sm:py-3 px-3 sm:px-4 bg-accent/10 rounded-lg border-l-2 border-primary/30">
                               <span className="font-medium text-primary">A. </span>
                               {qa.a}
                             </p>
@@ -258,23 +258,23 @@ export function InformationCarousel() {
 
                     {/* User Story Layout */}
                     {item.layout === 'user-story' && (
-                      <div className="space-y-6">
-                        <p className="text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed mb-6">
+                      <div className="space-y-4 sm:space-y-6">
+                        <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-medium text-primary leading-relaxed mb-4 sm:mb-6">
                           {item.subtitle}
                         </p>
-                        <div className="space-y-6">
+                        <div className="space-y-4 sm:space-y-6">
                           {item.stories?.map((story: any, idx: number) => (
-                            <div key={idx} className="p-5 rounded-xl bg-accent/10 border border-border/50 hover:bg-accent/20 transition-colors">
-                              <div className="flex items-start gap-4">
-                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                            <div key={idx} className="p-4 sm:p-5 rounded-xl bg-accent/10 border border-border/50 hover:bg-accent/20 transition-colors">
+                              <div className="flex items-start gap-3 sm:gap-4">
+                                <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm sm:text-base">
                                   {idx + 1}
                                 </div>
                                 <div className="flex-1 space-y-2">
-                                  <p className="text-base md:text-lg">
+                                  <p className="text-sm sm:text-base md:text-lg">
                                     <span className="font-semibold text-foreground">{story.persona}</span>
                                     <span className="text-muted-foreground">、{story.action}、</span>
                                   </p>
-                                  <p className="text-base md:text-lg text-primary font-medium pl-4 border-l-2 border-primary/30">
+                                  <p className="text-sm sm:text-base md:text-lg text-primary font-medium pl-3 sm:pl-4 border-l-2 border-primary/30">
                                     {story.outcome}
                                   </p>
                                 </div>

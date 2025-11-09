@@ -34,38 +34,58 @@ export function UseCaseCards() {
       title: "AI資料自動生成",
       description: "定例・進捗・提案報告を自動作成",
     },
+    {
+      icon: FileText,
+      title: "論文検索と要約",
+      description: "外部文献を検索して要約・解釈",
+    },
+    {
+      icon: Target,
+      title: "テーマ評価",
+      description: "社内研究とビジネス課題の関連性を評価",
+    },
+    {
+      icon: FileSpreadsheet,
+      title: "専門家検索",
+      description: "関連分野の専門家を推薦",
+    },
+    {
+      icon: FileText,
+      title: "HTML報告書生成",
+      description: "インフォグラフィック形式で自動作成",
+    },
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-5">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
       <div className="relative">
         <div className="overflow-hidden" ref={emblaRef}>
-          <div className="flex gap-4">
+          <div className="flex gap-3 sm:gap-4">
             {useCases.map((useCase, index) => {
               const Icon = useCase.icon;
               return (
                 <div
                   key={index}
-                  className="flex-[0_0_100%] md:flex-[0_0_calc(33.333%-0.67rem)] min-w-0"
+                  className="flex-[0_0_100%] sm:flex-[0_0_calc(50%-0.5rem)] md:flex-[0_0_calc(33.333%-0.67rem)] min-w-0"
                 >
                   <div
-                    className="group relative overflow-hidden rounded-2xl bg-card/50 
+                    className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-card/50 
                       border border-border h-full
                       transition-all duration-300 ease-out
                       hover:bg-card hover:shadow-lg hover:border-primary/20
                       cursor-pointer"
                   >
-                    <div className="relative p-6">
+                    <div className="relative p-4 sm:p-5 md:p-6">
                       {/* Icon */}
-                      <div className="mb-3">
+                      <div className="mb-2 sm:mb-3">
                         <div className="text-primary transition-transform duration-300 group-hover:scale-110">
-                          <Icon className="w-8 h-8" strokeWidth={1.5} />
+                          <Icon className="w-7 h-7 sm:w-8 sm:h-8" strokeWidth={1.5} />
                         </div>
                       </div>
 
                       {/* Content */}
-                      <div className="space-y-1.5">
-                        <h3 className="text-base font-semibold text-foreground">
+                      <div className="space-y-1 sm:space-y-1.5">
+                        <h3 className="text-sm sm:text-base font-semibold text-foreground">
                           {useCase.title}
                         </h3>
                         <p className="text-xs text-muted-foreground leading-relaxed">
