@@ -41,18 +41,13 @@ export function UseCaseCards() {
     },
     {
       icon: Target,
-      title: "テーマ評価",
-      description: "社内研究とビジネス課題の関連性を評価",
+      title: "ポジショニング分析",
+      description: "研究の位置付けを動的に可視化",
     },
     {
       icon: FileSpreadsheet,
       title: "専門家検索",
       description: "関連分野の専門家を推薦",
-    },
-    {
-      icon: FileText,
-      title: "HTML報告書生成",
-      description: "インフォグラフィック形式で自動作成",
     },
   ];
 

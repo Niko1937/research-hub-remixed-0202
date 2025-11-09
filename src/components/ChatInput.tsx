@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 
-type Tool = "wide-knowledge" | "theme-evaluation" | "knowwho" | "positioning-analysis" | "seeds-needs-matching" | "html-generation";
+type Tool = "wide-knowledge" | "knowwho" | "positioning-analysis" | "seeds-needs-matching" | "html-generation";
 type Mode = "search" | "assistant";
 
 interface ChatInputProps {
@@ -45,7 +45,6 @@ export function ChatInput({
 
   const toolLabels: Record<Tool, string> = {
     "wide-knowledge": "ワイドナレッジ検索",
-    "theme-evaluation": "テーマ評価",
     "knowwho": "KnowWho検索",
     "positioning-analysis": "ポジショニング分析",
     "seeds-needs-matching": "シーズ・ニーズマッチング",
@@ -167,13 +166,6 @@ export function ChatInput({
                         >
                           <div className="text-sm font-medium">ワイドナレッジ検索</div>
                           <div className="text-xs text-muted-foreground">幅広い知識ベースから検索</div>
-                        </button>
-                        <button
-                          onClick={() => handleToolSelect("theme-evaluation")}
-                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                        >
-                          <div className="text-sm font-medium">テーマ評価</div>
-                          <div className="text-xs text-muted-foreground">社内外研究・Seeds-Needsマッチング</div>
                         </button>
                         <button
                           onClick={() => handleToolSelect("knowwho")}

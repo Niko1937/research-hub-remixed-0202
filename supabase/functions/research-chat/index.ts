@@ -295,56 +295,6 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                     })}\n\n`
                   )
                 );
-              } else if (step.tool === "theme-evaluation") {
-                const internalResearch = searchInternalResearch(step.query);
-                const businessChallenges = searchBusinessChallenges(step.query);
-                
-                // Note: theme-evaluation uses mock data, but context is still useful for AI interpretation
-
-                const comparison = [
-                  {
-                    aspect: "技術成熟度",
-                    internal: "プロトタイプレベル（TRL 4-5）",
-                    external: "研究段階（TRL 2-3）",
-                    evaluation: "advantage"
-                  },
-                  {
-                    aspect: "市場適用性",
-                    internal: "特定業界向け",
-                    external: "汎用的アプローチ",
-                    evaluation: "neutral"
-                  },
-                  {
-                    aspect: "理論的新規性",
-                    internal: "既存手法の改良",
-                    external: "新規アルゴリズム提案",
-                    evaluation: "gap"
-                  }
-                ];
-
-                const needs = businessChallenges.map(c => ({
-                  title: c.challenge,
-                  department: c.business_unit,
-                  priority: c.priority === "高" ? "high" : c.priority === "中" ? "medium" : "low",
-                  match_score: Math.floor(Math.random() * 30) + 65
-                }));
-
-                // Store results
-                toolResults.push({
-                  tool: "theme-evaluation",
-                  query: step.query,
-                  results: { comparison, needs }
-                });
-
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "theme_evaluation",
-                      comparison,
-                      needs,
-                    })}\n\n`
-                  )
-                );
               } else if (step.tool === "knowwho") {
                 // Build context from previous tool results
                 let knowWhoContext = `You are an expert finder. Based on the query "${step.query}", generate a list of relevant experts.`;

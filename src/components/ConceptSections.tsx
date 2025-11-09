@@ -27,12 +27,11 @@ export function ConceptSections() {
           {/* 現在の機能 */}
           <AccordionItem value="features" className="border rounded-lg px-3 sm:px-4 bg-card/30">
             <AccordionTrigger className="text-sm sm:text-base font-semibold text-foreground hover:no-underline py-3 sm:py-4">
-              今できること（最小構成の7機能）
+              今できること（最小構成の6機能）
             </AccordionTrigger>
             <AccordionContent>
               <ul className="text-xs sm:text-sm text-muted-foreground space-y-1 leading-relaxed">
                 <li>• <strong className="text-foreground">論文検索</strong> - 外部API連携で関連文献を収集</li>
-                <li>• <strong className="text-foreground">テーマ評価</strong> - 社内 vs 外部の研究動向を分析</li>
                 <li>• <strong className="text-foreground">専門家検索</strong> - 関連分野の専門家を推薦</li>
                 <li>• <strong className="text-foreground">ポジショニング分析</strong> - 動的軸生成と3種類のチャート</li>
                 <li>• <strong className="text-foreground">シーズ・ニーズマッチング</strong> - 技術と課題の接続</li>

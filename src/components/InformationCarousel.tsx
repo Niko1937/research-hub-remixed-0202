@@ -87,7 +87,6 @@ export function InformationCarousel() {
       subtitle: "現在実装されている機能と、その実装方式",
       items: [
         "<strong>wide-knowledge</strong>（外部論文検索）- OpenAlex/Semantic Scholar/arXivの実APIから取得し、LLMが要約・解釈",
-        "<strong>theme-evaluation</strong>（テーマ評価）- <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モック社内研究2件</span>と<span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モックビジネス課題2件</span>を使用。LLMが評価スコアを算出",
         "<strong>knowwho</strong>（専門家発見）- コンテクスト（検索した論文の著者等）からLLMが3-5名の関連専門家を動的に生成",
         "<strong>positioning-analysis</strong>（ポジショニング分析）- コンテクストからLLMが比較対象（論文・研究テーマ等）と比較軸（2-5軸）を動的に生成・可視化。軸の追加/削除/再生成も対話的に実行可能",
         "<strong>seeds-needs-matching</strong>（シーズ・ニーズマッチング）- <span class='bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded'>モックデータ</span>を使用。LLMがマッチングスコアと理由を定性・定量の両面から算出",
