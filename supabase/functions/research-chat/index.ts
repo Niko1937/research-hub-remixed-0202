@@ -1083,6 +1083,17 @@ ${toolResultsContext}
                     reader.releaseLock();
                   }
 
+                  // Add HTML generation result to toolResults
+                  toolResults.push({
+                    tool: "html-generation",
+                    query: step.query,
+                    results: {
+                      status: "completed",
+                      htmlLength: htmlContent.length,
+                      summary: "HTML資料を生成しました"
+                    }
+                  });
+
                   controller.enqueue(
                     encoder.encode(`data: ${JSON.stringify({ type: "html_complete" })}\n\n`)
                   );
@@ -1116,7 +1127,12 @@ ${toolResultsContext}
             contextPrompt += `\n\n上記の検索結果とツール実行結果を踏まえて、R&D研究者向けに簡潔で実践的な回答を生成してください。`;
             
             if (htmlWasGenerated) {
-              contextPrompt += `\n\n**重要**: 本分析のビジュアル資料（HTML）を生成しました。この回答では、資料の生成完了を自然な形で報告し（例：「〇〇についてのビジュアル資料を作成しました」）、資料の内容の概要を簡潔に説明してください。HTMLコードやマークアップを記載する必要はありません。`;
+              contextPrompt += `\n\n**重要な指示**: すでにビジュアル資料（HTML）の生成が完了しています。
+- この回答では、HTMLコードを一切表示しないでください
+- 「資料を生成しました」「ビジュアル資料を作成しました」のような簡潔な完了報告のみを含めてください
+- 資料の内容を2-3文で要約してください
+- 「以下のHTMLコードを...」のような説明は不要です
+- マークダウンのコードブロックやHTMLタグは絶対に出力しないでください`;
             }
 
             // Add PDF context if available
