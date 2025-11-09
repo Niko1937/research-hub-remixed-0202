@@ -33,13 +33,6 @@ export function InformationCarousel() {
 
   const items = [
     {
-      title: "対話的な研究支援の「拡張性」を示す、AgentChatプロトタイプ",
-      layout: "hero",
-      subtitle: "対話的な研究支援の",
-      highlight: "「拡張性」を示す",
-      description: "AgentChatプロトタイプ"
-    },
-    {
       title: "昨今の研究支援AI",
       layout: "paragraph",
       content: [
@@ -154,15 +147,32 @@ export function InformationCarousel() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 lg:py-10">
-      <div 
-        className="relative" 
-        role="region" 
-        aria-label="情報カルーセル"
-        aria-roledescription="carousel"
-      >
-        <div className="overflow-hidden" ref={emblaRef}>
-          <div className="flex">
-            {items.map((item, index) => (
+      <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-6 lg:gap-8">
+        {/* Left: Fixed Description */}
+        <div className="flex items-center justify-center lg:justify-end">
+          <div className="space-y-3 text-center lg:text-right max-w-sm">
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+              対話的な研究支援AIの
+            </p>
+            <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-primary leading-tight">
+              拡張性を示す
+            </p>
+            <p className="text-base md:text-lg text-muted-foreground font-medium">
+              AgentChatプロトタイプ
+            </p>
+          </div>
+        </div>
+
+        {/* Right: Carousel */}
+        <div 
+          className="relative" 
+          role="region" 
+          aria-label="情報カルーセル"
+          aria-roledescription="carousel"
+        >
+          <div className="overflow-hidden" ref={emblaRef}>
+            <div className="flex">
+              {items.map((item, index) => (
               <div
                 key={index}
                 className="flex-[0_0_100%] min-w-0 px-2 md:px-3"
@@ -181,32 +191,6 @@ export function InformationCarousel() {
 
                   {/* Scrollable Content Area */}
                   <div className="flex-1 overflow-y-auto px-6 md:px-8 lg:px-10 py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    {/* Hero Layout */}
-                    {item.layout === 'hero' && (
-                      <div className="h-full flex items-center justify-center">
-                        <div className="grid grid-cols-1 md:grid-cols-[30%_70%] gap-6 md:gap-8 items-center max-w-6xl">
-                          {/* Left: Description */}
-                          <div className="space-y-2 text-center md:text-right">
-                            <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                              {item.subtitle}
-                            </p>
-                            <p className="text-lg md:text-xl lg:text-2xl font-bold text-primary leading-tight">
-                              {item.highlight}
-                            </p>
-                            <p className="text-sm md:text-base text-muted-foreground">
-                              {item.description}
-                            </p>
-                          </div>
-                          {/* Right: Main Title */}
-                          <div className="border-t md:border-t-0 md:border-l-2 border-primary/30 pt-6 md:pt-0 md:pl-8">
-                            <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight">
-                              {item.title}
-                            </h2>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Paragraph Layout */}
                     {item.layout === 'paragraph' && (
                       <div className="max-w-4xl space-y-6">
@@ -340,6 +324,25 @@ export function InformationCarousel() {
           <ChevronRight className="h-5 w-5" />
         </Button>
 
+        {/* Dot Indicators */}
+        <div className="flex justify-center gap-2 mt-6" role="tablist" aria-label="スライド選択">
+          {items.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => scrollTo(index)}
+              aria-label={`スライド ${index + 1} へ移動`}
+              aria-current={selectedIndex === index ? 'true' : 'false'}
+              role="tab"
+              className={cn(
+                "h-2 rounded-full transition-all duration-300",
+                selectedIndex === index 
+                  ? "w-8 bg-primary" 
+                  : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
+              )}
+            />
+          ))}
+        </div>
+        </div>
       </div>
     </div>
   );
