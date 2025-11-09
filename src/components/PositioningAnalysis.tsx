@@ -20,6 +20,9 @@ interface PositioningData {
   suggestedChartType: "scatter" | "box" | "radar";
   items: {
     name: string;
+    fullTitle?: string;
+    authors?: string;
+    source?: string;
     values: Record<string, number>; // axis name -> value
     type: "internal" | "external" | "target";
   }[];

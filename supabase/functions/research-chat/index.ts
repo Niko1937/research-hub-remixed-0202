@@ -436,31 +436,47 @@ Return a JSON object with this structure:
                     positioningContext += `\n### ${result.tool} (Query: ${result.query})\n`;
                     positioningContext += JSON.stringify(result.results, null, 2) + "\n";
                   }
-                  positioningContext += `\n上記の結果を踏まえて分析を行ってください。特に外部研究データがある場合は、それらを活用してください。`;
+                  positioningContext += `\n上記の結果を踏まえて分析を行ってください。`;
                 }
                 
                 const positioningPrompt = `あなたは研究ポジショニング分析の専門家です。${positioningContext}
+
+**重要：比較対象（items）と比較軸（axes）の両方をコンテクストから動的に生成してください。**
+
+比較対象は以下のいずれでも構いません：
+- 具体的な研究論文（タイトル、著者を含む）
+- 研究テーマや研究アプローチ
+- 技術や手法
+- 研究機関やプロジェクト
 
 以下のJSON形式で出力してください：
 
 {
   "axes": [
-    { "name": "軸の名前", "type": "quantitative" }
+    { "name": "軸の名前（例：技術的新規性、実用性）", "type": "quantitative" }
   ],
   "items": [
     {
-      "name": "研究項目名",
-      "values": { "軸の名前1": 50, "軸の名前2": 60 },
-      "type": "internal"
+      "name": "短縮名（20文字以内、凡例表示用）",
+      "fullTitle": "完全なタイトルや詳細な説明（論文の場合は完全なタイトル）",
+      "authors": "著者名（論文の場合）または研究者・機関名",
+      "source": "出典（例：arXiv, 社内研究, 目標設定）",
+      "type": "internal | external | target",
+      "values": { "軸の名前1": 50, "軸の名前2": 60 }
     }
   ],
-  "insights": ["分析結果1"]
+  "insights": ["分析結果1", "分析結果2"]
 }
 
 **指示：**
-- axesは最低2軸、推奨3-5軸を生成
-- 各軸はquantitative（定量）またはqualitative（定性）
-- itemsには internal（社内2-3個）、external（外部3-4個）、target（目標1個）を含む
+- **比較対象（items）**：コンテクストから5-10個の具体的な比較対象を抽出・生成してください
+  - external（外部研究・論文）: 3-5個
+  - internal（社内研究・既存アプローチ）: 2-3個
+  - target（目標とする位置）: 1-2個
+- **比較軸（axes）**：コンテクストと比較対象に基づいて意味のある軸を2-5個生成
+  - 各軸はquantitative（定量）またはqualitative（定性）
+- 各itemには必ず name, fullTitle, authors, source, type, values を含める
+- nameは凡例表示用の短縮名、fullTitleは完全な情報
 - 各itemのvaluesには全軸の評価値（0-100）を含む
 - insightsは3-5個の実践的分析結果
 - 全て日本語で記述`;
