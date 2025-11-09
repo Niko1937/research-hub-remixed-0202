@@ -131,39 +131,25 @@ export function InformationCarousel() {
       ]
     },
     {
-      title: "ユースケース",
-      layout: "feature",
-      subtitle: "個別資料との対話学習",
-      description: "PDFや論文などの個別資料を読み込み、その内容について対話しながら学習を深めることができます。資料の要点を抽出し、わからない箇所を質問したり、関連する専門家を推薦してもらったりすることで、効率的な学習をサポートします。",
-      items: [
-        "PDF閲覧機能でテキストをハイライト",
-        "ハイライト部分について質問・対話",
-        "関連する専門家の検索と推薦",
-        "論文の要約と重要ポイントの抽出"
-      ]
-    },
-    {
-      title: "ユースケース",
-      layout: "feature",
-      subtitle: "研究戦略の立案",
-      description: "研究テーマのポジショニング分析やシーズ・ニーズマッチングを通じて、効果的な研究戦略を立案できます。競合研究との差別化ポイントを可視化し、自社の技術シーズと市場ニーズの接点を発見することで、戦略的な研究開発を支援します。",
-      items: [
-        "ポジショニング分析（散布図・箱ひげ図・レーダーチャート）",
-        "動的な分析軸の生成と再生成",
-        "シーズ・ニーズマッチングの可視化",
-        "テーマ評価（社内外の研究動向分析）"
-      ]
-    },
-    {
-      title: "ユースケース",
-      layout: "feature",
-      subtitle: "AI資料自動生成",
-      description: "研究の定例報告、進捗報告、提案資料などを、対話を通じてAIが自動生成します。研究内容や進捗状況を入力するだけで、見やすいインフォグラフィック形式の報告書が作成され、報告書作成の時間を大幅に削減できます。",
-      items: [
-        "HTML形式のインフォグラフィック自動生成",
-        "研究テーマに応じた構成の自動調整",
-        "視覚的にわかりやすいレイアウト",
-        "プレビュー機能での即時確認"
+      title: "ユーザーストーリー",
+      layout: "user-story",
+      subtitle: "このシステムで実現できること",
+      stories: [
+        {
+          persona: "研究者として",
+          action: "論文やPDFを読み込んで対話しながら",
+          outcome: "重要なポイントを素早く理解し、関連する専門家を見つけたい"
+        },
+        {
+          persona: "プロジェクトリーダーとして",
+          action: "研究テーマのポジショニングを分析し",
+          outcome: "競合との差別化ポイントを可視化して、戦略的な研究計画を立てたい"
+        },
+        {
+          persona: "研究マネージャーとして",
+          action: "AIと対話しながら進捗状況を整理し",
+          outcome: "見やすいインフォグラフィック形式の報告書を自動生成して、報告時間を削減したい"
+        }
       ]
     }
   ];
@@ -270,25 +256,31 @@ export function InformationCarousel() {
                       </div>
                     )}
 
-                    {/* Feature Layout */}
-                    {item.layout === 'feature' && (
+                    {/* User Story Layout */}
+                    {item.layout === 'user-story' && (
                       <div className="space-y-6">
-                        <p className="text-base md:text-lg font-medium text-primary leading-relaxed">
+                        <p className="text-base md:text-lg font-medium text-primary leading-relaxed mb-6">
                           {item.subtitle}
                         </p>
-                        <p className="text-sm text-muted-foreground leading-loose">
-                          {item.description}
-                        </p>
-                        <div className="space-y-2">
-                          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">実装済み機能</p>
-                          <ul className="space-y-2">
-                            {item.items?.map((listItem: string, idx: number) => (
-                              <li key={idx} className="flex items-start gap-3 text-sm text-muted-foreground leading-relaxed">
-                                <span className="text-primary mt-1">✓</span>
-                                <span className="flex-1">{listItem}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        <div className="space-y-6">
+                          {item.stories?.map((story: any, idx: number) => (
+                            <div key={idx} className="p-5 rounded-xl bg-accent/10 border border-border/50 hover:bg-accent/20 transition-colors">
+                              <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                                  {idx + 1}
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                  <p className="text-sm">
+                                    <span className="font-semibold text-foreground">{story.persona}</span>
+                                    <span className="text-muted-foreground">、{story.action}、</span>
+                                  </p>
+                                  <p className="text-sm text-primary font-medium pl-4 border-l-2 border-primary/30">
+                                    {story.outcome}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
