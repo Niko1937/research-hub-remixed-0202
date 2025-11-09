@@ -57,29 +57,29 @@ export function InformationCarousel() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-6 border-b border-border">
+    <div className="max-w-7xl mx-auto px-8 py-8">
       <div className="relative group">
         <div className="overflow-hidden" ref={emblaRef}>
           <div className="flex">
             {items.map((item, index) => (
               <div
                 key={index}
-                className="flex-[0_0_100%] min-w-0 px-2"
+                className="flex-[0_0_100%] min-w-0 px-3"
               >
-                <div className="rounded-2xl bg-card/50 border border-border p-8 transition-all duration-300 hover:bg-card hover:shadow-lg hover:border-primary/20">
-                  <div className="grid md:grid-cols-2 gap-8">
-                    {/* Left side: Title and Subtitle */}
+                <div className="rounded-2xl bg-card/50 border border-border p-12 transition-all duration-300 hover:bg-card hover:shadow-lg hover:border-primary/20">
+                  <div className="grid grid-cols-[30%_70%] gap-12 items-start">
+                    {/* Left side: Title and Subtitle (30%) */}
                     <div className="space-y-4">
                       <h2 className="text-3xl font-bold text-foreground leading-tight">
                         {item.title}
                       </h2>
-                      <p className="text-lg text-muted-foreground leading-relaxed">
+                      <p className="text-base text-muted-foreground leading-relaxed">
                         {item.subtitle}
                       </p>
                     </div>
 
-                    {/* Right side: Detail content */}
-                    <div className="flex items-center">
+                    {/* Right side: Detail content (70%) */}
+                    <div>
                       <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                         {item.detail}
                       </p>
@@ -98,9 +98,9 @@ export function InformationCarousel() {
           onClick={scrollPrev}
           className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 
             opacity-0 group-hover:opacity-100 transition-opacity
-            bg-background/80 backdrop-blur-sm z-10"
+            bg-background/90 backdrop-blur-sm z-10 hover:bg-background"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5" />
         </Button>
         <Button
           variant="outline"
@@ -108,9 +108,9 @@ export function InformationCarousel() {
           onClick={scrollNext}
           className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 
             opacity-0 group-hover:opacity-100 transition-opacity
-            bg-background/80 backdrop-blur-sm z-10"
+            bg-background/90 backdrop-blur-sm z-10 hover:bg-background"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
     </div>
