@@ -23,6 +23,7 @@ import { Sparkles, Loader2, FileText, Search, MessageSquare, X, ChevronDown } fr
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 
 const initialSearchResults = [
   { 
@@ -170,15 +171,20 @@ const Index = () => {
     setSearchQuery(null);
     // Reset to initial recommendations
     setRecommendedLoading(true);
-    fetch(
-      `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(
-        DEFAULT_RECOMMEND_QUERY
-      )}&start=0&max_results=7`
-    )
-      .then((response) => response.text())
-      .then((feed) => {
+    
+    supabase.functions
+      .invoke("arxiv-proxy", {
+        body: { 
+          searchQuery: DEFAULT_RECOMMEND_QUERY,
+          maxResults: 7 
+        },
+      })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        if (!data?.xmlData) throw new Error("No data returned");
+        
         const parser = new DOMParser();
-        const xml = parser.parseFromString(feed, "text/xml");
+        const xml = parser.parseFromString(data.xmlData, "text/xml");
         const entries = Array.from(xml.getElementsByTagName("entry"));
 
         const mapped: RecommendedPaper[] = entries
@@ -243,15 +249,19 @@ const Index = () => {
         setRecommendedLoading(true);
         setRecommendedError(null);
 
-        const response = await fetch(
-          `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(
-            DEFAULT_RECOMMEND_QUERY
-          )}&start=0&max_results=7`
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch recommendations: ${response.status}`);
+        const { data, error } = await supabase.functions.invoke("arxiv-proxy", {
+          body: { 
+            searchQuery: DEFAULT_RECOMMEND_QUERY,
+            maxResults: 7 
+          },
+        });
+
+        if (error) throw error;
+        if (!data?.xmlData) {
+          throw new Error("No data returned from arXiv proxy");
         }
-        const feed = await response.text();
+        
+        const feed = data.xmlData;
         if (cancelled) return;
 
         const parser = new DOMParser();
