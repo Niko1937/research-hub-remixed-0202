@@ -1039,7 +1039,8 @@ ${toolResultsContext}
                     model: "google/gemini-2.5-flash",
                     messages: [
                       { role: "system", content: htmlPrompt },
-                      ...messages  // 会話履歴全体を含めることで、過去の検索結果やツール実行結果を参照できる
+                      ...messages.filter((m: Message) => m.role !== "system"),
+                      { role: "user", content: userMessage }
                     ],
                     stream: true,
                   }),
