@@ -497,11 +497,11 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                   knowWhoContext += `\n上記の研究結果や分析を踏まえて、最も関連性の高い専門家を検索してください。`;
                 }
 
-                const knowWhoPrompt = `あなたは日本の研究機関や大学の専門家データベースにアクセスできるシステムです。${knowWhoContext}
+                const knowWhoPrompt = `あなたは社内の専門家データベースにアクセスできるシステムです。${knowWhoContext}
 
 現在の検索クエリ: ${step.query}
 
-**重要**: 会話履歴とツール実行結果を参考に、ユーザーの研究テーマに最も適した専門家を選定してください。
+**重要**: 会話履歴とツール実行結果を参考に、ユーザーの研究テーマに最も関連性の高い社内有識者を選定してください。
 
 以下のJSON形式で専門家リストを返してください：
 
@@ -509,22 +509,36 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
   "experts": [
     {
       "name": "専門家の名前",
-      "affiliation": "所属機関（大学名・研究機関名）",
-      "expertise": ["専門分野1", "専門分野2", "専門分野3"],
-      "publications": 論文数(整数),
-      "h_index": h-index値(整数),
-      "email": "example@university.jp"
+      "affiliation": "所属部署（例: 研究開発本部 AI推進室）",
+      "role": "役職（例: シニアリサーチャー、主任研究員など）",
+      "approachability": "direct" | "introduction" | "via_manager",
+      "connectionPath": "つながりの説明（例: 同じ部署 / 共通の知人: 田中さん（企画部）/ 以前のプロジェクトで協業）",
+      "suggestedQuestions": [
+        "この人に聞けそうな具体的な質問1",
+        "この人に聞けそうな具体的な質問2",
+        "この人に聞けそうな具体的な質問3"
+      ],
+      "contactMethods": ["slack", "email"]
     }
   ]
 }
 
+**approachability の基準:**
+- "direct": 同じチーム、以前協業経験あり、オープンな人 → contactMethods: ["slack", "email"]
+- "introduction": 別部署だが共通の知人がいる → contactMethods: ["email", "request_intro"]  
+- "via_manager": 階層が離れている、面識なし → contactMethods: ["ask_manager"]
+
+**suggestedQuestions の指針:**
+- ユーザーの検索クエリと会話履歴から、この専門家に聞くと有益そうな具体的な質問を3つ生成
+- 質問は「〇〇について教えていただけますか？」「〇〇の経験はありますか？」など具体的に
+- ユーザーの研究テーマに直結する質問を優先
+
 **指示:**
 - experts配列には4-6名の専門家を含めてください
-- 会話内容とツール結果から研究分野を特定し、その分野のトップ研究者を選定
-- 実在しそうな日本の大学・研究機関を使用（東京大学、京都大学、理化学研究所、産総研など）
-- 専門分野は検索クエリと研究結果に基づいて具体的に設定
-- publications と h_index は専門家のレベルに応じた妥当な数値を（h-index: 20-80, publications: 50-300）
-- 各専門家の専門性が少しずつ異なるようにバリエーションを持たせる`;
+- approachabilityのバランス: direct 1-2名、introduction 2-3名、via_manager 1名程度
+- 各専門家の専門性と聞けそうなことが異なるようにバリエーションを持たせる
+- connectionPathは具体的に（「同じフロア」「前回のハッカソンで一緒」など）
+- 実在しそうな部署名と役職を使用`;
 
                 const knowWhoResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                   method: "POST",
