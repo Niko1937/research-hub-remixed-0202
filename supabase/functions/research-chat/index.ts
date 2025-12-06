@@ -453,18 +453,74 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                   .sort((a, b) => (b.citations || 0) - (a.citations || 0))
                   .slice(0, 5);
 
-                // Store results for later use
+                // Assign citation IDs [1], [2], [3]...
+                const numberedPapers = externalPapers.map((paper, idx) => ({
+                  ...paper,
+                  id: idx + 1
+                }));
+
+                // Generate answer with citations using LLM
+                let summary = "";
+                try {
+                  const paperContext = numberedPapers.map(p => 
+                    `[${p.id}] "${p.title}" (${p.authors.slice(0, 3).join(", ")}${p.authors.length > 3 ? " et al." : ""}, ${p.year})\n概要: ${p.abstract?.substring(0, 200) || "N/A"}...`
+                  ).join("\n\n");
+
+                  const answerPrompt = `あなたは研究支援AIです。ユーザーの質問に対して、以下の論文を出典として引用しながら回答してください。
+
+## ユーザーの質問
+${userMessage}
+
+## 検索クエリ
+${step.query}
+
+## 参照可能な論文
+${paperContext}
+
+## 指示
+- ユーザーの質問に直接回答する（研究動向の要約ではない）
+- 回答は300-600文字程度の日本語で
+- 文中で論文を引用する際は [1]、[2] のように番号で参照
+- 必ず複数の論文を引用して回答を裏付ける
+- 引用は自然な文脈で埋め込む（例：「〇〇という手法が提案されています[1]」）
+- 回答は具体的かつ実用的に`;
+
+                  const answerResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      model: "google/gemini-2.5-flash",
+                      messages: [{ role: "user", content: answerPrompt }],
+                      max_tokens: 1000,
+                    }),
+                  });
+
+                  if (answerResponse.ok) {
+                    const answerData = await answerResponse.json();
+                    summary = answerData.choices?.[0]?.message?.content || "";
+                    console.log("Generated summary with citations:", summary.substring(0, 100));
+                  }
+                } catch (e) {
+                  console.error("Failed to generate summary:", e);
+                }
+
+                // Store results for later use (include summary)
                 toolResults.push({
                   tool: "wide-knowledge",
                   query: step.query,
-                  results: externalPapers
+                  results: numberedPapers,
+                  summary: summary
                 });
 
                 controller.enqueue(
                   encoder.encode(
                     `data: ${JSON.stringify({
                       type: "research_data",
-                      external: externalPapers,
+                      summary: summary,
+                      external: numberedPapers,
                     })}\n\n`
                   )
                 );
