@@ -12,6 +12,7 @@ export interface TimelineItem {
 }
 
 export interface ResearchData {
+  summary?: string;
   internal: Array<{
     title: string;
     tags: string[];
@@ -25,6 +26,7 @@ export interface ResearchData {
     keywords: string[];
   }>;
   external: Array<{
+    id?: number;
     title: string;
     abstract: string;
     authors: string[];
