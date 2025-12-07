@@ -21,6 +21,59 @@ interface NetworkNode {
   role: string;
 }
 
+// 職階の階層定義 (上が高い)
+const roleHierarchy: Record<string, number> = {
+  'CEO': 0,
+  '社長': 0,
+  '取締役': 1,
+  '本部長': 2,
+  '部長': 2,
+  'Director': 2,
+  '副部長': 3,
+  'マネージャー': 3,
+  '課長': 3,
+  'Manager': 3,
+  'リーダー': 4,
+  '主任': 4,
+  'Lead': 4,
+  'Principal': 4,
+  'Senior': 5,
+  'シニア': 5,
+  '研究員': 5,
+  'Researcher': 5,
+  'Engineer': 6,
+  'エンジニア': 6,
+  'Associate': 6,
+  'アソシエイト': 6,
+  'Staff': 7,
+  'スタッフ': 7,
+  'Junior': 8,
+  'ジュニア': 8,
+};
+
+// 組織分類の距離定義 (同じ部門ほど近い)
+const getOrgDistance = (aff1: string, aff2: string): number => {
+  if (aff1 === aff2) return 0;
+  // 同じ系統の部門 (e.g., 研究部門同士)
+  const getCategory = (aff: string): string => {
+    if (aff.includes('研究') || aff.includes('R&D') || aff.includes('リサーチ')) return 'research';
+    if (aff.includes('開発') || aff.includes('エンジニア') || aff.includes('技術')) return 'engineering';
+    if (aff.includes('営業') || aff.includes('マーケ') || aff.includes('事業')) return 'business';
+    if (aff.includes('企画') || aff.includes('戦略')) return 'strategy';
+    if (aff.includes('人事') || aff.includes('総務') || aff.includes('管理')) return 'admin';
+    return 'other';
+  };
+  if (getCategory(aff1) === getCategory(aff2)) return 1;
+  return 2;
+};
+
+const getRoleLevel = (role: string): number => {
+  for (const [keyword, level] of Object.entries(roleHierarchy)) {
+    if (role.includes(keyword)) return level;
+  }
+  return 6; // デフォルトは中間レベル
+};
+
 interface NetworkEdge {
   from: string;
   to: string;
@@ -44,98 +97,116 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  // Generate network data from experts with realistic organizational structure
+  // Generate network data with hierarchy (Y) x org distance (X) positioning
   const generateNetworkData = () => {
     const nodes: NetworkNode[] = [];
     const edges: NetworkEdge[] = [];
+    
+    const userAffiliation = '自チーム';
+    const userRoleLevel = 6; // 自分の職階レベル
+
+    // Collect all unique affiliations and assign X positions
+    const allAffiliations = new Set<string>([userAffiliation]);
+    experts.forEach(e => allAffiliations.add(e.affiliation));
+    
+    // Sort affiliations by distance from user's team
+    const sortedAffiliations = Array.from(allAffiliations).sort((a, b) => {
+      const distA = getOrgDistance(userAffiliation, a);
+      const distB = getOrgDistance(userAffiliation, b);
+      return distA - distB;
+    });
+    
+    // Assign X position per affiliation (spread across width)
+    const affiliationXMap = new Map<string, number>();
+    const leftMargin = 70;
+    const rightMargin = 430;
+    const affiliationCount = sortedAffiliations.length;
+    sortedAffiliations.forEach((aff, idx) => {
+      const x = affiliationCount === 1 
+        ? (leftMargin + rightMargin) / 2 
+        : leftMargin + (idx / (affiliationCount - 1)) * (rightMargin - leftMargin);
+      affiliationXMap.set(aff, x);
+    });
+
+    // Y position based on role hierarchy (top = senior, bottom = junior)
+    const topMargin = 50;
+    const bottomMargin = 340;
+    const levelToY = (level: number): number => {
+      const minLevel = 0;
+      const maxLevel = 8;
+      return topMargin + ((level - minLevel) / (maxLevel - minLevel)) * (bottomMargin - topMargin);
+    };
 
     // Add user node
     nodes.push({
       id: 'user',
       label: 'あなた',
       type: 'user',
-      x: 100,
-      y: 200,
-      affiliation: '自チーム',
+      x: affiliationXMap.get(userAffiliation) || leftMargin,
+      y: levelToY(userRoleLevel),
+      affiliation: userAffiliation,
       role: '',
     });
 
-    // Group experts by affiliation for cluster positioning
-    const affiliationGroups = new Map<string, { experts: Expert[], indices: number[] }>();
-    experts.forEach((expert, index) => {
-      const group = affiliationGroups.get(expert.affiliation) || { experts: [], indices: [] };
-      group.experts.push(expert);
-      group.indices.push(index);
-      affiliationGroups.set(expert.affiliation, group);
-    });
-
-    const groupArray = Array.from(affiliationGroups.entries());
-    const groupCount = groupArray.length;
-
-    // Add intermediary nodes for indirect connections
-    const intermediaries: { id: string; name: string; x: number; y: number }[] = [];
+    // Track positions to avoid overlap
+    const positionOffsets = new Map<string, number>();
     
-    // Position groups in vertical layers based on approachability
-    // Direct contacts closer, via_manager further
-    let directY = 60;
-    let introY = 60;
-    let managerY = 60;
+    // Add intermediary nodes
+    const intermediaries: { id: string; name: string; x: number; y: number; role: string }[] = [];
 
-    groupArray.forEach(([affiliation, group], groupIdx) => {
-      const clusterX = 280 + (groupIdx % 2) * 120;
+    // Add expert nodes positioned by role (Y) and affiliation (X)
+    experts.forEach((expert, index) => {
+      const roleLevel = getRoleLevel(expert.role);
+      const baseX = affiliationXMap.get(expert.affiliation) || 250;
+      const baseY = levelToY(roleLevel);
       
-      group.experts.forEach((expert, idx) => {
-        const expertIndex = group.indices[idx];
-        let x: number, y: number;
-        
-        // Position based on approachability (horizontal layers)
-        if (expert.approachability === 'direct') {
-          x = 200 + (idx * 40);
-          y = directY;
-          directY += 80;
-        } else if (expert.approachability === 'introduction') {
-          x = 320 + (idx * 35);
-          y = introY;
-          introY += 70;
-          
-          // Add intermediary if needed
-          const intermediaryId = `intro-${groupIdx}`;
-          if (!intermediaries.find(i => i.id === intermediaryId)) {
-            intermediaries.push({
-              id: intermediaryId,
-              name: '共通知人',
-              x: 210,
-              y: y - 20,
-            });
-          }
-        } else {
-          x = 420 + (idx * 30);
-          y = managerY;
-          managerY += 65;
-          
-          // Add manager intermediary
-          const managerId = `manager-${groupIdx}`;
-          if (!intermediaries.find(i => i.id === managerId)) {
-            intermediaries.push({
-              id: managerId,
-              name: '上司',
-              x: 280,
-              y: y - 15,
-            });
-          }
-        }
+      // Offset to avoid exact overlap
+      const posKey = `${Math.round(baseX)}-${Math.round(baseY)}`;
+      const offset = positionOffsets.get(posKey) || 0;
+      positionOffsets.set(posKey, offset + 1);
+      
+      const x = baseX + (offset % 3) * 35 - 35;
+      const y = baseY + Math.floor(offset / 3) * 30;
 
-        nodes.push({
-          id: `expert-${expertIndex}`,
-          label: expert.name,
-          type: 'expert',
-          approachability: expert.approachability,
-          x,
-          y,
-          affiliation: expert.affiliation,
-          role: expert.role,
-        });
+      nodes.push({
+        id: `expert-${index}`,
+        label: expert.name,
+        type: 'expert',
+        approachability: expert.approachability,
+        x,
+        y,
+        affiliation: expert.affiliation,
+        role: expert.role,
       });
+      
+      // Add intermediaries for indirect connections
+      if (expert.approachability === 'introduction') {
+        const intermediaryId = `intro-${expert.affiliation}`;
+        if (!intermediaries.find(i => i.id === intermediaryId)) {
+          const introX = (affiliationXMap.get(userAffiliation)! + baseX) / 2;
+          const introY = (levelToY(userRoleLevel) + baseY) / 2;
+          intermediaries.push({
+            id: intermediaryId,
+            name: '共通知人',
+            x: introX,
+            y: introY,
+            role: 'intermediary',
+          });
+        }
+      } else if (expert.approachability === 'via_manager') {
+        const managerId = `manager-${expert.affiliation}`;
+        if (!intermediaries.find(i => i.id === managerId)) {
+          const managerX = (affiliationXMap.get(userAffiliation)! + baseX) / 2 + 20;
+          const managerY = Math.min(levelToY(userRoleLevel), baseY) - 30;
+          intermediaries.push({
+            id: managerId,
+            name: '上司',
+            x: managerX,
+            y: Math.max(topMargin, managerY),
+            role: 'manager',
+          });
+        }
+      }
     });
 
     // Add intermediary nodes
