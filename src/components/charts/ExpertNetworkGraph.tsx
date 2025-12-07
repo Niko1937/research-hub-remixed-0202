@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRef, useState } from "react";
 
 interface Expert {
   name: string;
@@ -15,7 +13,8 @@ interface Expert {
 interface NetworkNode {
   id: string;
   label: string;
-  type: 'user' | 'direct' | 'introduction' | 'via_manager';
+  type: 'user' | 'expert' | 'intermediary';
+  approachability?: 'direct' | 'introduction' | 'via_manager';
   x: number;
   y: number;
   affiliation: string;
@@ -25,8 +24,9 @@ interface NetworkNode {
 interface NetworkEdge {
   from: string;
   to: string;
-  type: 'org' | 'research';
-  label?: string;
+  weight: number; // 0-1, combined org proximity + research similarity
+  orgWeight: number;
+  researchWeight: number;
 }
 
 interface ExpertNetworkGraphProps {
@@ -43,203 +43,344 @@ const approachabilityColors = {
 export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'org' | 'research'>('org');
 
-  // Generate network data from experts
+  // Generate network data from experts with realistic organizational structure
   const generateNetworkData = () => {
     const nodes: NetworkNode[] = [];
-    const orgEdges: NetworkEdge[] = [];
-    const researchEdges: NetworkEdge[] = [];
+    const edges: NetworkEdge[] = [];
 
-    // Add user node at center
+    // Add user node
     nodes.push({
       id: 'user',
       label: 'あなた',
       type: 'user',
-      x: 250,
+      x: 100,
       y: 200,
-      affiliation: '',
+      affiliation: '自チーム',
       role: '',
     });
 
-    // Group experts by affiliation for organizational view
-    const affiliationGroups = new Map<string, Expert[]>();
-    experts.forEach(expert => {
-      const group = affiliationGroups.get(expert.affiliation) || [];
-      group.push(expert);
+    // Group experts by affiliation for cluster positioning
+    const affiliationGroups = new Map<string, { experts: Expert[], indices: number[] }>();
+    experts.forEach((expert, index) => {
+      const group = affiliationGroups.get(expert.affiliation) || { experts: [], indices: [] };
+      group.experts.push(expert);
+      group.indices.push(index);
       affiliationGroups.set(expert.affiliation, group);
     });
 
-    // Position experts in a circle around user
-    const radius = 150;
-    experts.forEach((expert, index) => {
-      const angle = (index / experts.length) * 2 * Math.PI - Math.PI / 2;
-      const x = 250 + radius * Math.cos(angle);
-      const y = 200 + radius * Math.sin(angle);
+    const groupArray = Array.from(affiliationGroups.entries());
+    const groupCount = groupArray.length;
 
+    // Add intermediary nodes for indirect connections
+    const intermediaries: { id: string; name: string; x: number; y: number }[] = [];
+    
+    // Position groups in vertical layers based on approachability
+    // Direct contacts closer, via_manager further
+    let directY = 60;
+    let introY = 60;
+    let managerY = 60;
+
+    groupArray.forEach(([affiliation, group], groupIdx) => {
+      const clusterX = 280 + (groupIdx % 2) * 120;
+      
+      group.experts.forEach((expert, idx) => {
+        const expertIndex = group.indices[idx];
+        let x: number, y: number;
+        
+        // Position based on approachability (horizontal layers)
+        if (expert.approachability === 'direct') {
+          x = 200 + (idx * 40);
+          y = directY;
+          directY += 80;
+        } else if (expert.approachability === 'introduction') {
+          x = 320 + (idx * 35);
+          y = introY;
+          introY += 70;
+          
+          // Add intermediary if needed
+          const intermediaryId = `intro-${groupIdx}`;
+          if (!intermediaries.find(i => i.id === intermediaryId)) {
+            intermediaries.push({
+              id: intermediaryId,
+              name: '共通知人',
+              x: 210,
+              y: y - 20,
+            });
+          }
+        } else {
+          x = 420 + (idx * 30);
+          y = managerY;
+          managerY += 65;
+          
+          // Add manager intermediary
+          const managerId = `manager-${groupIdx}`;
+          if (!intermediaries.find(i => i.id === managerId)) {
+            intermediaries.push({
+              id: managerId,
+              name: '上司',
+              x: 280,
+              y: y - 15,
+            });
+          }
+        }
+
+        nodes.push({
+          id: `expert-${expertIndex}`,
+          label: expert.name,
+          type: 'expert',
+          approachability: expert.approachability,
+          x,
+          y,
+          affiliation: expert.affiliation,
+          role: expert.role,
+        });
+      });
+    });
+
+    // Add intermediary nodes
+    intermediaries.forEach(inter => {
       nodes.push({
-        id: `expert-${index}`,
-        label: expert.name,
-        type: expert.approachability,
-        x,
-        y,
-        affiliation: expert.affiliation,
-        role: expert.role,
-      });
-
-      // Organizational edges (based on approachability/connection path)
-      orgEdges.push({
-        from: 'user',
-        to: `expert-${index}`,
-        type: 'org',
-        label: expert.approachability === 'direct' ? '直接' : 
-               expert.approachability === 'introduction' ? '紹介' : '上司経由',
+        id: inter.id,
+        label: inter.name,
+        type: 'intermediary',
+        x: inter.x,
+        y: inter.y,
+        affiliation: '',
+        role: '',
       });
     });
 
-    // Research cluster edges - connect experts in same affiliation
-    const affiliationIndices = new Map<string, number[]>();
+    // Calculate research similarity based on affiliation overlap
+    const getResearchSimilarity = (exp1Idx: number, exp2Idx: number): number => {
+      const exp1 = experts[exp1Idx];
+      const exp2 = experts[exp2Idx];
+      if (exp1.affiliation === exp2.affiliation) return 0.8;
+      // Partial similarity for related fields (simplified heuristic)
+      if (exp1.affiliation.includes(exp2.affiliation.slice(0, 2)) ||
+          exp2.affiliation.includes(exp1.affiliation.slice(0, 2))) return 0.4;
+      return 0.1;
+    };
+
+    // Create edges from user to experts (direct or via intermediaries)
     experts.forEach((expert, index) => {
-      const indices = affiliationIndices.get(expert.affiliation) || [];
-      indices.push(index);
-      affiliationIndices.set(expert.affiliation, indices);
-    });
-
-    affiliationIndices.forEach((indices) => {
-      for (let i = 0; i < indices.length; i++) {
-        for (let j = i + 1; j < indices.length; j++) {
-          researchEdges.push({
-            from: `expert-${indices[i]}`,
-            to: `expert-${indices[j]}`,
-            type: 'research',
-            label: '同部署',
+      const orgWeight = expert.approachability === 'direct' ? 1.0 :
+                        expert.approachability === 'introduction' ? 0.5 : 0.2;
+      
+      if (expert.approachability === 'direct') {
+        // Direct connection
+        edges.push({
+          from: 'user',
+          to: `expert-${index}`,
+          weight: orgWeight,
+          orgWeight,
+          researchWeight: 0.5,
+        });
+      } else if (expert.approachability === 'introduction') {
+        // Via intermediary
+        const introId = intermediaries.find(i => i.id.startsWith('intro-'))?.id;
+        if (introId) {
+          // User to intermediary
+          if (!edges.find(e => e.from === 'user' && e.to === introId)) {
+            edges.push({
+              from: 'user',
+              to: introId,
+              weight: 0.7,
+              orgWeight: 0.7,
+              researchWeight: 0,
+            });
+          }
+          // Intermediary to expert
+          edges.push({
+            from: introId,
+            to: `expert-${index}`,
+            weight: orgWeight,
+            orgWeight,
+            researchWeight: 0.3,
+          });
+        }
+      } else {
+        // Via manager
+        const managerId = intermediaries.find(i => i.id.startsWith('manager-'))?.id;
+        if (managerId) {
+          // User to manager
+          if (!edges.find(e => e.from === 'user' && e.to === managerId)) {
+            edges.push({
+              from: 'user',
+              to: managerId,
+              weight: 0.4,
+              orgWeight: 0.4,
+              researchWeight: 0,
+            });
+          }
+          // Manager to expert
+          edges.push({
+            from: managerId,
+            to: `expert-${index}`,
+            weight: orgWeight,
+            orgWeight,
+            researchWeight: 0.2,
           });
         }
       }
     });
 
-    return { nodes, orgEdges, researchEdges };
+    // Create edges between experts based on research similarity
+    for (let i = 0; i < experts.length; i++) {
+      for (let j = i + 1; j < experts.length; j++) {
+        const researchWeight = getResearchSimilarity(i, j);
+        if (researchWeight > 0.3) {
+          edges.push({
+            from: `expert-${i}`,
+            to: `expert-${j}`,
+            weight: researchWeight * 0.7,
+            orgWeight: 0,
+            researchWeight,
+          });
+        }
+      }
+    }
+
+    return { nodes, edges };
   };
 
-  const { nodes, orgEdges, researchEdges } = generateNetworkData();
-  const edges = viewMode === 'org' ? orgEdges : researchEdges;
+  const { nodes, edges } = generateNetworkData();
 
-  const getNodeRadius = (type: string) => type === 'user' ? 30 : 24;
+  const getNodeRadius = (type: string) => {
+    if (type === 'user') return 28;
+    if (type === 'intermediary') return 18;
+    return 22;
+  };
+
+  const getNodeColor = (node: NetworkNode) => {
+    if (node.type === 'user') return approachabilityColors.user;
+    if (node.type === 'intermediary') return { fill: "hsl(var(--muted))", stroke: "hsl(var(--muted-foreground))" };
+    return approachabilityColors[node.approachability || 'direct'];
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-foreground">ネットワーク概観</h4>
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'org' | 'research')}>
-          <TabsList className="h-8">
-            <TabsTrigger value="org" className="text-xs px-3 h-6">組織レポートライン</TabsTrigger>
-            <TabsTrigger value="research" className="text-xs px-3 h-6">研究類似クラスタ</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+    <div className="space-y-3">
+      <h4 className="text-sm font-medium text-foreground">ネットワーク概観</h4>
 
       <div className="relative bg-card/50 rounded-lg border border-border overflow-hidden">
         <svg
           ref={svgRef}
           viewBox="0 0 500 400"
-          className="w-full h-[300px]"
+          className="w-full h-[320px]"
         >
-          {/* Edges */}
+          {/* Edges with combined weight */}
           {edges.map((edge, index) => {
             const fromNode = nodes.find(n => n.id === edge.from);
             const toNode = nodes.find(n => n.id === edge.to);
             if (!fromNode || !toNode) return null;
 
             const isHighlighted = hoveredNode === edge.from || hoveredNode === edge.to;
-            const opacity = hoveredNode ? (isHighlighted ? 1 : 0.2) : 0.6;
+            const baseOpacity = 0.15 + edge.weight * 0.6;
+            const opacity = hoveredNode ? (isHighlighted ? Math.min(baseOpacity + 0.3, 1) : 0.08) : baseOpacity;
+            const strokeWidth = 1 + edge.weight * 3;
+
+            // Color based on edge type mix
+            const isResearchOnly = edge.orgWeight === 0;
+            const strokeColor = isResearchOnly 
+              ? "hsl(var(--primary))" 
+              : "hsl(var(--muted-foreground))";
 
             return (
-              <g key={index}>
-                <line
-                  x1={fromNode.x}
-                  y1={fromNode.y}
-                  x2={toNode.x}
-                  y2={toNode.y}
-                  stroke={viewMode === 'org' ? "hsl(var(--muted-foreground))" : "hsl(var(--primary))"}
-                  strokeWidth={isHighlighted ? 2 : 1}
-                  strokeDasharray={viewMode === 'research' ? "4 2" : "none"}
-                  opacity={opacity}
-                />
-                {isHighlighted && edge.label && (
-                  <text
-                    x={(fromNode.x + toNode.x) / 2}
-                    y={(fromNode.y + toNode.y) / 2 - 5}
-                    fontSize="10"
-                    fill="hsl(var(--foreground))"
-                    textAnchor="middle"
-                    className="pointer-events-none"
-                  >
-                    {edge.label}
-                  </text>
-                )}
-              </g>
+              <line
+                key={`edge-${index}`}
+                x1={fromNode.x}
+                y1={fromNode.y}
+                x2={toNode.x}
+                y2={toNode.y}
+                stroke={strokeColor}
+                strokeWidth={isHighlighted ? strokeWidth + 1 : strokeWidth}
+                strokeDasharray={isResearchOnly ? "4 3" : "none"}
+                opacity={opacity}
+                className="transition-all duration-200"
+              />
             );
           })}
 
           {/* Nodes */}
           {nodes.map((node) => {
-            const colors = approachabilityColors[node.type];
+            const colors = getNodeColor(node);
             const radius = getNodeRadius(node.type);
-            const isHighlighted = hoveredNode === node.id || !hoveredNode;
-            const opacity = hoveredNode ? (isHighlighted ? 1 : 0.3) : 1;
+            const isHovered = hoveredNode === node.id;
+            const isConnected = hoveredNode && edges.some(
+              e => (e.from === hoveredNode && e.to === node.id) || 
+                   (e.to === hoveredNode && e.from === node.id)
+            );
+            const opacity = hoveredNode 
+              ? (isHovered || isConnected || hoveredNode === null ? 1 : 0.25) 
+              : 1;
 
             return (
               <g
                 key={node.id}
-                className="cursor-pointer transition-opacity"
+                className="cursor-pointer"
                 style={{ opacity }}
                 onMouseEnter={() => setHoveredNode(node.id)}
                 onMouseLeave={() => setHoveredNode(null)}
               >
+                {/* Glow effect for hovered */}
+                {isHovered && (
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={radius + 6}
+                    fill="none"
+                    stroke={colors.stroke}
+                    strokeWidth={2}
+                    opacity={0.3}
+                  />
+                )}
                 <circle
                   cx={node.x}
                   cy={node.y}
                   r={radius}
                   fill={colors.fill}
-                  stroke={hoveredNode === node.id ? "hsl(var(--foreground))" : colors.stroke}
-                  strokeWidth={hoveredNode === node.id ? 3 : 2}
-                  opacity={0.9}
+                  stroke={isHovered ? "hsl(var(--foreground))" : colors.stroke}
+                  strokeWidth={isHovered ? 2.5 : 1.5}
+                  opacity={node.type === 'intermediary' ? 0.7 : 0.9}
                 />
                 <text
                   x={node.x}
                   y={node.y}
                   dy="0.35em"
-                  fontSize={node.type === 'user' ? 12 : 10}
-                  fill="white"
+                  fontSize={node.type === 'user' ? 11 : node.type === 'intermediary' ? 8 : 9}
+                  fill={node.type === 'intermediary' ? "hsl(var(--foreground))" : "white"}
                   textAnchor="middle"
                   fontWeight="600"
-                  className="pointer-events-none"
+                  className="pointer-events-none select-none"
                 >
                   {node.label.length > 4 ? node.label.slice(0, 3) + '…' : node.label}
                 </text>
                 {/* Full name below node */}
-                <text
-                  x={node.x}
-                  y={node.y + radius + 12}
-                  fontSize="10"
-                  fill="hsl(var(--foreground))"
-                  textAnchor="middle"
-                  className="pointer-events-none"
-                >
-                  {node.label}
-                </text>
-                {/* Affiliation below name for experts */}
-                {node.type !== 'user' && (
-                  <text
-                    x={node.x}
-                    y={node.y + radius + 24}
-                    fontSize="8"
-                    fill="hsl(var(--muted-foreground))"
-                    textAnchor="middle"
-                    className="pointer-events-none"
-                  >
-                    {node.affiliation.length > 12 ? node.affiliation.slice(0, 10) + '…' : node.affiliation}
-                  </text>
+                {node.type !== 'intermediary' && (
+                  <>
+                    <text
+                      x={node.x}
+                      y={node.y + radius + 12}
+                      fontSize="9"
+                      fill="hsl(var(--foreground))"
+                      textAnchor="middle"
+                      className="pointer-events-none select-none"
+                    >
+                      {node.label}
+                    </text>
+                    {node.affiliation && node.type === 'expert' && (
+                      <text
+                        x={node.x}
+                        y={node.y + radius + 23}
+                        fontSize="7"
+                        fill="hsl(var(--muted-foreground))"
+                        textAnchor="middle"
+                        className="pointer-events-none select-none"
+                      >
+                        {node.affiliation.length > 14 ? node.affiliation.slice(0, 12) + '…' : node.affiliation}
+                      </text>
+                    )}
+                  </>
                 )}
               </g>
             );
@@ -248,25 +389,31 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-xs">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: approachabilityColors.direct.fill }} />
-          <span className="text-muted-foreground">すぐ話せる</span>
+      <div className="flex flex-wrap gap-4 text-xs">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: approachabilityColors.direct.fill }} />
+            <span className="text-muted-foreground">直接</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: approachabilityColors.introduction.fill }} />
+            <span className="text-muted-foreground">紹介経由</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: approachabilityColors.via_manager.fill }} />
+            <span className="text-muted-foreground">上司経由</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: approachabilityColors.introduction.fill }} />
-          <span className="text-muted-foreground">紹介が必要</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: approachabilityColors.via_manager.fill }} />
-          <span className="text-muted-foreground">上司経由</span>
-        </div>
-        {viewMode === 'research' && (
-          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-border">
-            <div className="w-4 h-0 border-t border-dashed border-primary" />
+        <div className="flex items-center gap-3 border-l border-border pl-3">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-0.5 bg-muted-foreground" />
+            <span className="text-muted-foreground">組織関係</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-0 border-t-2 border-dashed border-primary" />
             <span className="text-muted-foreground">研究類似</span>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
