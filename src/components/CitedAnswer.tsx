@@ -1,5 +1,5 @@
-import { useRef, useCallback } from "react";
-import { Globe, ExternalLink, TrendingUp } from "lucide-react";
+import { useRef, useCallback, useState } from "react";
+import { Globe, ExternalLink, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,6 +8,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface Paper {
   id?: number;
@@ -27,17 +32,24 @@ interface CitedAnswerProps {
 }
 
 export function CitedAnswer({ summary, papers, onPaperClick }: CitedAnswerProps) {
+  const [isSourcesOpen, setIsSourcesOpen] = useState(false);
   const sourceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   
   const scrollToSource = useCallback((id: number) => {
-    const element = sourceRefs.current.get(id);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
-      element.classList.add("ring-2", "ring-primary", "ring-offset-2");
-      setTimeout(() => {
-        element.classList.remove("ring-2", "ring-primary", "ring-offset-2");
-      }, 2000);
-    }
+    // Open sources section first if closed
+    setIsSourcesOpen(true);
+    
+    // Wait for collapsible to open, then scroll
+    setTimeout(() => {
+      const element = sourceRefs.current.get(id);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        element.classList.add("ring-2", "ring-primary", "ring-offset-2");
+        setTimeout(() => {
+          element.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+        }, 2000);
+      }
+    }, 100);
   }, []);
 
   const getPaperById = useCallback((id: number) => {
@@ -119,80 +131,87 @@ export function CitedAnswer({ summary, papers, onPaperClick }: CitedAnswerProps)
         </div>
       )}
 
-      {/* Sources Section */}
+      {/* Sources Section - Collapsible */}
       {papers.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+        <Collapsible open={isSourcesOpen} onOpenChange={setIsSourcesOpen}>
+          <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
+            {isSourcesOpen ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
             <Globe className="w-4 h-4" />
             出典 ({papers.length})
-          </h4>
+          </CollapsibleTrigger>
           
-          <div className="space-y-2">
-            {papers.map((paper, index) => (
-              <div
-                key={index}
-                ref={(el) => {
-                  if (el && paper.id) {
-                    sourceRefs.current.set(paper.id, el);
-                  }
-                }}
-              >
-                <Card
-                  className="p-3 bg-card border-border hover:bg-card-hover hover:shadow-hover transition-all group cursor-pointer"
-                  onClick={() =>
-                    onPaperClick?.({
-                      url: paper.url,
-                      title: paper.title,
-                      authors: paper.authors,
-                      source: paper.source,
-                    })
-                  }
+          <CollapsibleContent className="mt-3">
+            <div className="space-y-2">
+              {papers.map((paper, index) => (
+                <div
+                  key={index}
+                  ref={(el) => {
+                    if (el && paper.id) {
+                      sourceRefs.current.set(paper.id, el);
+                    }
+                  }}
                 >
-                  <div className="flex items-start gap-3">
-                    {/* Citation Number */}
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
-                      {paper.id || index + 1}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h5 className="text-sm font-medium text-foreground group-hover:text-highlight transition-colors line-clamp-2">
-                        {paper.title}
-                      </h5>
-
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                        <span className="truncate">
-                          {paper.authors.slice(0, 2).join(", ")}
-                          {paper.authors.length > 2 ? " et al." : ""}
-                        </span>
-                        <span>•</span>
-                        <span>{paper.year}</span>
-                        {paper.citations !== undefined && (
-                          <>
-                            <span>•</span>
-                            <div className="flex items-center gap-1">
-                              <TrendingUp className="w-3 h-3" />
-                              <span>{paper.citations}</span>
-                            </div>
-                          </>
-                        )}
+                  <Card
+                    className="p-3 bg-card border-border hover:bg-card-hover hover:shadow-hover transition-all group cursor-pointer"
+                    onClick={() =>
+                      onPaperClick?.({
+                        url: paper.url,
+                        title: paper.title,
+                        authors: paper.authors,
+                        source: paper.source,
+                      })
+                    }
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Citation Number */}
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
+                        {paper.id || index + 1}
                       </div>
 
-                      <div className="flex items-center justify-between mt-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {paper.source}
-                        </Badge>
-                        <div className="flex items-center gap-1 text-xs text-primary group-hover:text-highlight transition-colors">
-                          <span>開く</span>
-                          <ExternalLink className="w-3 h-3" />
+                      <div className="flex-1 min-w-0">
+                        <h5 className="text-sm font-medium text-foreground group-hover:text-highlight transition-colors line-clamp-2">
+                          {paper.title}
+                        </h5>
+
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <span className="truncate">
+                            {paper.authors.slice(0, 2).join(", ")}
+                            {paper.authors.length > 2 ? " et al." : ""}
+                          </span>
+                          <span>•</span>
+                          <span>{paper.year}</span>
+                          {paper.citations !== undefined && (
+                            <>
+                              <span>•</span>
+                              <div className="flex items-center gap-1">
+                                <TrendingUp className="w-3 h-3" />
+                                <span>{paper.citations}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between mt-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {paper.source}
+                          </Badge>
+                          <div className="flex items-center gap-1 text-xs text-primary group-hover:text-highlight transition-colors">
+                            <span>開く</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              </div>
-            ))}
-          </div>
-        </div>
+                  </Card>
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );
