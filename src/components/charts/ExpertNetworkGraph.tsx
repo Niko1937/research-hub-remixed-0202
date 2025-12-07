@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import React, { useMemo, useState } from 'react';
 
 interface Expert {
   name: string;
@@ -6,603 +6,292 @@ interface Expert {
   role: string;
   approachability: 'direct' | 'introduction' | 'via_manager';
   connectionPath?: string;
-  suggestedQuestions: string[];
-  contactMethods: ('slack' | 'email' | 'request_intro' | 'ask_manager')[];
+  suggestedQuestions?: string[];
+  contactMethods?: string[];
 }
 
 interface NetworkNode {
   id: string;
   label: string;
-  subLabel?: string;
-  type: 'user' | 'expert' | 'intermediary';
-  intermediaryType?: 'introducer' | 'manager';
+  role: string;
+  affiliation: string;
+  type: 'user' | 'expert';
   approachability?: 'direct' | 'introduction' | 'via_manager';
   x: number;
   y: number;
-  affiliation: string;
-  role: string;
+  roleLevel: number;
 }
 
 interface NetworkEdge {
-  from: string;
-  to: string;
-  weight: number;
-  orgWeight: number;
-  researchWeight: number;
+  source: string;
+  target: string;
 }
 
 interface ExpertNetworkGraphProps {
   experts: Expert[];
 }
 
-// 職階レベル (0=最上位, 数字が大きいほど下位)
+// 職階レベルを取得（数字が大きいほど上位）
 const getRoleLevel = (role: string): number => {
   const roleLower = role.toLowerCase();
-  if (roleLower.includes('ceo') || roleLower.includes('社長')) return 0;
-  if (roleLower.includes('取締役') || roleLower.includes('役員')) return 1;
-  if (roleLower.includes('本部長') || roleLower.includes('director')) return 2;
-  if (roleLower.includes('部長')) return 2;
-  if (roleLower.includes('副部長')) return 3;
-  if (roleLower.includes('マネージャー') || roleLower.includes('manager') || roleLower.includes('課長')) return 3;
-  if (roleLower.includes('リーダー') || roleLower.includes('lead') || roleLower.includes('主任')) return 4;
-  if (roleLower.includes('principal') || roleLower.includes('シニア') || roleLower.includes('senior')) return 5;
-  if (roleLower.includes('研究員') || roleLower.includes('researcher')) return 5;
-  if (roleLower.includes('エンジニア') || roleLower.includes('engineer')) return 6;
-  if (roleLower.includes('アソシエイト') || roleLower.includes('associate')) return 6;
-  if (roleLower.includes('スタッフ') || roleLower.includes('staff')) return 7;
-  if (roleLower.includes('ジュニア') || roleLower.includes('junior')) return 8;
-  return 6;
+  if (roleLower.includes('ceo') || roleLower.includes('社長') || roleLower.includes('代表')) return 4;
+  if (roleLower.includes('執行役') || roleLower.includes('vp') || roleLower.includes('vice president') || roleLower.includes('役員')) return 3;
+  if (roleLower.includes('部長') || roleLower.includes('director') || roleLower.includes('manager') || roleLower.includes('教授')) return 2;
+  if (roleLower.includes('課長') || roleLower.includes('lead') || roleLower.includes('主任') || roleLower.includes('准教授') || roleLower.includes('講師')) return 1;
+  return 0; // 一般社員・研究員
 };
 
-// 組織カテゴリ分類
-const getOrgCategory = (aff: string): string => {
-  if (aff.includes('研究') || aff.includes('R&D') || aff.includes('リサーチ')) return 'research';
-  if (aff.includes('開発') || aff.includes('エンジニア') || aff.includes('技術')) return 'engineering';
-  if (aff.includes('営業') || aff.includes('マーケ') || aff.includes('事業')) return 'business';
-  if (aff.includes('企画') || aff.includes('戦略')) return 'strategy';
-  if (aff.includes('人事') || aff.includes('総務') || aff.includes('管理')) return 'admin';
-  return 'other';
+// 職階レベルのラベル
+const getRoleLevelLabel = (level: number): string => {
+  switch (level) {
+    case 4: return '経営層';
+    case 3: return '役員級';
+    case 2: return '部長級';
+    case 1: return '課長級';
+    default: return '一般';
+  }
 };
 
-// カテゴリ間の距離
-const categoryDistances: Record<string, Record<string, number>> = {
-  research: { research: 0, engineering: 1, strategy: 2, business: 3, admin: 4, other: 3 },
-  engineering: { research: 1, engineering: 0, strategy: 2, business: 2, admin: 3, other: 2 },
-  strategy: { research: 2, engineering: 2, strategy: 0, business: 1, admin: 2, other: 2 },
-  business: { research: 3, engineering: 2, strategy: 1, business: 0, admin: 2, other: 2 },
-  admin: { research: 4, engineering: 3, strategy: 2, business: 2, admin: 0, other: 2 },
-  other: { research: 3, engineering: 2, strategy: 2, business: 2, admin: 2, other: 0 },
+// アプローチ分類の色
+const getApproachabilityColor = (approachability?: string): string => {
+  switch (approachability) {
+    case 'direct': return 'hsl(142, 76%, 36%)';
+    case 'introduction': return 'hsl(38, 92%, 50%)';
+    case 'via_manager': return 'hsl(0, 84%, 60%)';
+    default: return 'hsl(var(--primary))';
+  }
 };
 
-const getOrgDistance = (aff1: string, aff2: string): number => {
-  if (aff1 === aff2) return 0;
-  const cat1 = getOrgCategory(aff1);
-  const cat2 = getOrgCategory(aff2);
-  return categoryDistances[cat1]?.[cat2] ?? 2;
-};
-
-const approachabilityColors = {
-  user: { fill: "hsl(var(--primary))", stroke: "hsl(var(--primary))" },
-  direct: { fill: "hsl(142 76% 36%)", stroke: "hsl(142 76% 36%)" },
-  introduction: { fill: "hsl(45 93% 47%)", stroke: "hsl(45 93% 47%)" },
-  via_manager: { fill: "hsl(0 84% 60%)", stroke: "hsl(0 84% 60%)" },
-  intermediary: { fill: "hsl(220 14% 50%)", stroke: "hsl(220 14% 40%)" },
-};
-
-// connectionPathから仲介者名を抽出
-const extractIntermediaryName = (connectionPath?: string, fallback?: string): string => {
-  if (!connectionPath) return fallback || '仲介者';
-  // "〇〇さん経由" や "〇〇を通じて" のパターン
-  const match = connectionPath.match(/([^、。\s]+?)(?:さん)?(?:経由|を通じて|に紹介|から紹介)/);
-  if (match) return match[1];
-  // "上司の〇〇" パターン
-  const managerMatch = connectionPath.match(/上司(?:の)?([^、。\s]+)/);
-  if (managerMatch) return managerMatch[1];
-  return fallback || connectionPath.slice(0, 6);
-};
-
-export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  const generateNetworkData = () => {
-    const nodes: NetworkNode[] = [];
-    const edges: NetworkEdge[] = [];
-    
+  const { nodes, edges, roleLevels } = useMemo(() => {
+    const nodeList: NetworkNode[] = [];
+    const edgeList: NetworkEdge[] = [];
+    const roleLevelSet = new Set<number>();
+
     const svgWidth = 900;
     const svgHeight = 600;
-    const leftMargin = 100;
-    const rightMargin = svgWidth - 80;
-    const topMargin = 70;
-    const bottomMargin = svgHeight - 90;
+    const centerX = svgWidth / 2;
+    const centerY = svgHeight / 2;
     
-    const userAffiliation = '自チーム';
-    const userRoleLevel = 6;
-
-    // 全組織を収集しカテゴリ別にグループ化
-    const affiliationSet = new Set<string>();
-    experts.forEach(e => affiliationSet.add(e.affiliation));
-    const affiliations = Array.from(affiliationSet);
-    
-    // 組織をカテゴリでソートし、ユーザーチームからの距離順に並べる
-    const sortedAffiliations = affiliations.sort((a, b) => {
-      const distA = getOrgDistance(userAffiliation, a);
-      const distB = getOrgDistance(userAffiliation, b);
-      if (distA !== distB) return distA - distB;
-      return a.localeCompare(b);
-    });
-    
-    // X座標: 自チームを左端、他組織を距離順に配置
-    const affiliationXMap = new Map<string, number>();
-    affiliationXMap.set(userAffiliation, leftMargin);
-    
-    const orgSpacing = (rightMargin - leftMargin - 120) / Math.max(sortedAffiliations.length, 1);
-    sortedAffiliations.forEach((aff, idx) => {
-      affiliationXMap.set(aff, leftMargin + 150 + idx * orgSpacing);
-    });
-
-    // Y座標: 職階レベルをマップ
-    const levelToY = (level: number): number => {
-      return topMargin + (level / 8) * (bottomMargin - topMargin);
-    };
-
-    // ユーザーノード
-    nodes.push({
+    // 中心に自分を配置
+    nodeList.push({
       id: 'user',
-      label: 'あなた',
+      label: '自分',
+      role: '研究員',
+      affiliation: '自社',
       type: 'user',
-      x: affiliationXMap.get(userAffiliation)!,
-      y: levelToY(userRoleLevel),
-      affiliation: userAffiliation,
-      role: '',
+      x: centerX,
+      y: centerY,
+      roleLevel: 0
     });
 
-    // 専門家をグリッド配置 (重複回避)
-    const expertNodes: { expert: Expert; index: number; x: number; y: number }[] = [];
-    const occupiedPositions: { x: number; y: number }[] = [];
-    const minDistance = 80; // ノード間の最小距離
-
-    const findNonOverlappingPosition = (baseX: number, baseY: number): { x: number; y: number } => {
-      let x = baseX;
-      let y = baseY;
-      let attempts = 0;
-      const maxAttempts = 20;
-      
-      while (attempts < maxAttempts) {
-        const hasOverlap = occupiedPositions.some(pos => {
-          const dist = Math.sqrt((pos.x - x) ** 2 + (pos.y - y) ** 2);
-          return dist < minDistance;
-        });
-        
-        if (!hasOverlap) break;
-        
-        // スパイラル状に位置を探索
-        const angle = attempts * 0.8;
-        const radius = 50 + attempts * 15;
-        x = baseX + Math.cos(angle) * radius;
-        y = baseY + Math.sin(angle) * radius * 0.6;
-        
-        // 範囲内に収める
-        x = Math.max(leftMargin + 50, Math.min(rightMargin - 50, x));
-        y = Math.max(topMargin + 30, Math.min(bottomMargin - 30, y));
-        
-        attempts++;
-      }
-      
-      return { x, y };
-    };
-
-    experts.forEach((expert, index) => {
-      const roleLevel = getRoleLevel(expert.role);
-      const baseX = affiliationXMap.get(expert.affiliation) || 400;
-      const baseY = levelToY(roleLevel);
-      
-      const { x, y } = findNonOverlappingPosition(baseX, baseY);
-      occupiedPositions.push({ x, y });
-      
-      expertNodes.push({
-        expert,
-        index,
-        x,
-        y,
-      });
+    // エキスパートを職階レベルごとにグループ化
+    const expertsByLevel: Record<number, Expert[]> = {};
+    experts.forEach(expert => {
+      const level = getRoleLevel(expert.role);
+      roleLevelSet.add(level);
+      if (!expertsByLevel[level]) expertsByLevel[level] = [];
+      expertsByLevel[level].push(expert);
     });
 
-    // 仲介者ノードを生成 (connectionPathから具体的な名前を抽出)
-    const intermediaryMap = new Map<string, { id: string; name: string; type: 'introducer' | 'manager'; x: number; y: number; expertIndices: number[] }>();
+    // 同心円状に配置（職階が高いほど外側の円）
+    const sortedLevels = Array.from(roleLevelSet).sort((a, b) => a - b);
+    const baseRadius = 120;
+    const radiusStep = 100;
     
-    expertNodes.forEach(({ expert, index, x, y }) => {
-      if (expert.approachability === 'introduction') {
-        const name = extractIntermediaryName(expert.connectionPath, '紹介者');
-        const key = `intro-${name}`;
-        if (!intermediaryMap.has(key)) {
-          // 仲介者はユーザーと専門家の中間に配置
-          const userX = affiliationXMap.get(userAffiliation)!;
-          const userY = levelToY(userRoleLevel);
-          intermediaryMap.set(key, {
-            id: key,
-            name,
-            type: 'introducer',
-            x: (userX + x) / 2,
-            y: (userY + y) / 2 - 10,
-            expertIndices: [index],
-          });
-        } else {
-          intermediaryMap.get(key)!.expertIndices.push(index);
-        }
-      } else if (expert.approachability === 'via_manager') {
-        const name = extractIntermediaryName(expert.connectionPath, '上司');
-        const key = `manager-${name}`;
-        if (!intermediaryMap.has(key)) {
-          const userX = affiliationXMap.get(userAffiliation)!;
-          const userY = levelToY(userRoleLevel);
-          // 上司はユーザーより上の職階に配置
-          intermediaryMap.set(key, {
-            id: key,
-            name,
-            type: 'manager',
-            x: (userX + x) / 2 + 15,
-            y: Math.min(userY, y) - 40,
-            expertIndices: [index],
-          });
-        } else {
-          intermediaryMap.get(key)!.expertIndices.push(index);
-        }
-      }
-    });
-
-    // 仲介者の位置を再計算 (関連する専門家全体の中心へ)
-    intermediaryMap.forEach((inter) => {
-      if (inter.expertIndices.length > 1) {
-        const relatedExperts = inter.expertIndices.map(i => expertNodes[i]);
-        const avgX = relatedExperts.reduce((sum, e) => sum + e.x, 0) / relatedExperts.length;
-        const avgY = relatedExperts.reduce((sum, e) => sum + e.y, 0) / relatedExperts.length;
-        const userX = affiliationXMap.get(userAffiliation)!;
-        const userY = levelToY(userRoleLevel);
-        inter.x = (userX + avgX) / 2;
-        inter.y = inter.type === 'manager' 
-          ? Math.min(userY, avgY) - 35
-          : (userY + avgY) / 2;
-      }
-    });
-
-    // 専門家ノードを追加
-    expertNodes.forEach(({ expert, index, x, y }) => {
-      nodes.push({
-        id: `expert-${index}`,
-        label: expert.name,
-        subLabel: expert.role,
-        type: 'expert',
-        approachability: expert.approachability,
-        x,
-        y,
-        affiliation: expert.affiliation,
-        role: expert.role,
-      });
-    });
-
-    // 仲介者ノードを追加
-    intermediaryMap.forEach((inter) => {
-      nodes.push({
-        id: inter.id,
-        label: inter.name,
-        subLabel: inter.type === 'manager' ? '上司' : '紹介者',
-        type: 'intermediary',
-        intermediaryType: inter.type,
-        x: inter.x,
-        y: Math.max(topMargin, inter.y),
-        affiliation: '',
-        role: '',
-      });
-    });
-
-    // エッジ生成
-    experts.forEach((expert, index) => {
-      const orgWeight = expert.approachability === 'direct' ? 1.0 :
-                        expert.approachability === 'introduction' ? 0.5 : 0.3;
+    sortedLevels.forEach((level, levelIndex) => {
+      const expertsAtLevel = expertsByLevel[level] || [];
+      const radius = baseRadius + levelIndex * radiusStep;
       
-      if (expert.approachability === 'direct') {
-        edges.push({
-          from: 'user',
-          to: `expert-${index}`,
-          weight: orgWeight,
-          orgWeight,
-          researchWeight: 0,
+      expertsAtLevel.forEach((expert, idx) => {
+        // 均等に配置、少しオフセットを加えて重なりを防ぐ
+        const angleOffset = levelIndex * 0.3; // レベルごとに回転
+        const angle = (2 * Math.PI * idx) / expertsAtLevel.length - Math.PI / 2 + angleOffset;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+
+        const nodeId = `expert-${expert.name}`;
+        nodeList.push({
+          id: nodeId,
+          label: expert.name,
+          role: expert.role,
+          affiliation: expert.affiliation,
+          type: 'expert',
+          approachability: expert.approachability,
+          x,
+          y,
+          roleLevel: level
         });
-      } else if (expert.approachability === 'introduction') {
-        const name = extractIntermediaryName(expert.connectionPath, '紹介者');
-        const interKey = `intro-${name}`;
-        if (!edges.find(e => e.from === 'user' && e.to === interKey)) {
-          edges.push({
-            from: 'user',
-            to: interKey,
-            weight: 0.7,
-            orgWeight: 0.7,
-            researchWeight: 0,
-          });
-        }
-        edges.push({
-          from: interKey,
-          to: `expert-${index}`,
-          weight: orgWeight,
-          orgWeight,
-          researchWeight: 0,
+
+        // 自分からエキスパートへのエッジ
+        edgeList.push({
+          source: 'user',
+          target: nodeId
         });
-      } else {
-        const name = extractIntermediaryName(expert.connectionPath, '上司');
-        const interKey = `manager-${name}`;
-        if (!edges.find(e => e.from === 'user' && e.to === interKey)) {
-          edges.push({
-            from: 'user',
-            to: interKey,
-            weight: 0.5,
-            orgWeight: 0.5,
-            researchWeight: 0,
-          });
-        }
-        edges.push({
-          from: interKey,
-          to: `expert-${index}`,
-          weight: orgWeight,
-          orgWeight,
-          researchWeight: 0,
-        });
-      }
+      });
     });
 
-    // 研究類似性エッジ
-    for (let i = 0; i < experts.length; i++) {
-      for (let j = i + 1; j < experts.length; j++) {
-        const exp1 = experts[i];
-        const exp2 = experts[j];
-        let similarity = 0;
-        if (exp1.affiliation === exp2.affiliation) similarity = 0.8;
-        else if (getOrgCategory(exp1.affiliation) === getOrgCategory(exp2.affiliation)) similarity = 0.5;
-        
-        if (similarity > 0.4) {
-          edges.push({
-            from: `expert-${i}`,
-            to: `expert-${j}`,
-            weight: similarity * 0.6,
-            orgWeight: 0,
-            researchWeight: similarity,
-          });
-        }
-      }
-    }
+    return { 
+      nodes: nodeList, 
+      edges: edgeList,
+      roleLevels: sortedLevels
+    };
+  }, [experts]);
 
-    return { nodes, edges, affiliationXMap, levelToY };
-  };
-
-  const { nodes, edges, affiliationXMap, levelToY } = generateNetworkData();
-
-  const getNodeRadius = (node: NetworkNode) => {
-    if (node.type === 'user') return 32;
-    if (node.type === 'intermediary') return 26;
-    return 30;
-  };
-
-  const getNodeColor = (node: NetworkNode) => {
-    if (node.type === 'user') return approachabilityColors.user;
-    if (node.type === 'intermediary') return approachabilityColors.intermediary;
-    return approachabilityColors[node.approachability || 'direct'];
-  };
+  const svgWidth = 900;
+  const svgHeight = 600;
+  const centerX = svgWidth / 2;
+  const centerY = svgHeight / 2;
+  const baseRadius = 120;
+  const radiusStep = 100;
 
   return (
-    <div className="space-y-3">
-      <h4 className="text-sm font-medium text-foreground">ネットワーク概観</h4>
-
-      <div className="relative bg-card/50 rounded-lg border border-border overflow-hidden">
-        <svg
-          ref={svgRef}
-          viewBox="0 0 900 600"
-          className="w-full h-[520px]"
+    <div className="w-full">
+      <h4 className="text-sm font-medium text-foreground mb-3">ネットワーク概観</h4>
+      <div className="w-full overflow-x-auto">
+        <svg 
+          width={svgWidth} 
+          height={svgHeight} 
+          className="mx-auto"
+          style={{ minWidth: svgWidth }}
         >
-          {/* 組織ラベル (X軸上部) */}
-          {Array.from(affiliationXMap.entries()).map(([aff, x]) => (
-            <text
-              key={`org-${aff}`}
-              x={x}
-              y={40}
-              fontSize="12"
-              fill="hsl(var(--muted-foreground))"
-              textAnchor="middle"
-              fontWeight="500"
-              className="pointer-events-none select-none"
-            >
-              {aff.length > 12 ? aff.slice(0, 11) + '…' : aff}
-            </text>
-          ))}
+          {/* 背景 */}
+          <rect width={svgWidth} height={svgHeight} fill="hsl(var(--card))" rx={8} />
 
-          {/* 職階ラベル (Y軸左側) */}
-          {[
-            { level: 2, label: '部長級' },
-            { level: 4, label: 'リーダー級' },
-            { level: 6, label: '担当者級' },
-          ].map(({ level, label }) => (
-            <text
-              key={`level-${level}`}
-              x={20}
-              y={levelToY(level)}
-              fontSize="11"
-              fill="hsl(var(--muted-foreground))"
-              textAnchor="start"
-              fontWeight="500"
-              dominantBaseline="middle"
-            >
-              {label}
-            </text>
-          ))}
+          {/* 職階レベルの同心円（枠線） */}
+          {roleLevels.map((level, idx) => {
+            const radius = baseRadius + idx * radiusStep;
+            return (
+              <g key={`level-${level}`}>
+                <circle
+                  cx={centerX}
+                  cy={centerY}
+                  r={radius}
+                  fill="none"
+                  stroke="hsl(var(--border))"
+                  strokeWidth={1.5}
+                  strokeDasharray="6 4"
+                  opacity={0.6}
+                />
+                {/* レベルラベル（右上に配置） */}
+                <text
+                  x={centerX + radius * 0.7 + 10}
+                  y={centerY - radius * 0.7 - 5}
+                  fill="hsl(var(--muted-foreground))"
+                  fontSize={11}
+                  fontWeight={500}
+                  textAnchor="start"
+                >
+                  {getRoleLevelLabel(level)}
+                </text>
+              </g>
+            );
+          })}
 
           {/* エッジ */}
-          {edges.map((edge, index) => {
-            const fromNode = nodes.find(n => n.id === edge.from);
-            const toNode = nodes.find(n => n.id === edge.to);
-            if (!fromNode || !toNode) return null;
+          {edges.map((edge, idx) => {
+            const sourceNode = nodes.find(n => n.id === edge.source);
+            const targetNode = nodes.find(n => n.id === edge.target);
+            if (!sourceNode || !targetNode) return null;
 
-            const isHighlighted = hoveredNode === edge.from || hoveredNode === edge.to;
-            const baseOpacity = 0.2 + edge.weight * 0.5;
-            const opacity = hoveredNode ? (isHighlighted ? Math.min(baseOpacity + 0.4, 1) : 0.06) : baseOpacity;
-            const strokeWidth = 1.5 + edge.weight * 2.5;
-
-            const isResearchOnly = edge.orgWeight === 0;
-            const strokeColor = isResearchOnly 
-              ? "hsl(var(--primary))" 
-              : "hsl(var(--muted-foreground))";
+            const isHighlighted = hoveredNode === edge.source || hoveredNode === edge.target;
 
             return (
               <line
-                key={`edge-${index}`}
-                x1={fromNode.x}
-                y1={fromNode.y}
-                x2={toNode.x}
-                y2={toNode.y}
-                stroke={strokeColor}
-                strokeWidth={isHighlighted ? strokeWidth + 1 : strokeWidth}
-                strokeDasharray={isResearchOnly ? "5 3" : "none"}
-                opacity={opacity}
-                className="transition-all duration-200"
+                key={`edge-${idx}`}
+                x1={sourceNode.x}
+                y1={sourceNode.y}
+                x2={targetNode.x}
+                y2={targetNode.y}
+                stroke={isHighlighted ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"}
+                strokeWidth={isHighlighted ? 2 : 1}
+                opacity={hoveredNode && !isHighlighted ? 0.15 : 0.4}
+                className="transition-opacity duration-200"
               />
             );
           })}
 
           {/* ノード */}
           {nodes.map((node) => {
-            const colors = getNodeColor(node);
-            const radius = getNodeRadius(node);
-            const isHovered = hoveredNode === node.id;
+            const isUser = node.type === 'user';
+            const radius = isUser ? 30 : 24;
+            const fillColor = isUser 
+              ? 'hsl(var(--primary))' 
+              : getApproachabilityColor(node.approachability);
+            const isHighlighted = hoveredNode === node.id;
             const isConnected = hoveredNode && edges.some(
-              e => (e.from === hoveredNode && e.to === node.id) || 
-                   (e.to === hoveredNode && e.from === node.id)
+              e => (e.source === hoveredNode && e.target === node.id) || 
+                   (e.target === hoveredNode && e.source === node.id)
             );
-            const opacity = hoveredNode 
-              ? (isHovered || isConnected ? 1 : 0.2) 
-              : 1;
 
             return (
               <g
                 key={node.id}
-                className="cursor-pointer transition-opacity duration-200"
-                style={{ opacity }}
+                transform={`translate(${node.x}, ${node.y})`}
                 onMouseEnter={() => setHoveredNode(node.id)}
                 onMouseLeave={() => setHoveredNode(null)}
+                style={{ cursor: 'pointer' }}
+                opacity={hoveredNode && !isHighlighted && !isConnected ? 0.3 : 1}
+                className="transition-opacity duration-200"
               >
-                {/* ホバー時のグロー */}
-                {isHovered && (
-                  <circle
-                    cx={node.x}
-                    cy={node.y}
-                    r={radius + 8}
-                    fill="none"
-                    stroke={colors.stroke}
-                    strokeWidth={2}
-                    opacity={0.4}
-                  />
-                )}
-                
-                {/* ノード本体 */}
+                {/* ノード円 */}
                 <circle
-                  cx={node.x}
-                  cy={node.y}
                   r={radius}
-                  fill={colors.fill}
-                  stroke={isHovered ? "hsl(var(--foreground))" : colors.stroke}
-                  strokeWidth={isHovered ? 2.5 : 1.5}
-                  opacity={0.95}
+                  fill={fillColor}
+                  stroke={isHighlighted ? "hsl(var(--foreground))" : "hsl(var(--background))"}
+                  strokeWidth={isHighlighted ? 3 : 2}
                 />
                 
-                {/* ノード内テキスト */}
+                {/* ノードラベル（名前） */}
                 <text
-                  x={node.x}
-                  y={node.y}
-                  dy="0.35em"
-                  fontSize={node.type === 'user' ? 13 : 11}
-                  fill="white"
+                  y={radius + 16}
                   textAnchor="middle"
-                  fontWeight="600"
-                  className="pointer-events-none select-none"
-                >
-                  {node.label.length > 5 ? node.label.slice(0, 4) + '…' : node.label}
-                </text>
-                
-                {/* ノード下のラベル */}
-                <text
-                  x={node.x}
-                  y={node.y + radius + 16}
-                  fontSize="11"
                   fill="hsl(var(--foreground))"
-                  textAnchor="middle"
-                  fontWeight="500"
-                  className="pointer-events-none select-none"
+                  fontSize={12}
+                  fontWeight={500}
                 >
                   {node.label}
                 </text>
-                
-                {/* サブラベル (役職 or 仲介者種別) */}
-                {node.subLabel && (
+
+                {/* サブラベル（所属） */}
+                {!isUser && (
                   <text
-                    x={node.x}
-                    y={node.y + radius + 30}
-                    fontSize="10"
-                    fill="hsl(var(--muted-foreground))"
+                    y={radius + 30}
                     textAnchor="middle"
-                    className="pointer-events-none select-none"
-                  >
-                    {node.subLabel.length > 14 ? node.subLabel.slice(0, 13) + '…' : node.subLabel}
-                  </text>
-                )}
-                
-                {/* 組織名 (専門家のみ) */}
-                {node.type === 'expert' && node.affiliation && (
-                  <text
-                    x={node.x}
-                    y={node.y + radius + 44}
-                    fontSize="9"
                     fill="hsl(var(--muted-foreground))"
-                    textAnchor="middle"
-                    opacity={0.7}
-                    className="pointer-events-none select-none"
+                    fontSize={10}
                   >
-                    {node.affiliation.length > 14 ? node.affiliation.slice(0, 13) + '…' : node.affiliation}
+                    {node.affiliation.length > 10 ? node.affiliation.slice(0, 9) + '…' : node.affiliation}
                   </text>
                 )}
               </g>
             );
           })}
-        </svg>
-      </div>
 
-      {/* 凡例 */}
-      <div className="flex flex-wrap gap-4 text-xs">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: approachabilityColors.direct.fill }} />
-            <span className="text-muted-foreground">直接連絡可</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: approachabilityColors.introduction.fill }} />
-            <span className="text-muted-foreground">紹介経由</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: approachabilityColors.via_manager.fill }} />
-            <span className="text-muted-foreground">上司経由</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: approachabilityColors.intermediary.fill }} />
-            <span className="text-muted-foreground">仲介者</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 border-l border-border pl-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-0.5 bg-muted-foreground" />
-            <span className="text-muted-foreground">組織関係</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-0 border-t-2 border-dashed border-primary" />
-            <span className="text-muted-foreground">研究類似</span>
-          </div>
-        </div>
+          {/* 凡例 */}
+          <g transform={`translate(24, ${svgHeight - 100})`}>
+            <text fill="hsl(var(--foreground))" fontSize={12} fontWeight={600}>
+              アプローチ分類
+            </text>
+            {[
+              { color: 'hsl(142, 76%, 36%)', label: '直接連絡可' },
+              { color: 'hsl(38, 92%, 50%)', label: '紹介経由' },
+              { color: 'hsl(0, 84%, 60%)', label: '上司経由' },
+            ].map((item, idx) => (
+              <g key={item.label} transform={`translate(0, ${20 + idx * 22})`}>
+                <circle r={7} cx={10} cy={0} fill={item.color} />
+                <text x={24} y={4} fill="hsl(var(--muted-foreground))" fontSize={11}>
+                  {item.label}
+                </text>
+              </g>
+            ))}
+          </g>
+        </svg>
       </div>
     </div>
   );
-}
+};
+
+export default ExpertNetworkGraph;
