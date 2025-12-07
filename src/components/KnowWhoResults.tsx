@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Building2, MessageSquare, Users, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ExpertNetworkGraph } from "@/components/charts/ExpertNetworkGraph";
+import ExpertNetworkGraph from "@/components/charts/ExpertNetworkGraph";
 
 interface Expert {
   name: string;
