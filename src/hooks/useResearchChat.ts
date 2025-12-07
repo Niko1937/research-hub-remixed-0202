@@ -205,6 +205,7 @@ export function useResearchChat() {
                     type: "research_result",
                     timestamp: Date.now(),
                     data: {
+                      summary: parsed.summary || "",
                       internal: parsed.internal || [],
                       business: parsed.business || [],
                       external: parsed.external || [],
@@ -261,22 +262,7 @@ export function useResearchChat() {
                 continue;
               }
 
-              // Handle research data
-              if (parsed.type === "research_data") {
-                setTimeline((prev) => [
-                  ...prev,
-                  {
-                    type: "research_result",
-                    timestamp: Date.now(),
-                    data: {
-                      internal: parsed.internal || [],
-                      business: parsed.business || [],
-                      external: parsed.external || [],
-                    },
-                  },
-                ]);
-                continue;
-              }
+              // Handle research data (duplicate handler removed - already handled above)
 
               // Handle theme evaluation
               if (parsed.type === "theme_evaluation") {
