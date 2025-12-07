@@ -109,12 +109,12 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
     const nodes: NetworkNode[] = [];
     const edges: NetworkEdge[] = [];
     
-    const svgWidth = 520;
-    const svgHeight = 420;
-    const leftMargin = 80;
-    const rightMargin = svgWidth - 60;
-    const topMargin = 60;
-    const bottomMargin = svgHeight - 70;
+    const svgWidth = 900;
+    const svgHeight = 600;
+    const leftMargin = 100;
+    const rightMargin = svgWidth - 80;
+    const topMargin = 70;
+    const bottomMargin = svgHeight - 90;
     
     const userAffiliation = '自チーム';
     const userRoleLevel = 6;
@@ -136,9 +136,9 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
     const affiliationXMap = new Map<string, number>();
     affiliationXMap.set(userAffiliation, leftMargin);
     
-    const orgSpacing = (rightMargin - leftMargin - 60) / Math.max(sortedAffiliations.length, 1);
+    const orgSpacing = (rightMargin - leftMargin - 120) / Math.max(sortedAffiliations.length, 1);
     sortedAffiliations.forEach((aff, idx) => {
-      affiliationXMap.set(aff, leftMargin + 100 + idx * orgSpacing);
+      affiliationXMap.set(aff, leftMargin + 150 + idx * orgSpacing);
     });
 
     // Y座標: 職階レベルをマップ
@@ -157,28 +157,54 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
       role: '',
     });
 
-    // 専門家をグリッド配置 (同じ組織×職階の重複回避)
-    const positionCounts = new Map<string, number>();
+    // 専門家をグリッド配置 (重複回避)
     const expertNodes: { expert: Expert; index: number; x: number; y: number }[] = [];
+    const occupiedPositions: { x: number; y: number }[] = [];
+    const minDistance = 80; // ノード間の最小距離
+
+    const findNonOverlappingPosition = (baseX: number, baseY: number): { x: number; y: number } => {
+      let x = baseX;
+      let y = baseY;
+      let attempts = 0;
+      const maxAttempts = 20;
+      
+      while (attempts < maxAttempts) {
+        const hasOverlap = occupiedPositions.some(pos => {
+          const dist = Math.sqrt((pos.x - x) ** 2 + (pos.y - y) ** 2);
+          return dist < minDistance;
+        });
+        
+        if (!hasOverlap) break;
+        
+        // スパイラル状に位置を探索
+        const angle = attempts * 0.8;
+        const radius = 50 + attempts * 15;
+        x = baseX + Math.cos(angle) * radius;
+        y = baseY + Math.sin(angle) * radius * 0.6;
+        
+        // 範囲内に収める
+        x = Math.max(leftMargin + 50, Math.min(rightMargin - 50, x));
+        y = Math.max(topMargin + 30, Math.min(bottomMargin - 30, y));
+        
+        attempts++;
+      }
+      
+      return { x, y };
+    };
 
     experts.forEach((expert, index) => {
       const roleLevel = getRoleLevel(expert.role);
-      const baseX = affiliationXMap.get(expert.affiliation) || 250;
+      const baseX = affiliationXMap.get(expert.affiliation) || 400;
       const baseY = levelToY(roleLevel);
       
-      const posKey = `${Math.round(baseX / 40)}-${Math.round(baseY / 30)}`;
-      const count = positionCounts.get(posKey) || 0;
-      positionCounts.set(posKey, count + 1);
-      
-      // 重複時は少しずらす
-      const offsetX = (count % 2) * 45;
-      const offsetY = Math.floor(count / 2) * 35;
+      const { x, y } = findNonOverlappingPosition(baseX, baseY);
+      occupiedPositions.push({ x, y });
       
       expertNodes.push({
         expert,
         index,
-        x: baseX + offsetX,
-        y: baseY + offsetY,
+        x,
+        y,
       });
     });
 
@@ -351,9 +377,9 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
   const { nodes, edges, affiliationXMap, levelToY } = generateNetworkData();
 
   const getNodeRadius = (node: NetworkNode) => {
-    if (node.type === 'user') return 26;
-    if (node.type === 'intermediary') return 20;
-    return 24;
+    if (node.type === 'user') return 32;
+    if (node.type === 'intermediary') return 26;
+    return 30;
   };
 
   const getNodeColor = (node: NetworkNode) => {
@@ -369,21 +395,22 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
       <div className="relative bg-card/50 rounded-lg border border-border overflow-hidden">
         <svg
           ref={svgRef}
-          viewBox="0 0 520 420"
-          className="w-full h-[360px]"
+          viewBox="0 0 900 600"
+          className="w-full h-[520px]"
         >
           {/* 組織ラベル (X軸上部) */}
           {Array.from(affiliationXMap.entries()).map(([aff, x]) => (
             <text
               key={`org-${aff}`}
               x={x}
-              y={28}
-              fontSize="9"
+              y={40}
+              fontSize="12"
               fill="hsl(var(--muted-foreground))"
               textAnchor="middle"
+              fontWeight="500"
               className="pointer-events-none select-none"
             >
-              {aff.length > 10 ? aff.slice(0, 9) + '…' : aff}
+              {aff.length > 12 ? aff.slice(0, 11) + '…' : aff}
             </text>
           ))}
 
@@ -395,13 +422,13 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
           ].map(({ level, label }) => (
             <text
               key={`level-${level}`}
-              x={12}
+              x={20}
               y={levelToY(level)}
-              fontSize="8"
+              fontSize="11"
               fill="hsl(var(--muted-foreground))"
               textAnchor="start"
+              fontWeight="500"
               dominantBaseline="middle"
-              className="pointer-events-none select-none"
             >
               {label}
             </text>
@@ -489,7 +516,7 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
                   x={node.x}
                   y={node.y}
                   dy="0.35em"
-                  fontSize={node.type === 'user' ? 10 : 9}
+                  fontSize={node.type === 'user' ? 13 : 11}
                   fill="white"
                   textAnchor="middle"
                   fontWeight="600"
@@ -501,8 +528,8 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
                 {/* ノード下のラベル */}
                 <text
                   x={node.x}
-                  y={node.y + radius + 13}
-                  fontSize="9"
+                  y={node.y + radius + 16}
+                  fontSize="11"
                   fill="hsl(var(--foreground))"
                   textAnchor="middle"
                   fontWeight="500"
@@ -515,13 +542,13 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
                 {node.subLabel && (
                   <text
                     x={node.x}
-                    y={node.y + radius + 24}
-                    fontSize="7"
+                    y={node.y + radius + 30}
+                    fontSize="10"
                     fill="hsl(var(--muted-foreground))"
                     textAnchor="middle"
                     className="pointer-events-none select-none"
                   >
-                    {node.subLabel.length > 12 ? node.subLabel.slice(0, 11) + '…' : node.subLabel}
+                    {node.subLabel.length > 14 ? node.subLabel.slice(0, 13) + '…' : node.subLabel}
                   </text>
                 )}
                 
@@ -529,14 +556,14 @@ export function ExpertNetworkGraph({ experts }: ExpertNetworkGraphProps) {
                 {node.type === 'expert' && node.affiliation && (
                   <text
                     x={node.x}
-                    y={node.y + radius + 35}
-                    fontSize="7"
+                    y={node.y + radius + 44}
+                    fontSize="9"
                     fill="hsl(var(--muted-foreground))"
                     textAnchor="middle"
                     opacity={0.7}
                     className="pointer-events-none select-none"
                   >
-                    {node.affiliation.length > 12 ? node.affiliation.slice(0, 11) + '…' : node.affiliation}
+                    {node.affiliation.length > 14 ? node.affiliation.slice(0, 13) + '…' : node.affiliation}
                   </text>
                 )}
               </g>
