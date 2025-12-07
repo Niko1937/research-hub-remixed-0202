@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Building2, MessageSquare, Users, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ExpertNetworkGraph } from "@/components/charts/ExpertNetworkGraph";
 
 interface Expert {
   name: string;
@@ -15,6 +16,7 @@ interface Expert {
 
 interface KnowWhoResultsProps {
   experts: Expert[];
+  hideFollowUpText?: boolean;
 }
 
 const approachabilityConfig = {
@@ -65,6 +67,11 @@ export function KnowWhoResults({ experts }: KnowWhoResultsProps) {
           {experts.length}名の有識者が見つかりました
         </span>
       </div>
+
+      {/* Network Graph */}
+      {experts.length > 0 && (
+        <ExpertNetworkGraph experts={experts} />
+      )}
 
       {(Object.keys(groupedExperts) as Array<keyof typeof groupedExperts>).map((category) => {
         const config = approachabilityConfig[category];

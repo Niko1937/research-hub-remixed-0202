@@ -646,6 +646,11 @@ const Index = () => {
                               );
                             
                             case "assistant_message":
+                              // Skip assistant message if it directly follows knowwho_result
+                              const prevItem = timeline[index - 1];
+                              if (prevItem && prevItem.type === "knowwho_result") {
+                                return null;
+                              }
                               return (
                                 <div key={index} className="flex justify-start w-full">
                                   <div className="w-full rounded-lg p-4">
