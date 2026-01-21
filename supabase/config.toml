@@ -1,10 +1,1 @@
-project_id = "kklhzvypgstdmucdkckr"
-
-[functions.research-chat]
-verify_jwt = false
-
-[functions.pdf-proxy]
-verify_jwt = false
-
-[functions.arxiv-proxy]
-verify_jwt = false
+project_id = "edbftsnyrtiabzfbxtbr"
