@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Card } from './ui/card';
 import { cn } from '@/lib/utils';
-import { X, Sparkles, Search, Brain, Lightbulb, PenTool } from 'lucide-react';
+import { X, Sparkles, Search, FileText, BarChart3, PenTool } from 'lucide-react';
 
 // Data complexity levels (vertical axis)
 const dataLevels = [
@@ -17,8 +17,8 @@ const dataLevels = [
 // AI sophistication levels (horizontal axis)
 const aiLevels = [
   { id: 'search', label: '検索・抽出', icon: Search },
-  { id: 'summary', label: '要約・分析', icon: Brain },
-  { id: 'inference', label: '推論・判断', icon: Lightbulb },
+  { id: 'qualitative', label: '推論・定性分析', icon: FileText },
+  { id: 'quantitative', label: '定量データ分析', icon: BarChart3 },
   { id: 'creation', label: '創造・実行', icon: PenTool },
 ];
 
@@ -35,6 +35,7 @@ type UseCase = {
 };
 
 const useCases: UseCase[] = [
+  // 検索・抽出
   {
     id: 'paper-search',
     name: '論文検索・調査',
@@ -43,87 +44,7 @@ const useCases: UseCase[] = [
     status: 'implemented',
     description: 'OpenAlex/arXiv/Semantic Scholarから論文を検索',
     why: ['この分野の全体像を把握したい', '見落としている重要な研究がないか確認したい'],
-    value: '検索結果のリストではなく、対話を通じて「理解」に至る',
-  },
-  {
-    id: 'field-understanding',
-    name: '分野理解・要約',
-    dataLevel: 'web-expert',
-    aiLevel: 'summary',
-    status: 'implemented',
-    description: '論文群から分野の構造と動向を解釈',
-    why: ['自分の研究がどの位置にあるか知りたい', '新しい研究テーマのヒントを得たい'],
-    value: '断片的な情報から全体像を構築',
-  },
-  {
-    id: 'expert-discovery',
-    name: '専門家発見',
-    dataLevel: 'tacit-knowledge',
-    aiLevel: 'inference',
-    status: 'implemented',
-    description: '文脈から関連専門家を推定・提案',
-    why: ['困ったとき相談できる人を見つけたい', '共同研究のパートナーを探したい'],
-    value: '名前のリストではなく、アプローチの道筋を提案',
-  },
-  {
-    id: 'report-generation',
-    name: '報告書生成',
-    dataLevel: 'web-expert',
-    aiLevel: 'creation',
-    status: 'implemented',
-    description: '調査結果からインフォグラフィック形式のHTMLを生成',
-    why: ['見やすい報告書を作りたい', '報告時間を削減したい'],
-    value: '分析結果を即座に共有可能な形式に変換',
-  },
-  {
-    id: 'positioning',
-    name: 'ポジショニング分析',
-    dataLevel: 'internal-structured',
-    aiLevel: 'summary',
-    status: 'mock',
-    description: '比較対象と軸を動的に生成し可視化',
-    why: ['競合との差別化ポイントを知りたい', '戦略的な研究計画を立てたい'],
-    value: '定性的な比較を定量的に可視化',
-  },
-  {
-    id: 'seeds-needs',
-    name: 'シーズ・ニーズ',
-    dataLevel: 'internal-structured',
-    aiLevel: 'inference',
-    status: 'mock',
-    description: '技術シーズと市場ニーズのマッチング',
-    why: ['研究成果の応用先を見つけたい', '市場ニーズに合った研究テーマを探したい'],
-    value: '技術と市場の橋渡しを支援',
-  },
-  {
-    id: 'internal-search',
-    name: '社内ナレッジ検索',
-    dataLevel: 'internal-unstructured',
-    aiLevel: 'search',
-    status: 'future',
-    description: '過去のレポート・Slack・メールを横断検索',
-    why: ['過去の類似研究を知りたい', '誰が何を知っているか把握したい'],
-    value: '散在する情報を一元的にアクセス可能に',
-  },
-  {
-    id: 'internal-expert',
-    name: '社内専門家推薦',
-    dataLevel: 'tacit-knowledge',
-    aiLevel: 'inference',
-    status: 'future',
-    description: '社内の誰に相談すべきかを提案',
-    why: ['社内で〇〇に詳しい人を知りたい', '適切な相談相手を見つけたい'],
-    value: '組織内の知識ネットワークを可視化',
-  },
-  {
-    id: 'approval-flow',
-    name: '承認フロー提案',
-    dataLevel: 'tacit-rules',
-    aiLevel: 'inference',
-    status: 'future',
-    description: '社内の暗黙的なルールに基づく提案',
-    why: ['うちの承認フローは？', '適切な手続きを知りたい'],
-    value: '暗黙知を形式知に変換',
+    value: '検索だけでも、適切なソースへのアクセスと結果の整理が必要',
   },
   {
     id: 'llm-qa',
@@ -136,14 +57,150 @@ const useCases: UseCase[] = [
     value: '即座に基礎知識を確認',
   },
   {
+    id: 'internal-search',
+    name: '社内ナレッジ検索',
+    dataLevel: 'internal-unstructured',
+    aiLevel: 'search',
+    status: 'future',
+    description: '過去のレポート・Slack・メールを横断検索',
+    why: ['過去の類似研究を知りたい', '誰が何を知っているか把握したい'],
+    value: '散在する情報を一元的にアクセス可能に',
+  },
+
+  // 推論・定性分析
+  {
+    id: 'field-understanding',
+    name: '分野理解・要約',
+    dataLevel: 'web-expert',
+    aiLevel: 'qualitative',
+    status: 'implemented',
+    description: '論文群から分野の構造と動向を解釈',
+    why: ['自分の研究がどの位置にあるか知りたい', '新しい研究テーマのヒントを得たい'],
+    value: '断片的な情報から全体像を構築',
+  },
+  {
+    id: 'expert-discovery',
+    name: '専門家発見',
+    dataLevel: 'tacit-knowledge',
+    aiLevel: 'qualitative',
+    status: 'implemented',
+    description: '文脈から関連専門家を推定・提案',
+    why: ['困ったとき相談できる人を見つけたい', '共同研究のパートナーを探したい'],
+    value: '名前のリストではなく、アプローチの道筋を提案',
+  },
+  {
     id: 'llm-analysis',
     name: '概念分析',
     dataLevel: 'llm',
-    aiLevel: 'summary',
+    aiLevel: 'qualitative',
     status: 'implemented',
     description: '複雑な概念の整理と説明',
     why: ['複雑な概念を整理したい', '関係性を理解したい'],
     value: '抽象的な情報を構造化',
+  },
+  {
+    id: 'seeds-needs',
+    name: 'シーズ・ニーズマッチ',
+    dataLevel: 'internal-structured',
+    aiLevel: 'qualitative',
+    status: 'mock',
+    description: '技術シーズと市場ニーズのマッチング',
+    why: ['研究成果の応用先を見つけたい', '市場ニーズに合った研究テーマを探したい'],
+    value: '技術と市場の橋渡しを支援',
+  },
+  {
+    id: 'internal-expert',
+    name: '社内専門家推薦',
+    dataLevel: 'tacit-knowledge',
+    aiLevel: 'qualitative',
+    status: 'future',
+    description: '社内の誰に相談すべきかを提案',
+    why: ['社内で〇〇に詳しい人を知りたい', '適切な相談相手を見つけたい'],
+    value: '組織内の知識ネットワークを可視化',
+  },
+  {
+    id: 'approval-flow',
+    name: '承認フロー提案',
+    dataLevel: 'tacit-rules',
+    aiLevel: 'qualitative',
+    status: 'future',
+    description: '社内の暗黙的なルールに基づく提案',
+    why: ['うちの承認フローは？', '適切な手続きを知りたい'],
+    value: '暗黙知を形式知に変換',
+  },
+
+  // 定量データ分析
+  {
+    id: 'positioning',
+    name: 'ポジショニング分析',
+    dataLevel: 'internal-structured',
+    aiLevel: 'quantitative',
+    status: 'mock',
+    description: '比較対象と軸を動的に生成し可視化',
+    why: ['競合との差別化ポイントを知りたい', '戦略的な研究計画を立てたい'],
+    value: '定性的な比較を定量的に可視化',
+  },
+  {
+    id: 'citation-analysis',
+    name: '引用ネットワーク分析',
+    dataLevel: 'web-expert',
+    aiLevel: 'quantitative',
+    status: 'mock',
+    description: '論文間の引用関係を定量的に分析',
+    why: ['影響力のある論文を特定したい', '研究のトレンドを数値で把握したい'],
+    value: '主観ではなくデータに基づく評価',
+  },
+  {
+    id: 'trend-analysis',
+    name: '研究トレンド分析',
+    dataLevel: 'web-expert',
+    aiLevel: 'quantitative',
+    status: 'future',
+    description: '時系列での研究動向を定量化',
+    why: ['この分野は成長しているか？', '投資すべき領域はどこか？'],
+    value: '未来予測のための定量的根拠',
+  },
+  {
+    id: 'internal-analytics',
+    name: '社内データ分析',
+    dataLevel: 'internal-structured',
+    aiLevel: 'quantitative',
+    status: 'future',
+    description: '社内データの統計分析・可視化',
+    why: ['過去のプロジェクト成功率は？', 'リソース配分の最適化'],
+    value: '意思決定を数値で支援',
+  },
+
+  // 創造・実行
+  {
+    id: 'report-generation',
+    name: '報告書生成',
+    dataLevel: 'web-expert',
+    aiLevel: 'creation',
+    status: 'implemented',
+    description: '調査結果からインフォグラフィック形式のHTMLを生成',
+    why: ['見やすい報告書を作りたい', '報告時間を削減したい'],
+    value: '分析結果を即座に共有可能な形式に変換',
+  },
+  {
+    id: 'proposal-draft',
+    name: '提案書ドラフト',
+    dataLevel: 'internal-structured',
+    aiLevel: 'creation',
+    status: 'future',
+    description: '調査結果から提案書の初稿を自動生成',
+    why: ['提案書作成の時間を削減したい', '構成のたたき台がほしい'],
+    value: 'ゼロからではなく編集から始められる',
+  },
+  {
+    id: 'auto-outreach',
+    name: '自動アプローチ',
+    dataLevel: 'tacit-knowledge',
+    aiLevel: 'creation',
+    status: 'future',
+    description: '専門家へのコンタクトメール自動生成・送信',
+    why: ['専門家にアプローチしたい', '適切な依頼文を書きたい'],
+    value: '発見から行動までを一気通貫',
   },
 ];
 
