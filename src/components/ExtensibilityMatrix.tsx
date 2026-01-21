@@ -14,13 +14,13 @@ const dataLevels = [
   { id: 'tacit-knowledge', label: '暗黙知', description: '経験・ノウハウ・人脈' },
 ];
 
-// AI sophistication levels (horizontal axis)
+// AI sophistication levels (horizontal axis) - Progressive difficulty stages
 const aiLevels = [
-  { id: 'simple-search', label: '単回検索', description: '1クエリ1応答', icon: Search },
-  { id: 'advanced-search', label: '高度検索', description: 'マルチホップ・Agentic', icon: Search },
-  { id: 'qualitative', label: '推論・定性分析', description: '文脈理解・解釈', icon: FileText },
-  { id: 'quantitative', label: '定量分析', description: '統計・可視化', icon: BarChart3 },
-  { id: 'creation', label: '創造・実行', description: '生成・自律行動', icon: PenTool },
+  { id: 'simple-search', label: '単回検索', description: '1クエリ1応答', icon: Search, stage: '基礎', stageNum: 1 },
+  { id: 'advanced-search', label: '高度検索', description: 'マルチホップ・Agentic', icon: Search, stage: '応用', stageNum: 2 },
+  { id: 'qualitative', label: '推論・定性分析', description: '文脈理解・解釈', icon: FileText, stage: '高度', stageNum: 3 },
+  { id: 'quantitative', label: '定量分析', description: '統計・可視化', icon: BarChart3, stage: '専門', stageNum: 4 },
+  { id: 'creation', label: '創造・実行', description: '生成・自律行動', icon: PenTool, stage: '先端', stageNum: 5 },
 ];
 
 // Use cases mapped to the matrix
@@ -275,20 +275,36 @@ export function ExtensibilityMatrix() {
         {/* Matrix */}
         <Card className="p-4 sm:p-6 overflow-x-auto">
           <div className="min-w-[600px]">
-            {/* AI Axis Labels (top) */}
+            {/* AI Axis Labels (top) with stage gradient */}
             <div className="grid grid-cols-[100px_repeat(5,1fr)] gap-1 mb-2">
               <div className="text-xs text-muted-foreground text-right pr-2 flex items-end justify-end pb-1">
-                AI →
+                <span className="flex flex-col items-end">
+                  <span className="text-[10px]">難易度</span>
+                  <span>AI →</span>
+                </span>
               </div>
-              {aiLevels.map(level => (
-                <div key={level.id} className="text-center group relative">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <level.icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                    <span className="text-[10px] sm:text-xs font-medium text-foreground leading-tight">{level.label}</span>
-                    <span className="text-[8px] sm:text-[10px] text-muted-foreground hidden sm:block">{level.description}</span>
+              {aiLevels.map((level, idx) => {
+                // Gradient from light to dark (increasing difficulty)
+                const opacity = 0.1 + (idx * 0.15);
+                return (
+                  <div 
+                    key={level.id} 
+                    className="text-center group relative rounded-lg py-2"
+                    style={{ 
+                      background: `linear-gradient(180deg, hsl(var(--primary) / ${opacity}) 0%, transparent 100%)` 
+                    }}
+                  >
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="text-[8px] sm:text-[10px] font-bold text-primary/80 uppercase tracking-wider">
+                        Stage {level.stageNum} · {level.stage}
+                      </span>
+                      <level.icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                      <span className="text-[10px] sm:text-xs font-medium text-foreground leading-tight">{level.label}</span>
+                      <span className="text-[8px] sm:text-[10px] text-muted-foreground hidden sm:block">{level.description}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Grid */}
