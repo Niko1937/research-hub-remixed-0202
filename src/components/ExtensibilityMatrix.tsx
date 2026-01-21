@@ -16,10 +16,11 @@ const dataLevels = [
 
 // AI sophistication levels (horizontal axis)
 const aiLevels = [
-  { id: 'search', label: '検索・抽出', icon: Search },
-  { id: 'qualitative', label: '推論・定性分析', icon: FileText },
-  { id: 'quantitative', label: '定量データ分析', icon: BarChart3 },
-  { id: 'creation', label: '創造・実行', icon: PenTool },
+  { id: 'simple-search', label: '単回検索', description: '1クエリ1応答', icon: Search },
+  { id: 'advanced-search', label: '高度検索', description: 'マルチホップ・Agentic', icon: Search },
+  { id: 'qualitative', label: '推論・定性分析', description: '文脈理解・解釈', icon: FileText },
+  { id: 'quantitative', label: '定量分析', description: '統計・可視化', icon: BarChart3 },
+  { id: 'creation', label: '創造・実行', description: '生成・自律行動', icon: PenTool },
 ];
 
 // Use cases mapped to the matrix
@@ -35,36 +36,58 @@ type UseCase = {
 };
 
 const useCases: UseCase[] = [
-  // 検索・抽出
-  {
-    id: 'paper-search',
-    name: '論文検索・調査',
-    dataLevel: 'web-expert',
-    aiLevel: 'search',
-    status: 'implemented',
-    description: 'OpenAlex/arXiv/Semantic Scholarから論文を検索',
-    why: ['この分野の全体像を把握したい', '見落としている重要な研究がないか確認したい'],
-    value: '検索だけでも、適切なソースへのアクセスと結果の整理が必要',
-  },
+  // 単回検索
   {
     id: 'llm-qa',
     name: '一般知識Q&A',
     dataLevel: 'llm',
-    aiLevel: 'search',
+    aiLevel: 'simple-search',
     status: 'implemented',
     description: 'LLMの事前学習知識に基づく回答',
     why: ['基本的な概念を確認したい', '用語の意味を知りたい'],
     value: '即座に基礎知識を確認',
   },
   {
+    id: 'web-search',
+    name: 'Web一般検索',
+    dataLevel: 'web-general',
+    aiLevel: 'simple-search',
+    status: 'implemented',
+    description: '最新ニュースや一般情報の検索',
+    why: ['最新の情報を知りたい', '一般的なトピックを調べたい'],
+    value: 'リアルタイムな情報へのアクセス',
+  },
+
+  // 高度検索（マルチホップ・Agentic）
+  {
+    id: 'paper-search',
+    name: '論文検索・調査',
+    dataLevel: 'web-expert',
+    aiLevel: 'advanced-search',
+    status: 'implemented',
+    description: '複数のAPIを組み合わせて論文を探索',
+    why: ['この分野の全体像を把握したい', '見落としている重要な研究がないか確認したい'],
+    value: '単純な検索ではなく、複数ソースの横断的探索',
+  },
+  {
     id: 'internal-search',
     name: '社内ナレッジ検索',
     dataLevel: 'internal-unstructured',
-    aiLevel: 'search',
+    aiLevel: 'advanced-search',
     status: 'future',
     description: '過去のレポート・Slack・メールを横断検索',
     why: ['過去の類似研究を知りたい', '誰が何を知っているか把握したい'],
     value: '散在する情報を一元的にアクセス可能に',
+  },
+  {
+    id: 'expert-network-search',
+    name: '専門家ネットワーク探索',
+    dataLevel: 'web-expert',
+    aiLevel: 'advanced-search',
+    status: 'implemented',
+    description: '著者情報から共著関係を辿って探索',
+    why: ['この分野のキーパーソンは誰か？', '誰と誰がつながっているか？'],
+    value: 'マルチホップで人脈ネットワークを発見',
   },
 
   // 推論・定性分析
@@ -251,17 +274,18 @@ export function ExtensibilityMatrix() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         {/* Matrix */}
         <Card className="p-4 sm:p-6 overflow-x-auto">
-          <div className="min-w-[500px]">
+          <div className="min-w-[600px]">
             {/* AI Axis Labels (top) */}
-            <div className="grid grid-cols-[100px_repeat(4,1fr)] gap-1 mb-2">
+            <div className="grid grid-cols-[100px_repeat(5,1fr)] gap-1 mb-2">
               <div className="text-xs text-muted-foreground text-right pr-2 flex items-end justify-end pb-1">
                 AI →
               </div>
               {aiLevels.map(level => (
-                <div key={level.id} className="text-center">
-                  <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-medium text-foreground">
+                <div key={level.id} className="text-center group relative">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
                     <level.icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                    <span className="hidden sm:inline">{level.label}</span>
+                    <span className="text-[10px] sm:text-xs font-medium text-foreground leading-tight">{level.label}</span>
+                    <span className="text-[8px] sm:text-[10px] text-muted-foreground hidden sm:block">{level.description}</span>
                   </div>
                 </div>
               ))}
@@ -275,7 +299,7 @@ export function ExtensibilityMatrix() {
               </div>
 
               {dataLevels.slice().reverse().map((dataLevel, rowIndex) => (
-                <div key={dataLevel.id} className="grid grid-cols-[100px_repeat(4,1fr)] gap-1 mb-1">
+                <div key={dataLevel.id} className="grid grid-cols-[100px_repeat(5,1fr)] gap-1 mb-1">
                   {/* Data level label */}
                   <div className="text-xs text-right pr-2 flex items-center justify-end">
                     <span className="text-foreground font-medium">{dataLevel.label}</span>
