@@ -13,7 +13,7 @@ import { SearchResultItem } from "@/components/SearchResultItem";
 import { UseCaseCards } from "@/components/UseCaseCards";
 import { HeroSection } from "@/components/HeroSection";
 import { ConceptSections } from "@/components/ConceptSections";
-import { InformationCarousel } from "@/components/InformationCarousel";
+import { ExtensibilityMatrix } from "@/components/ExtensibilityMatrix";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
 import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -459,7 +459,7 @@ const Index = () => {
                       <X className="h-5 w-5" />
                     </Button>
                     <HeroSection />
-                    <InformationCarousel />
+                    <ExtensibilityMatrix />
                   </div>
                 ) : (
                   <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
