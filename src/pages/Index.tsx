@@ -623,15 +623,6 @@ const Index = () => {
           ) : (
             // Assistant Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
-              {/* DeepDive Banner - Above Chat */}
-              {deepDiveContext && (
-                <DeepDiveBanner
-                  source={deepDiveContext.source}
-                  onClose={handleCloseDeepDive}
-                  hasPdfContext={!!pdfContext}
-                  hasScreenshot={!!capturedScreenshot}
-                />
-              )}
               
               <ScrollArea className="flex-1">
                 <div className="p-4 sm:p-6">
