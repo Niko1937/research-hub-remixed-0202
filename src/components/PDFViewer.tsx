@@ -2,11 +2,10 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import * as pdfjsLib from "pdfjs-dist";
 import "pdfjs-dist/web/pdf_viewer.css";
-import html2canvas from "html2canvas";
 
 // Configure PDF.js worker - use a more reliable approach
 // Instead of dynamic import, we'll initialize the worker inline
@@ -27,10 +26,6 @@ interface PDFViewerProps {
   onTextSelect?: (text: string) => void;
   onPdfLoaded?: (fullText: string) => void;
   clearHighlightSignal?: number;
-}
-
-export interface PDFViewerHandle {
-  captureCurrentView: () => Promise<string>;
 }
 
 type HighlightRect = {
