@@ -434,12 +434,15 @@ serve(async (req) => {
                           role: "system",
                           content: `You are a research planning assistant. Analyze the user query and create a step-by-step execution plan.
 Available tools:
-- wide-knowledge: Search external papers and research (SKIP if user is viewing a PDF unless they explicitly ask for additional research)
+${deepDiveContext ? `- deep-file-search: Search the virtual data folder of the current paper for figures, data, code, and references. Use this FIRST when user asks about specific details of the paper they are viewing.
+` : ''}- wide-knowledge: Search external papers and research${deepDiveContext ? ' (use only if user explicitly asks for additional external research)' : ''}
 - knowwho: Search for experts and researchers
 - positioning-analysis: Create positioning analysis comparing research items across multiple axes
 - seeds-needs-matching: Match research seeds with business needs
 - html-generation: Generate HTML infographics summarizing the conversation
 - chat: Use AI to summarize or format results
+
+${deepDiveContext ? `**IMPORTANT**: User is in DeepDive mode viewing a specific paper. Prioritize deep-file-search for questions about the paper's data, figures, code, or methodology.` : ''}
 
 Return a JSON object with "steps" array containing objects with this structure:
 {"steps": [
@@ -491,7 +494,32 @@ Keep it concise, 2-4 steps maximum. Always end with a "chat" step to summarize.`
                 encoder.encode(`data: ${JSON.stringify({ type: "step_start", step: i })}\n\n`)
               );
 
-              if (step.tool === "wide-knowledge") {
+              // Handle deep-file-search tool
+              if (step.tool === "deep-file-search") {
+                if (deepDiveContext && deepDiveContext.virtualFolder) {
+                  const ragResults = searchVirtualFolder(step.query, deepDiveContext.virtualFolder);
+                  
+                  toolResults.push({
+                    tool: "deep-file-search",
+                    query: step.query,
+                    results: ragResults,
+                    summary: ragResults.length > 0 
+                      ? `${ragResults.length}件の関連ファイルが見つかりました: ${ragResults.map(r => r.path).join(", ")}`
+                      : "関連ファイルは見つかりませんでした"
+                  });
+
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ 
+                      type: "deep_file_search_result", 
+                      results: ragResults 
+                    })}\n\n`)
+                  );
+
+                  console.log(`[deep-file-search] Found ${ragResults.length} files for query: ${step.query}`);
+                } else {
+                  console.log(`[deep-file-search] No virtual folder available`);
+                }
+              } else if (step.tool === "wide-knowledge") {
                 const [openAlexResults, semanticResults, arxivResults] = await Promise.all([
                   searchOpenAlex(step.query),
                   searchSemanticScholar(step.query),

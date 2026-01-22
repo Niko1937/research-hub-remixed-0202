@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 
-type Tool = "wide-knowledge" | "knowwho" | "positioning-analysis" | "seeds-needs-matching" | "html-generation";
+type Tool = "wide-knowledge" | "knowwho" | "positioning-analysis" | "seeds-needs-matching" | "html-generation" | "deep-file-search";
 type Mode = "search" | "assistant";
 
 interface ChatInputProps {
@@ -57,6 +57,7 @@ export function ChatInput({
     "positioning-analysis": "ポジショニング分析",
     "seeds-needs-matching": "シーズ・ニーズマッチング",
     "html-generation": "HTML資料生成",
+    "deep-file-search": "🔍 DeepFileSearch",
   };
 
   const handleToolSelect = (tool: Tool) => {
@@ -184,6 +185,16 @@ export function ChatInput({
                     </PopoverTrigger>
                     <PopoverContent className="w-64 p-2" align="start">
                       <div className="space-y-1">
+                        {/* DeepDive専用ツール */}
+                        {isDeepDiveActive && (
+                          <button
+                            onClick={() => handleToolSelect("deep-file-search")}
+                            className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                          >
+                            <div className="text-sm font-medium text-blue-700 dark:text-blue-300">🔍 DeepFileSearch</div>
+                            <div className="text-xs text-blue-600 dark:text-blue-400">論文の仮想データフォルダから関連資料を検索</div>
+                          </button>
+                        )}
                         <button
                           onClick={() => handleToolSelect("wide-knowledge")}
                           className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
