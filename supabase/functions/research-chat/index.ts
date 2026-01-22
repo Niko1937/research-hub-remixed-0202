@@ -321,7 +321,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode, tool, toolQuery, pdfContext, highlightedText } = await req.json();
+    const { messages, mode, tool, toolQuery, pdfContext, highlightedText, screenshot, deepDiveContext } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -330,6 +330,55 @@ serve(async (req) => {
 
     const userMessage = messages[messages.length - 1].content;
     const encoder = new TextEncoder();
+    
+    // DeepDive RAG: Simulate searching virtual data folder
+    function searchVirtualFolder(query: string, virtualFolder: any[]): { path: string; relevantContent: string; type: string }[] {
+      if (!virtualFolder || virtualFolder.length === 0) return [];
+      
+      // Simulate RAG search - in production this would be vector search
+      const queryLower = query.toLowerCase();
+      const results: { path: string; relevantContent: string; type: string }[] = [];
+      
+      for (const file of virtualFolder) {
+        const descLower = file.description.toLowerCase();
+        const pathLower = file.path.toLowerCase();
+        
+        // Simple keyword matching (production would use embeddings)
+        if (descLower.includes(queryLower.split(' ')[0]) || 
+            pathLower.includes(queryLower.split(' ')[0]) ||
+            file.type === 'data' && queryLower.includes('データ') ||
+            file.type === 'figure' && (queryLower.includes('図') || queryLower.includes('グラフ')) ||
+            file.type === 'code' && queryLower.includes('コード')) {
+          
+          // Generate mock content based on file type
+          let mockContent = '';
+          switch (file.type) {
+            case 'data':
+              mockContent = `[${file.path}より抽出]\n実験データ: accuracy=0.945, precision=0.923, recall=0.961\nサンプル数: 10,000, エポック: 50, バッチサイズ: 32`;
+              break;
+            case 'figure':
+              mockContent = `[${file.path}より]\n図の説明: ${file.description}\n主要な知見: モデル性能は層数に対して対数的に向上`;
+              break;
+            case 'code':
+              mockContent = `[${file.path}より]\nモデル構成: Transformer, hidden_dim=768, num_heads=12, num_layers=6`;
+              break;
+            case 'reference':
+              mockContent = `[${file.path}より]\n関連研究: Attention Is All You Need (2017), BERT (2018), GPT-3 (2020)`;
+              break;
+            default:
+              mockContent = `[${file.path}より]\n${file.description}`;
+          }
+          
+          results.push({
+            path: file.path,
+            relevantContent: mockContent,
+            type: file.type
+          });
+        }
+      }
+      
+      return results.slice(0, 3); // Return top 3 relevant files
+    }
 
     // For assistant mode, create execution plan first
     if (mode === "assistant") {
@@ -1221,12 +1270,32 @@ ${toolResultsContext}
             // Add PDF context if available
             if (pdfContext) {
               const pdfSnippet = pdfContext.slice(0, 10000);
-              contextPrompt += `\n\n<User is showing a document>${pdfSnippet}</User is showing a document>`;
+              contextPrompt += `\n\n<PDFドキュメント>\n${pdfSnippet}\n</PDFドキュメント>`;
               contextPrompt += `\n\n**重要**: ユーザーは現在PDFを参照しています。このPDFの内容に基づいて回答してください。`;
             }
 
             if (highlightedText) {
               contextPrompt += `\n\n## ユーザーがハイライトしているテキスト\nユーザーは現在、PDFの以下の部分を選択しています：\n\n「${highlightedText}」\n\nこの部分について質問されている可能性があります。`;
+            }
+            
+            // DeepDive mode: Add virtual folder RAG context
+            if (deepDiveContext && deepDiveContext.virtualFolder) {
+              const ragResults = searchVirtualFolder(userMessage, deepDiveContext.virtualFolder);
+              
+              if (ragResults.length > 0) {
+                contextPrompt += `\n\n## 🗂️ 仮想データフォルダ検索結果\n論文「${deepDiveContext.source?.title || 'Unknown'}」の付随データから関連情報を取得しました：\n`;
+                
+                for (const result of ragResults) {
+                  contextPrompt += `\n### ${result.path}\n${result.relevantContent}\n`;
+                }
+                
+                contextPrompt += `\n**指示**: 上記の仮想フォルダから取得したデータを回答に活用し、出典として [${ragResults.map(r => r.path).join('], [')}] のように引用してください。`;
+              }
+            }
+            
+            // Add screenshot context if available (for multimodal)
+            if (screenshot) {
+              contextPrompt += `\n\n## 📸 スクリーンショット添付\nユーザーがPDFの特定部分のスクリーンショットを添付しています。この画像に含まれる図表やグラフを分析して回答に含めてください。`;
             }
 
             const summaryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
