@@ -16,7 +16,7 @@ import { ConceptSections } from "@/components/ConceptSections";
 import { ExtensibilityMatrix } from "@/components/ExtensibilityMatrix";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
 import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
-import { DeepDiveBanner, VirtualFile, DeepDiveSource } from "@/components/DeepDiveBanner";
+import { DeepDiveBanner, DeepDiveSource, VirtualFile } from "@/components/DeepDiveBanner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -480,7 +480,7 @@ const Index = () => {
   const handleSubmit = (
     message: string,
     tool?: string,
-    pdfContext?: string,
+    pdfContextArg?: string,
     highlightedText?: string,
     screenshot?: string
   ) => {
@@ -495,14 +495,21 @@ const Index = () => {
     if (screenshot) {
       setCapturedScreenshot(null);
     }
+    
+    // Build DeepDive context if active
+    const deepDivePayload = deepDiveContext ? {
+      source: deepDiveContext.source,
+      virtualFolder: deepDiveContext.virtualFolder
+    } : undefined;
+    
     // Don't change mode when in search mode without a tool selected
     if (mode === "search" && !tool) {
-      sendMessage(message, "search", tool, pdfContext, highlightedText);
+      sendMessage(message, "search", tool, pdfContextArg || pdfContext, highlightedText, screenshot, deepDivePayload);
     } else {
       if (mode === "search") {
         setMode("assistant");
       }
-      sendMessage(message, "assistant", tool, pdfContext, highlightedText);
+      sendMessage(message, "assistant", tool, pdfContextArg || pdfContext, highlightedText, screenshot, deepDivePayload);
     }
   };
 
@@ -615,12 +622,13 @@ const Index = () => {
           ) : (
             // Assistant Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
-              {/* DeepDive Banner */}
+              {/* DeepDive Banner - Above Chat */}
               {deepDiveContext && (
                 <DeepDiveBanner
                   source={deepDiveContext.source}
-                  virtualFolder={deepDiveContext.virtualFolder}
                   onClose={handleCloseDeepDive}
+                  hasPdfContext={!!pdfContext}
+                  hasScreenshot={!!capturedScreenshot}
                 />
               )}
               

@@ -83,7 +83,12 @@ export function useResearchChat() {
       mode: "search" | "assistant",
       tool?: string,
       pdfContext?: string,
-      highlightedText?: string
+      highlightedText?: string,
+      screenshot?: string,
+      deepDiveContext?: {
+        source: { title: string; url: string; authors?: string[]; source?: string; year?: string };
+        virtualFolder: Array<{ path: string; description: string; type: string }>;
+      }
     ) => {
       const userMessage = { role: "user" as const, content };
       const timestamp = Date.now();
@@ -125,6 +130,8 @@ export function useResearchChat() {
             tool,
             pdfContext,
             highlightedText,
+            screenshot,
+            deepDiveContext,
           }),
         });
 
