@@ -1,92 +1,99 @@
-import { Search, Users, FileText, Zap, ArrowRight } from "lucide-react";
+import { Clock, Brain, Users, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export function ValueProposition() {
-  const values = [
+  const painPoints = [
     {
-      icon: Search,
-      title: "調べる",
-      description: "膨大な論文・資料から必要な情報を素早く発見",
-      color: "text-blue-500",
+      problem: "論文を探すのに時間がかかりすぎる",
+      solution: "自然言語で質問するだけで、関連論文を瞬時にサーベイ",
     },
     {
-      icon: Zap,
-      title: "理解する",
-      description: "対話的なAIが専門知識を噛み砕いて解説",
-      color: "text-primary",
+      problem: "読んでも専門外だと理解が追いつかない",
+      solution: "AIが対話形式で噛み砕いて解説、図表も深掘り",
     },
     {
-      icon: Users,
-      title: "つながる",
-      description: "関連する専門家・研究者を自動で推薦",
-      color: "text-green-500",
+      problem: "誰に相談すればいいかわからない",
+      solution: "研究領域から最適な専門家・共同研究候補を推薦",
     },
   ];
 
+  const valueFlow = [
+    { label: "調べる", sublabel: "Search", icon: Clock },
+    { label: "理解する", sublabel: "Understand", icon: Brain },
+    { label: "つながる", sublabel: "Connect", icon: Users },
+  ];
+
   return (
-    <section className="py-8 sm:py-12">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        {/* Value Flow */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 mb-10">
-          {values.map((value, index) => {
-            const Icon = value.icon;
+    <section className="py-10 sm:py-16">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+        {/* Researcher Pain Points */}
+        <div className="text-center mb-10">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            For Researchers
+          </p>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3">
+            研究者の「時間」を取り戻す
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+            論文調査、理解、専門家探し——研究の本質ではない作業に、どれだけの時間を費やしていますか？
+          </p>
+        </div>
+
+        {/* Pain → Solution Cards */}
+        <div className="space-y-4 mb-12">
+          {painPoints.map((item, index) => (
+            <div
+              key={index}
+              className="bg-card border border-border rounded-lg p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6"
+            >
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground line-through decoration-muted-foreground/50">
+                  {item.problem}
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-primary hidden sm:block flex-shrink-0" />
+              <div className="flex-1 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <p className="text-sm font-medium text-foreground">
+                  {item.solution}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Value Flow Visual */}
+        <div className="flex items-center justify-center gap-2 sm:gap-4 mb-10">
+          {valueFlow.map((step, index) => {
+            const Icon = step.icon;
             return (
-              <div key={index} className="flex items-center gap-4 md:gap-8">
-                <div className="flex flex-col items-center text-center">
-                  <div className={`p-3 rounded-full bg-muted/50 mb-2 ${value.color}`}>
-                    <Icon className="w-6 h-6" />
+              <div key={index} className="flex items-center gap-2 sm:gap-4">
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center mb-1">
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                   </div>
-                  <h3 className="text-lg font-bold text-foreground">{value.title}</h3>
-                  <p className="text-xs text-muted-foreground max-w-[140px]">
-                    {value.description}
-                  </p>
+                  <span className="text-xs sm:text-sm font-semibold text-foreground">{step.label}</span>
+                  <span className="text-[10px] text-muted-foreground">{step.sublabel}</span>
                 </div>
-                {index < values.length - 1 && (
-                  <ArrowRight className="w-5 h-5 text-muted-foreground hidden md:block" />
+                {index < valueFlow.length - 1 && (
+                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                 )}
               </div>
             );
           })}
         </div>
 
-        {/* Simple Extension Diagram */}
-        <div className="bg-card/50 border border-border rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-foreground mb-4 text-center">
-            対話UIの裏側で、Agentを追加するだけで機能が拡張
-          </h3>
-          <div className="flex flex-col items-center gap-3">
-            {/* Current Core */}
-            <div className="flex flex-wrap justify-center gap-2">
-              <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-primary/20 text-primary border border-primary/30">
-                論文検索
-              </span>
-              <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-primary/20 text-primary border border-primary/30">
-                専門家推薦
-              </span>
-              <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-primary/20 text-primary border border-primary/30">
-                ポジショニング分析
-              </span>
-            </div>
-            
-            {/* Arrow */}
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <div className="w-px h-4 bg-border"></div>
-              <span className="text-xs">+ Agent追加</span>
-              <div className="w-px h-4 bg-border"></div>
-            </div>
-            
-            {/* Future Extensions */}
-            <div className="flex flex-wrap justify-center gap-2">
-              <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-muted text-muted-foreground border border-border">
-                社内ナレッジ検索
-              </span>
-              <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-muted text-muted-foreground border border-border">
-                定例報告自動生成
-              </span>
-              <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-muted text-muted-foreground border border-border">
-                実験計画支援
-              </span>
-            </div>
+        {/* Extensibility Note */}
+        <div className="bg-muted/30 border border-border rounded-lg p-4 sm:p-5 text-center">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
+              Extensible Architecture
+            </span>
           </div>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            対話UIの裏側で、Agentを追加するだけで機能が拡張可能。
+            社内ナレッジ検索、定例報告自動生成、実験計画支援など、ニーズに応じて成長します。
+          </p>
         </div>
       </div>
     </section>
