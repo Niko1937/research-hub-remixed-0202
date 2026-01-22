@@ -5,12 +5,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResearchData } from "@/hooks/useResearchChat";
 import { CitedAnswer } from "@/components/CitedAnswer";
 
+interface Paper {
+  id?: number;
+  title: string;
+  abstract: string;
+  authors: string[];
+  year: string;
+  source: string;
+  url: string;
+  citations?: number;
+}
+
 interface ResearchResultsProps {
   data: ResearchData;
   onPdfClick?: (paper: { url: string; title: string; authors?: string[]; source?: string }) => void;
+  onDeepDive?: (paper: Paper) => void;
 }
 
-export function ResearchResults({ data, onPdfClick }: ResearchResultsProps) {
+export function ResearchResults({ data, onPdfClick, onDeepDive }: ResearchResultsProps) {
   // If we have a summary (cited answer format), show the new layout
   if (data.summary && data.external.length > 0) {
     return (
@@ -19,6 +31,7 @@ export function ResearchResults({ data, onPdfClick }: ResearchResultsProps) {
           summary={data.summary}
           papers={data.external}
           onPaperClick={onPdfClick}
+          onDeepDive={onDeepDive}
         />
         
         {/* Show internal/business only if they have data */}
@@ -157,6 +170,7 @@ export function ResearchResults({ data, onPdfClick }: ResearchResultsProps) {
               summary=""
               papers={data.external}
               onPaperClick={onPdfClick}
+              onDeepDive={onDeepDive}
             />
           )}
         </TabsContent>
