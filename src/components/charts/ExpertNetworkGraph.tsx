@@ -34,7 +34,6 @@ interface NetworkNode {
 interface NetworkEdge {
   source: string;
   target: string;
-  isPathEdge: boolean;
   approachability?: 'direct' | 'introduction' | 'via_manager';
 }
 
@@ -78,29 +77,17 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
   const [hoveredExpertPath, setHoveredExpertPath] = useState<Set<string> | null>(null);
 
   const svgWidth = 900;
-  const svgHeight = 600;
-  const centerX = svgWidth / 2;
-  const centerY = svgHeight / 2;
-  const baseRadius = 100;
-  const radiusStep = 100;
+  const svgHeight = 500;
+  const topMargin = 50;
+  const bottomMargin = 70;
+  const leftMargin = 80;
+  const rightMargin = 40;
 
   const { nodes, edges, roleLevels, expertPaths } = useMemo(() => {
     const nodeMap = new Map<string, NetworkNode>();
     const edgeList: NetworkEdge[] = [];
     const roleLevelSet = new Set<number>();
     const expertPathsMap = new Map<string, Set<string>>();
-
-    // 自分を追加（中心）
-    nodeMap.set('user', {
-      id: 'user',
-      label: '自分',
-      role: '研究員',
-      department: '自社',
-      type: 'user',
-      x: centerX,
-      y: centerY,
-      roleLevel: 0
-    });
 
     // 各エキスパートのpathDetailsからノードとエッジを抽出
     experts.forEach(expert => {
@@ -112,12 +99,6 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
           const isFirst = i === 0;
           const isLast = i === expert.pathDetails.length - 1;
           
-          // 最初のノード（自分）はスキップ、userとして既に追加済み
-          if (isFirst && pathNode.name === '自分') {
-            pathNodeIds.add('user');
-            continue;
-          }
-
           const nodeId = pathNode.employee_id || `node-${pathNode.name}`;
           pathNodeIds.add(nodeId);
           
@@ -126,12 +107,15 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
             const roleLevel = getRoleLevel(pathNode.role);
             roleLevelSet.add(roleLevel);
             
+            // 「自分」かどうかを判定
+            const isUser = pathNode.name === '自分' || isFirst;
+            
             nodeMap.set(nodeId, {
               id: nodeId,
               label: pathNode.name,
               role: pathNode.role,
               department: pathNode.department,
-              type: isLast ? 'expert' : 'intermediate',
+              type: isUser ? 'user' : (isLast ? 'expert' : 'intermediate'),
               approachability: isLast ? expert.approachability : undefined,
               x: 0, // 後で計算
               y: 0,
@@ -140,18 +124,18 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
           } else if (isLast) {
             // 既存ノードがエキスパートの場合、タイプを更新
             const existingNode = nodeMap.get(nodeId)!;
-            existingNode.type = 'expert';
-            existingNode.approachability = expert.approachability;
+            if (existingNode.type !== 'user') {
+              existingNode.type = 'expert';
+              existingNode.approachability = expert.approachability;
+            }
           }
 
           // エッジを追加（経路上の隣接ノード間）
           if (i > 0) {
             const prevNode = expert.pathDetails[i - 1];
-            const prevNodeId = (i === 1 && prevNode.name === '自分') ? 'user' : (prevNode.employee_id || `node-${prevNode.name}`);
+            const prevNodeId = prevNode.employee_id || `node-${prevNode.name}`;
             
             // 重複エッジを防ぐ
-            const edgeKey = `${prevNodeId}-${nodeId}`;
-            const reverseEdgeKey = `${nodeId}-${prevNodeId}`;
             const edgeExists = edgeList.some(e => 
               (e.source === prevNodeId && e.target === nodeId) ||
               (e.source === nodeId && e.target === prevNodeId)
@@ -161,7 +145,6 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
               edgeList.push({
                 source: prevNodeId,
                 target: nodeId,
-                isPathEdge: true,
                 approachability: isLast ? expert.approachability : undefined
               });
             }
@@ -175,30 +158,37 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
       }
     });
 
-    // 職階レベルごとにノードを配置
-    const sortedLevels = Array.from(roleLevelSet).sort((a, b) => a - b);
+    // 職階レベルごとにノードをグループ化
+    const sortedLevels = Array.from(roleLevelSet).sort((a, b) => b - a); // 降順（上位が上）
     const nodesByLevel: Map<number, NetworkNode[]> = new Map();
     
     nodeMap.forEach(node => {
-      if (node.type !== 'user') {
-        const level = node.roleLevel;
-        if (!nodesByLevel.has(level)) {
-          nodesByLevel.set(level, []);
-        }
-        nodesByLevel.get(level)!.push(node);
+      const level = node.roleLevel;
+      if (!nodesByLevel.has(level)) {
+        nodesByLevel.set(level, []);
       }
+      nodesByLevel.get(level)!.push(node);
     });
 
-    // 各レベルのノードを同心円状に配置
+    // 縦型レイアウト：職階が上のものほど画面上部に配置
+    const usableHeight = svgHeight - topMargin - bottomMargin;
+    const levelCount = sortedLevels.length || 1;
+    const levelSpacing = usableHeight / Math.max(levelCount - 1, 1);
+
     sortedLevels.forEach((level, levelIndex) => {
       const nodesAtLevel = nodesByLevel.get(level) || [];
-      const radius = baseRadius + levelIndex * radiusStep;
+      const y = topMargin + levelIndex * levelSpacing;
+      
+      const usableWidth = svgWidth - leftMargin - rightMargin;
+      const nodeCount = nodesAtLevel.length;
       
       nodesAtLevel.forEach((node, idx) => {
-        const angleOffset = levelIndex * 0.2;
-        const angle = (2 * Math.PI * idx) / Math.max(nodesAtLevel.length, 1) - Math.PI / 2 + angleOffset;
-        node.x = centerX + radius * Math.cos(angle);
-        node.y = centerY + radius * Math.sin(angle);
+        if (nodeCount === 1) {
+          node.x = svgWidth / 2;
+        } else {
+          node.x = leftMargin + (idx * usableWidth) / (nodeCount - 1);
+        }
+        node.y = y;
       });
     });
 
@@ -208,7 +198,7 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
       roleLevels: sortedLevels,
       expertPaths: expertPathsMap
     };
-  }, [experts, centerX, centerY, baseRadius, radiusStep]);
+  }, [experts, svgHeight, svgWidth, topMargin, bottomMargin, leftMargin, rightMargin]);
 
   // ホバー時に経路全体をハイライト
   const getHighlightedPath = (nodeId: string): Set<string> | null => {
@@ -245,9 +235,18 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
     return hoveredExpertPath.has(source) && hoveredExpertPath.has(target);
   };
 
+  // ノードが見つからない場合の表示
+  if (nodes.length === 0) {
+    return (
+      <div className="w-full p-4 text-center text-muted-foreground">
+        経路データがありません
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
-      <h4 className="text-sm font-medium text-foreground mb-3">ネットワーク概観</h4>
+      <h4 className="text-sm font-medium text-foreground mb-3">組織経路図</h4>
       <div className="w-full overflow-x-auto">
         <svg 
           width={svgWidth} 
@@ -258,25 +257,28 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
           {/* 背景 */}
           <rect width={svgWidth} height={svgHeight} fill="hsl(var(--card))" rx={8} />
 
-          {/* 職階レベルの同心円（枠線） */}
+          {/* 職階レベルのラベル（左側に縦配置） */}
           {roleLevels.map((level, idx) => {
-            const radius = baseRadius + idx * radiusStep;
+            const usableHeight = svgHeight - topMargin - bottomMargin;
+            const levelCount = roleLevels.length || 1;
+            const y = topMargin + idx * (usableHeight / Math.max(levelCount - 1, 1));
+            
             return (
-              <g key={`level-${level}`}>
-                <circle
-                  cx={centerX}
-                  cy={centerY}
-                  r={radius}
-                  fill="none"
+              <g key={`level-label-${level}`}>
+                {/* 横の点線ガイド */}
+                <line
+                  x1={leftMargin - 10}
+                  y1={y}
+                  x2={svgWidth - rightMargin + 10}
+                  y2={y}
                   stroke="hsl(var(--border))"
-                  strokeWidth={1.5}
-                  strokeDasharray="6 4"
-                  opacity={0.6}
+                  strokeWidth={1}
+                  strokeDasharray="4 4"
+                  opacity={0.4}
                 />
-                {/* レベルラベル（右上に配置） */}
                 <text
-                  x={centerX + radius * 0.7 + 10}
-                  y={centerY - radius * 0.7 - 5}
+                  x={12}
+                  y={y + 4}
                   fill="hsl(var(--muted-foreground))"
                   fontSize={11}
                   fontWeight={500}
@@ -299,16 +301,18 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
               ? getApproachabilityColor(edge.approachability)
               : 'hsl(var(--muted-foreground))';
 
+            // 曲線パスを使用してエッジを描画
+            const midY = (sourceNode.y + targetNode.y) / 2;
+            const pathD = `M ${sourceNode.x} ${sourceNode.y} Q ${(sourceNode.x + targetNode.x) / 2} ${midY} ${targetNode.x} ${targetNode.y}`;
+
             return (
-              <line
+              <path
                 key={`edge-${idx}`}
-                x1={sourceNode.x}
-                y1={sourceNode.y}
-                x2={targetNode.x}
-                y2={targetNode.y}
+                d={pathD}
+                fill="none"
                 stroke={isHighlighted ? edgeColor : 'hsl(var(--muted-foreground))'}
                 strokeWidth={isHighlighted ? 3 : 1.5}
-                opacity={hoveredNode && !isHighlighted ? 0.15 : isHighlighted ? 1 : 0.4}
+                opacity={hoveredNode && !isHighlighted ? 0.15 : isHighlighted ? 1 : 0.5}
                 className="transition-all duration-200"
               />
             );
@@ -319,7 +323,7 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
             const isUser = node.type === 'user';
             const isExpert = node.type === 'expert';
             const isIntermediate = node.type === 'intermediate';
-            const radius = isUser ? 28 : isExpert ? 24 : 18;
+            const radius = isUser ? 26 : isExpert ? 22 : 16;
             
             let fillColor: string;
             if (isUser) {
@@ -352,35 +356,57 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
                   className="transition-all duration-200"
                 />
                 
-                {/* ノードラベル（名前） */}
+                {/* ユーザーアイコン（自分の場合） */}
+                {isUser && (
+                  <text
+                    y={5}
+                    textAnchor="middle"
+                    fill="hsl(var(--primary-foreground))"
+                    fontSize={16}
+                    fontWeight={700}
+                  >
+                    ★
+                  </text>
+                )}
+                
+                {/* ノードラベル（名前） - 右側に配置 */}
                 <text
-                  y={radius + 14}
-                  textAnchor="middle"
+                  x={radius + 8}
+                  y={4}
+                  textAnchor="start"
                   fill="hsl(var(--foreground))"
-                  fontSize={isIntermediate ? 10 : 12}
-                  fontWeight={isExpert ? 600 : 500}
+                  fontSize={isIntermediate ? 11 : 12}
+                  fontWeight={isExpert || isUser ? 600 : 500}
                 >
                   {node.label}
                 </text>
 
-                {/* サブラベル（役職）- エキスパートと中間ノードのみ */}
-                {!isUser && (
-                  <text
-                    y={radius + (isIntermediate ? 24 : 28)}
-                    textAnchor="middle"
-                    fill="hsl(var(--muted-foreground))"
-                    fontSize={isIntermediate ? 9 : 10}
-                  >
-                    {node.role.length > 12 ? node.role.slice(0, 11) + '…' : node.role}
-                  </text>
-                )}
+                {/* サブラベル（役職）- 名前の下 */}
+                <text
+                  x={radius + 8}
+                  y={18}
+                  textAnchor="start"
+                  fill="hsl(var(--muted-foreground))"
+                  fontSize={10}
+                >
+                  {node.role.length > 15 ? node.role.slice(0, 14) + '…' : node.role}
+                </text>
               </g>
             );
           })}
 
           {/* 凡例 */}
-          <g transform={`translate(24, ${svgHeight - 130})`}>
-            <text fill="hsl(var(--foreground))" fontSize={12} fontWeight={600}>
+          <g transform={`translate(${svgWidth - 140}, ${svgHeight - 110})`}>
+            <rect 
+              x={-10} 
+              y={-20} 
+              width={130} 
+              height={105} 
+              fill="hsl(var(--background))" 
+              rx={6}
+              opacity={0.9}
+            />
+            <text fill="hsl(var(--foreground))" fontSize={11} fontWeight={600}>
               アプローチ分類
             </text>
             {[
@@ -388,18 +414,18 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
               { color: 'hsl(38, 92%, 50%)', label: '紹介経由' },
               { color: 'hsl(0, 84%, 60%)', label: '上司経由' },
             ].map((item, idx) => (
-              <g key={item.label} transform={`translate(0, ${20 + idx * 22})`}>
-                <circle r={7} cx={10} cy={0} fill={item.color} />
-                <text x={24} y={4} fill="hsl(var(--muted-foreground))" fontSize={11}>
+              <g key={item.label} transform={`translate(0, ${18 + idx * 20})`}>
+                <circle r={6} cx={8} cy={0} fill={item.color} />
+                <text x={20} y={4} fill="hsl(var(--muted-foreground))" fontSize={10}>
                   {item.label}
                 </text>
               </g>
             ))}
-            {/* 中間ノードの凡例 */}
-            <g transform={`translate(0, ${20 + 3 * 22})`}>
-              <circle r={6} cx={10} cy={0} fill="hsl(var(--muted))" />
-              <text x={24} y={4} fill="hsl(var(--muted-foreground))" fontSize={11}>
-                経路上の上司
+            {/* 自分のマーカー */}
+            <g transform={`translate(0, ${18 + 3 * 20})`}>
+              <circle r={6} cx={8} cy={0} fill="hsl(var(--primary))" />
+              <text x={20} y={4} fill="hsl(var(--muted-foreground))" fontSize={10}>
+                自分
               </text>
             </g>
           </g>
