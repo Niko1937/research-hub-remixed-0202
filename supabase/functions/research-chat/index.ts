@@ -596,115 +596,248 @@ ${paperContext}
                 // Log that we accumulated papers (no UI event sent)
                 console.log(`[wide-knowledge] Accumulated ${numberedPapers.length} papers for query: ${step.query}`);
               } else if (step.tool === "knowwho") {
-                // Build context from conversation history and previous tool results
-                let knowWhoContext = `ユーザーの質問「${userMessage}」に関連する専門家・研究者を検索します。`;
+                // Mock employee data (embedded for Edge Function)
+                const mockEmployees = [
+                  { employee_id: "E001", display_name: "山田 太郎", mail: "yamada.taro@company.com", job_title: "代表取締役CEO", department: "経営", manager_employee_id: null as string | null },
+                  { employee_id: "E010", display_name: "佐藤 一郎", mail: "sato.ichiro@company.com", job_title: "執行役員 CTO", department: "技術本部", manager_employee_id: "E001" },
+                  { employee_id: "E011", display_name: "鈴木 花子", mail: "suzuki.hanako@company.com", job_title: "執行役員 CSO", department: "戦略本部", manager_employee_id: "E001" },
+                  { employee_id: "E012", display_name: "高橋 健一", mail: "takahashi.kenichi@company.com", job_title: "執行役員 CFO", department: "管理本部", manager_employee_id: "E001" },
+                  { employee_id: "E020", display_name: "田中 誠", mail: "tanaka.makoto@company.com", job_title: "研究開発部長", department: "研究開発部", manager_employee_id: "E010" },
+                  { employee_id: "E021", display_name: "伊藤 美咲", mail: "ito.misaki@company.com", job_title: "AI推進部長", department: "AI推進部", manager_employee_id: "E010" },
+                  { employee_id: "E022", display_name: "渡辺 剛", mail: "watanabe.tsuyoshi@company.com", job_title: "技術戦略室長", department: "技術戦略室", manager_employee_id: "E010" },
+                  { employee_id: "E023", display_name: "小林 真理", mail: "kobayashi.mari@company.com", job_title: "企画部長", department: "企画部", manager_employee_id: "E011" },
+                  { employee_id: "E024", display_name: "加藤 隆", mail: "kato.takashi@company.com", job_title: "事業開発部長", department: "事業開発部", manager_employee_id: "E011" },
+                  { employee_id: "E030", display_name: "吉田 健太", mail: "yoshida.kenta@company.com", job_title: "NLP研究課長", department: "研究開発部", manager_employee_id: "E020" },
+                  { employee_id: "E031", display_name: "山本 愛", mail: "yamamoto.ai@company.com", job_title: "CV研究課長", department: "研究開発部", manager_employee_id: "E020" },
+                  { employee_id: "E032", display_name: "中村 翔", mail: "nakamura.sho@company.com", job_title: "LLM推進課長", department: "AI推進部", manager_employee_id: "E021" },
+                  { employee_id: "E033", display_name: "小川 裕子", mail: "ogawa.yuko@company.com", job_title: "MLOps課長", department: "AI推進部", manager_employee_id: "E021" },
+                  { employee_id: "E034", display_name: "藤田 大輔", mail: "fujita.daisuke@company.com", job_title: "技術調査課長", department: "技術戦略室", manager_employee_id: "E022" },
+                  { employee_id: "E100", display_name: "自分", mail: "me@company.com", job_title: "AIリサーチャー", department: "研究開発部", manager_employee_id: "E030" },
+                  { employee_id: "E101", display_name: "松本 理沙", mail: "matsumoto.risa@company.com", job_title: "シニアリサーチャー", department: "研究開発部", manager_employee_id: "E030" },
+                  { employee_id: "E102", display_name: "井上 拓也", mail: "inoue.takuya@company.com", job_title: "リサーチャー", department: "研究開発部", manager_employee_id: "E031" },
+                  { employee_id: "E103", display_name: "木村 優太", mail: "kimura.yuta@company.com", job_title: "MLエンジニア", department: "AI推進部", manager_employee_id: "E032" },
+                  { employee_id: "E104", display_name: "林 さくら", mail: "hayashi.sakura@company.com", job_title: "シニアMLエンジニア", department: "AI推進部", manager_employee_id: "E032" },
+                  { employee_id: "E105", display_name: "清水 龍一", mail: "shimizu.ryuichi@company.com", job_title: "MLOpsエンジニア", department: "AI推進部", manager_employee_id: "E033" },
+                  { employee_id: "E106", display_name: "森 真由美", mail: "mori.mayumi@company.com", job_title: "テックリサーチャー", department: "技術戦略室", manager_employee_id: "E034" },
+                  { employee_id: "E107", display_name: "池田 光", mail: "ikeda.hikaru@company.com", job_title: "ストラテジスト", department: "企画部", manager_employee_id: "E023" },
+                  { employee_id: "E108", display_name: "橋本 和也", mail: "hashimoto.kazuya@company.com", job_title: "ビジネスデベロッパー", department: "事業開発部", manager_employee_id: "E024" },
+                  { employee_id: "E109", display_name: "石井 美穂", mail: "ishii.miho@company.com", job_title: "プロンプトエンジニア", department: "AI推進部", manager_employee_id: "E032" },
+                  { employee_id: "E110", display_name: "前田 拓海", mail: "maeda.takumi@company.com", job_title: "データサイエンティスト", department: "研究開発部", manager_employee_id: "E031" },
+                ];
                 
-                // Add conversation history context
-                if (messages.length > 1) {
-                  knowWhoContext += `\n\n## 会話の経緯:\n`;
-                  messages.slice(-5).forEach((msg: Message) => {
-                    knowWhoContext += `${msg.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${msg.content.substring(0, 200)}...\n`;
-                  });
-                }
+                const CURRENT_USER_ID = "E100";
                 
-                // Add previous tool results
-                if (toolResults.length > 0) {
-                  knowWhoContext += `\n\n## これまでに実行したツールの結果:\n`;
-                  for (const result of toolResults) {
-                    knowWhoContext += `\n### ${result.tool} (Query: ${result.query})\n`;
-                    if (result.tool === "wide-knowledge" && result.results) {
-                      knowWhoContext += `検索された論文:\n`;
-                      for (const paper of result.results.slice(0, 3)) {
-                        knowWhoContext += `- "${paper.title}" by ${paper.authors.join(", ")}\n`;
-                      }
-                    } else {
-                      knowWhoContext += JSON.stringify(result.results, null, 2).substring(0, 500) + "...\n";
+                // Helper functions for LCA algorithm
+                const getEmployeeById = (id: string) => mockEmployees.find(e => e.employee_id === id);
+                
+                const getAncestors = (employeeId: string) => {
+                  const ancestors: typeof mockEmployees = [];
+                  let currentId: string | null = employeeId;
+                  while (currentId) {
+                    const employee = getEmployeeById(currentId);
+                    if (!employee) break;
+                    ancestors.push(employee);
+                    currentId = employee.manager_employee_id;
+                  }
+                  return ancestors;
+                };
+                
+                const findPathBetween = (fromId: string, toId: string) => {
+                  const myAncestors = getAncestors(fromId);
+                  const myAncestorSet = new Set(myAncestors.map(e => e.employee_id));
+                  const targetAncestors = getAncestors(toId);
+                  
+                  let lca: typeof mockEmployees[0] | null = null;
+                  let lcaIndexInTarget = -1;
+                  
+                  for (let i = 0; i < targetAncestors.length; i++) {
+                    if (myAncestorSet.has(targetAncestors[i].employee_id)) {
+                      lca = targetAncestors[i];
+                      lcaIndexInTarget = i;
+                      break;
                     }
                   }
-                  knowWhoContext += `\n上記の研究結果や分析を踏まえて、最も関連性の高い専門家を検索してください。`;
-                }
+                  
+                  if (!lca) return { lca: null, fullPath: [] as typeof mockEmployees, distance: -1 };
+                  
+                  const lcaIndexInMe = myAncestors.findIndex(e => e.employee_id === lca!.employee_id);
+                  const pathFromMe = myAncestors.slice(0, lcaIndexInMe + 1);
+                  const pathToTarget = targetAncestors.slice(0, lcaIndexInTarget).reverse();
+                  const fullPath = [...pathFromMe, ...pathToTarget];
+                  
+                  return { lca, fullPath, distance: pathFromMe.length + pathToTarget.length - 1 };
+                };
+                
+                const calculateApproachability = (fromId: string, toId: string): "direct" | "introduction" | "via_manager" => {
+                  const from = getEmployeeById(fromId);
+                  const to = getEmployeeById(toId);
+                  if (!from || !to) return "via_manager";
+                  
+                  const { distance } = findPathBetween(fromId, toId);
+                  if (from.department === to.department) return "direct";
+                  if (distance <= 2) return "direct";
+                  if (distance <= 4) return "introduction";
+                  return "via_manager";
+                };
+                
+                // Step 1: Stream thinking - identifying departments
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "knowwho_thinking",
+                      step: "departments",
+                      message: "関連部署を特定中...",
+                    })}\n\n`
+                  )
+                );
+                
+                // Use LLM to identify relevant departments/keywords
+                const departmentPrompt = `ユーザーの質問に関連する専門分野・部署・キーワードを特定してください。
 
-                const knowWhoPrompt = `あなたは社内の専門家データベースにアクセスできるシステムです。${knowWhoContext}
+質問: ${step.query}
 
-現在の検索クエリ: ${step.query}
+利用可能な部署: 研究開発部, AI推進部, 技術戦略室, 企画部, 事業開発部
 
-**重要**: 会話履歴とツール実行結果を参考に、ユーザーの研究テーマに最も関連性の高い社内有識者を選定してください。
-
-以下のJSON形式で専門家リストを返してください：
-
+以下のJSON形式で回答:
 {
-  "experts": [
-    {
-      "name": "専門家の名前",
-      "affiliation": "所属部署（例: 研究開発本部 AI推進室）",
-      "role": "役職（例: シニアリサーチャー、主任研究員など）",
-      "approachability": "direct" | "introduction" | "via_manager",
-      "connectionPath": "つながりの説明（例: 同じ部署 / 共通の知人: 田中さん（企画部）/ 以前のプロジェクトで協業）",
-      "suggestedQuestions": [
-        "この人に聞けそうな具体的な質問1",
-        "この人に聞けそうな具体的な質問2",
-        "この人に聞けそうな具体的な質問3"
-      ],
-      "contactMethods": ["slack", "email"]
-    }
-  ]
-}
+  "departments": ["関連する部署1", "関連する部署2"],
+  "keywords": ["関連キーワード1", "関連キーワード2"],
+  "suggestedQuestions": {
+    "シニアリサーチャー": ["質問1", "質問2"],
+    "MLエンジニア": ["質問1", "質問2"],
+    "default": ["質問1", "質問2", "質問3"]
+  }
+}`;
 
-**approachability の基準:**
-- "direct": 同じチーム、以前協業経験あり、オープンな人 → contactMethods: ["slack", "email"]
-- "introduction": 別部署だが共通の知人がいる → contactMethods: ["email", "request_intro"]  
-- "via_manager": 階層が離れている、面識なし → contactMethods: ["ask_manager"]
-
-**suggestedQuestions の指針:**
-- ユーザーの検索クエリと会話履歴から、この専門家に聞くと有益そうな具体的な質問を3つ生成
-- 質問は「〇〇について教えていただけますか？」「〇〇の経験はありますか？」など具体的に
-- ユーザーの研究テーマに直結する質問を優先
-
-**指示:**
-- experts配列には4-6名の専門家を含めてください
-- approachabilityのバランス: direct 1-2名、introduction 2-3名、via_manager 1名程度
-- 各専門家の専門性と聞けそうなことが異なるようにバリエーションを持たせる
-- connectionPathは具体的に（「同じフロア」「前回のハッカソンで一緒」など）
-- 実在しそうな部署名と役職を使用`;
-
-                const knowWhoResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    model: "google/gemini-2.5-flash",
-                    messages: [
-                      { role: "system", content: knowWhoPrompt },
-                      { role: "user", content: step.query }
-                    ],
-                    response_format: { type: "json_object" }
-                  }),
+                let relevantDepartments: string[] = [];
+                let suggestedQuestionsMap: Record<string, string[]> = {};
+                
+                try {
+                  const deptResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      model: "google/gemini-2.5-flash",
+                      messages: [{ role: "user", content: departmentPrompt }],
+                      response_format: { type: "json_object" }
+                    }),
+                  });
+                  
+                  if (deptResponse.ok) {
+                    const deptData = await deptResponse.json();
+                    const parsed = JSON.parse(stripCodeFence(deptData.choices?.[0]?.message?.content || "{}"));
+                    relevantDepartments = parsed.departments || ["研究開発部", "AI推進部"];
+                    suggestedQuestionsMap = parsed.suggestedQuestions || {};
+                  }
+                } catch (e) {
+                  console.error("Department identification failed:", e);
+                  relevantDepartments = ["研究開発部", "AI推進部"];
+                }
+                
+                // Step 2: Stream thinking - searching candidates
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "knowwho_thinking",
+                      step: "searching",
+                      message: `候補者を検索中... (${relevantDepartments.join(", ")})`,
+                      departments: relevantDepartments,
+                    })}\n\n`
+                  )
+                );
+                
+                // Search candidates from mock data
+                const candidates = mockEmployees.filter(e => 
+                  e.employee_id !== CURRENT_USER_ID && 
+                  (relevantDepartments.some(dept => e.department.includes(dept)) ||
+                   e.job_title.toLowerCase().includes("研究") ||
+                   e.job_title.toLowerCase().includes("ml") ||
+                   e.job_title.toLowerCase().includes("ai"))
+                );
+                
+                // Step 3: Stream thinking - calculating paths
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "knowwho_thinking",
+                      step: "calculating",
+                      message: `組織経路を計算中... (${candidates.length}名)`,
+                      candidateCount: candidates.length,
+                    })}\n\n`
+                  )
+                );
+                
+                // Calculate paths and build expert results
+                const experts = candidates.slice(0, 6).map(candidate => {
+                  const { fullPath, distance } = findPathBetween(CURRENT_USER_ID, candidate.employee_id);
+                  const approachability = calculateApproachability(CURRENT_USER_ID, candidate.employee_id);
+                  
+                  // Determine contact methods based on approachability
+                  let contactMethods: string[] = [];
+                  if (approachability === "direct") {
+                    contactMethods = ["slack", "email"];
+                  } else if (approachability === "introduction") {
+                    contactMethods = ["email", "request_intro"];
+                  } else {
+                    contactMethods = ["ask_manager"];
+                  }
+                  
+                  // Get suggested questions for this role
+                  const roleQuestions = suggestedQuestionsMap[candidate.job_title] || 
+                                       suggestedQuestionsMap["default"] || 
+                                       [`${candidate.job_title}としての経験について教えてください`, `${candidate.department}での取り組みについて聞きたい`];
+                  
+                  return {
+                    employee_id: candidate.employee_id,
+                    name: candidate.display_name,
+                    affiliation: candidate.department,
+                    role: candidate.job_title,
+                    mail: candidate.mail,
+                    approachability,
+                    connectionPath: fullPath.map(e => e.display_name).join(" → "),
+                    pathDetails: fullPath.map(e => ({
+                      employee_id: e.employee_id,
+                      name: e.display_name,
+                      role: e.job_title,
+                      department: e.department,
+                    })),
+                    distance,
+                    suggestedQuestions: roleQuestions.slice(0, 3),
+                    contactMethods,
+                  };
+                });
+                
+                // Sort by approachability (direct first)
+                experts.sort((a, b) => {
+                  const order = { direct: 0, introduction: 1, via_manager: 2 };
+                  return order[a.approachability] - order[b.approachability];
                 });
 
-                if (knowWhoResponse.ok) {
-                  const knowWhoData = await knowWhoResponse.json();
-                  const knowWhoContent = JSON.parse(stripCodeFence(knowWhoData.choices?.[0]?.message?.content || "{}"));
-                  const experts = knowWhoContent.experts || [];
+                // Store results
+                toolResults.push({
+                  tool: "knowwho",
+                  query: step.query,
+                  results: experts
+                });
 
-                  // Store results
-                  toolResults.push({
-                    tool: "knowwho",
-                    query: step.query,
-                    results: experts
-                  });
-
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({
-                        type: "knowwho_results",
-                        experts,
-                      })}\n\n`
-                    )
-                  );
-                }
-              } else if (step.tool === "positioning-analysis") {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "knowwho_results",
+                      experts,
+                      searchContext: {
+                        departments: relevantDepartments,
+                        candidateCount: candidates.length,
+                        currentUser: getEmployeeById(CURRENT_USER_ID),
+                      }
+                    })}\n\n`
+                  )
+                );
+              }
+              else if (step.tool === "positioning-analysis") {
                 console.log("Starting positioning-analysis tool execution");
                 
                 // Build context from previous tool results
