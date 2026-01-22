@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Send, Wrench, X, Search, MessageSquare, FileText } from "lucide-react";
+import { Send, Wrench, X, Search, MessageSquare, FileText, Camera, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,12 +9,16 @@ type Tool = "wide-knowledge" | "knowwho" | "positioning-analysis" | "seeds-needs
 type Mode = "search" | "assistant";
 
 interface ChatInputProps {
-  onSubmit: (message: string, tool?: Tool, pdfContext?: string, highlightedText?: string) => void;
+  onSubmit: (message: string, tool?: Tool, pdfContext?: string, highlightedText?: string, screenshot?: string) => void;
   mode: Mode;
   onModeChange: (mode: Mode) => void;
   highlightedText?: string;
   pdfContext?: string;
   onClearHighlight?: () => void;
+  isDeepDiveActive?: boolean;
+  screenshot?: string | null;
+  onCaptureScreenshot?: () => void;
+  onClearScreenshot?: () => void;
 }
 
 export function ChatInput({ 
@@ -23,7 +27,11 @@ export function ChatInput({
   onModeChange,
   highlightedText,
   pdfContext,
-  onClearHighlight 
+  onClearHighlight,
+  isDeepDiveActive,
+  screenshot,
+  onCaptureScreenshot,
+  onClearScreenshot,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
@@ -31,7 +39,7 @@ export function ChatInput({
 
   const handleSubmit = () => {
     if (message.trim()) {
-      onSubmit(message, selectedTool || undefined, pdfContext, highlightedText);
+      onSubmit(message, selectedTool || undefined, pdfContext, highlightedText, screenshot || undefined);
       setMessage("");
     }
   };
@@ -66,7 +74,7 @@ export function ChatInput({
         {/* Unified Chat Input Component */}
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           {/* PDF Context Indicators */}
-          {(highlightedText || pdfContext) && (
+          {(highlightedText || pdfContext || screenshot) && (
             <div className="px-4 pt-3 pb-2 space-y-2">
               {pdfContext && (
                 <Badge variant="secondary" className="gap-1.5">
@@ -88,6 +96,22 @@ export function ChatInput({
                     size="icon"
                     className="h-4 w-4 p-0 hover:bg-transparent shrink-0"
                     onClick={onClearHighlight}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </Badge>
+              )}
+              {screenshot && (
+                <Badge 
+                  className="gap-2 pr-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800"
+                >
+                  <ImageIcon className="w-3 h-3 shrink-0" />
+                  <span className="text-xs">スクリーンショット添付中</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 p-0 hover:bg-transparent shrink-0"
+                    onClick={onClearScreenshot}
                   >
                     <X className="w-3 h-3" />
                   </Button>
@@ -214,6 +238,20 @@ export function ChatInput({
                     </Badge>
                   )}
                 </>
+              )}
+
+              {/* Screenshot Button - Only show in DeepDive mode */}
+              {isDeepDiveActive && onCaptureScreenshot && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-8 gap-2 text-xs ${screenshot ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                  onClick={onCaptureScreenshot}
+                  disabled={!!screenshot}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{screenshot ? "キャプチャ済" : "📸 スクショ"}</span>
+                </Button>
               )}
             </div>
           </div>

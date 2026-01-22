@@ -1,7 +1,8 @@
 import { useRef, useCallback, useState } from "react";
-import { Globe, ExternalLink, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
+import { Globe, ExternalLink, TrendingUp, ChevronDown, ChevronRight, Microscope } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -29,9 +30,10 @@ interface CitedAnswerProps {
   summary: string;
   papers: Paper[];
   onPaperClick?: (paper: { url: string; title: string; authors?: string[]; source?: string }) => void;
+  onDeepDive?: (paper: Paper) => void;
 }
 
-export function CitedAnswer({ summary, papers, onPaperClick }: CitedAnswerProps) {
+export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: CitedAnswerProps) {
   const [isSourcesOpen, setIsSourcesOpen] = useState(false);
   const sourceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   
@@ -156,15 +158,7 @@ export function CitedAnswer({ summary, papers, onPaperClick }: CitedAnswerProps)
                   }}
                 >
                   <Card
-                    className="p-3 bg-card border-border hover:bg-card-hover hover:shadow-hover transition-all group cursor-pointer"
-                    onClick={() =>
-                      onPaperClick?.({
-                        url: paper.url,
-                        title: paper.title,
-                        authors: paper.authors,
-                        source: paper.source,
-                      })
-                    }
+                    className="p-3 bg-card border-border hover:bg-card-hover hover:shadow-hover transition-all group"
                   >
                     <div className="flex items-start gap-3">
                       {/* Citation Number */}
@@ -173,7 +167,17 @@ export function CitedAnswer({ summary, papers, onPaperClick }: CitedAnswerProps)
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <h5 className="text-sm font-medium text-foreground group-hover:text-highlight transition-colors line-clamp-2">
+                        <h5 
+                          className="text-sm font-medium text-foreground group-hover:text-highlight transition-colors line-clamp-2 cursor-pointer"
+                          onClick={() =>
+                            onPaperClick?.({
+                              url: paper.url,
+                              title: paper.title,
+                              authors: paper.authors,
+                              source: paper.source,
+                            })
+                          }
+                        >
                           {paper.title}
                         </h5>
 
@@ -199,9 +203,39 @@ export function CitedAnswer({ summary, papers, onPaperClick }: CitedAnswerProps)
                           <Badge variant="secondary" className="text-xs">
                             {paper.source}
                           </Badge>
-                          <div className="flex items-center gap-1 text-xs text-primary group-hover:text-highlight transition-colors">
-                            <span>開く</span>
-                            <ExternalLink className="w-3 h-3" />
+                          
+                          <div className="flex items-center gap-2">
+                            {/* DeepDive Button */}
+                            {paper.url && onDeepDive && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeepDive(paper);
+                                }}
+                              >
+                                <Microscope className="w-3 h-3" />
+                                <span>DeepDive</span>
+                              </Button>
+                            )}
+                            
+                            {/* Open Button */}
+                            <button
+                              className="flex items-center gap-1 text-xs text-primary hover:text-highlight transition-colors"
+                              onClick={() =>
+                                onPaperClick?.({
+                                  url: paper.url,
+                                  title: paper.title,
+                                  authors: paper.authors,
+                                  source: paper.source,
+                                })
+                              }
+                            >
+                              <span>開く</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ResearchSidebar } from "@/components/ResearchSidebar";
@@ -16,6 +16,7 @@ import { ConceptSections } from "@/components/ConceptSections";
 import { ExtensibilityMatrix } from "@/components/ExtensibilityMatrix";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
 import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
+import { DeepDiveBanner, VirtualFile, DeepDiveSource } from "@/components/DeepDiveBanner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,32 @@ import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
+
+// Mock virtual folder generator based on paper metadata
+function generateMockVirtualFolder(title: string): VirtualFile[] {
+  const baseFiles: VirtualFile[] = [
+    { path: "/data/experiment_results.csv", description: "主要な実験結果データ", type: "data" },
+    { path: "/data/training_metrics.json", description: "学習曲線・メトリクスデータ", type: "data" },
+    { path: "/figures/architecture.png", description: "モデルアーキテクチャ図", type: "figure" },
+    { path: "/figures/results_chart.png", description: "結果のグラフ・チャート", type: "figure" },
+    { path: "/references/bibliography.bib", description: "引用論文一覧", type: "reference" },
+    { path: "/references/related_works.md", description: "関連研究まとめノート", type: "reference" },
+    { path: "/code/model_config.py", description: "モデル設定・ハイパーパラメータ", type: "code" },
+    { path: "/code/train.py", description: "学習スクリプト", type: "code" },
+  ];
+  
+  // Add some randomization based on title hash
+  const hash = title.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const numFiles = 4 + (hash % 5); // 4-8 files
+  
+  return baseFiles.slice(0, numFiles);
+}
+
+interface DeepDiveContext {
+  source: DeepDiveSource;
+  virtualFolder: VirtualFile[];
+  pdfText?: string;
+}
 
 const initialSearchResults = [
   { 
@@ -144,6 +171,9 @@ const Index = () => {
   const [pendingHtmlAutoOpen, setPendingHtmlAutoOpen] = useState(false);
   const [lastHtmlItemTimestamp, setLastHtmlItemTimestamp] = useState<number | null>(null);
   const [showIntro, setShowIntro] = useState(true);
+  const [deepDiveContext, setDeepDiveContext] = useState<DeepDiveContext | null>(null);
+  const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
+  const pdfViewerRef = useRef<{ captureCurrentView: () => Promise<string> } | null>(null);
   const isMobile = useIsMobile();
 
   const clearHighlight = useCallback(() => {
@@ -169,6 +199,8 @@ const Index = () => {
     handleHtmlViewerClose();
     setLastHtmlItemTimestamp(null);
     setSearchQuery(null);
+    setDeepDiveContext(null);
+    setCapturedScreenshot(null);
     // Reset to initial recommendations
     setRecommendedLoading(true);
     
@@ -218,6 +250,58 @@ const Index = () => {
       })
       .finally(() => setRecommendedLoading(false));
   }, [clearMessages, closePdfViewer, handleHtmlViewerClose]);
+
+  // Handle DeepDive activation
+  const handleDeepDive = useCallback((paper: { id?: number; title: string; url: string; authors?: string[]; source?: string; year?: string }) => {
+    // Generate mock virtual folder
+    const virtualFolder = generateMockVirtualFolder(paper.title);
+    
+    setDeepDiveContext({
+      source: {
+        id: paper.id,
+        title: paper.title,
+        url: paper.url,
+        authors: paper.authors,
+        source: paper.source,
+        year: paper.year,
+      },
+      virtualFolder,
+      pdfText: pdfContext, // Use current PDF text if available
+    });
+    
+    // Open the PDF if not already open
+    if (!pdfViewer || pdfViewer.url !== paper.url) {
+      setMode("assistant");
+      handleHtmlViewerClose();
+      setPdfViewer({
+        url: paper.url,
+        title: paper.title,
+        authors: paper.authors,
+        source: paper.source,
+        openedAt: Date.now(),
+      });
+    }
+  }, [pdfViewer, pdfContext, handleHtmlViewerClose]);
+
+  const handleCloseDeepDive = useCallback(() => {
+    setDeepDiveContext(null);
+    setCapturedScreenshot(null);
+  }, []);
+
+  const handleCaptureScreenshot = useCallback(async () => {
+    if (pdfViewerRef.current) {
+      try {
+        const screenshot = await pdfViewerRef.current.captureCurrentView();
+        setCapturedScreenshot(screenshot);
+      } catch (error) {
+        console.error("Failed to capture screenshot:", error);
+      }
+    }
+  }, []);
+
+  const handleClearScreenshot = useCallback(() => {
+    setCapturedScreenshot(null);
+  }, []);
 
   const handleAddAxis = useCallback(async (axisName: string, axisType: "quantitative" | "qualitative") => {
     const lastPositioning = [...timeline].reverse().find(item => item.type === "positioning_analysis");
@@ -404,7 +488,8 @@ const Index = () => {
     message: string,
     tool?: string,
     pdfContext?: string,
-    highlightedText?: string
+    highlightedText?: string,
+    screenshot?: string
   ) => {
     if (tool === "html-generation") {
       const lastHtmlItem = [...timeline]
@@ -412,6 +497,10 @@ const Index = () => {
         .find(item => item.type === "html_generation");
       setLastHtmlItemTimestamp(lastHtmlItem?.timestamp ?? null);
       setPendingHtmlAutoOpen(true);
+    }
+    // Clear screenshot after sending
+    if (screenshot) {
+      setCapturedScreenshot(null);
     }
     // Don't change mode when in search mode without a tool selected
     if (mode === "search" && !tool) {
@@ -533,6 +622,15 @@ const Index = () => {
           ) : (
             // Assistant Mode Layout
             <div className="flex flex-col h-full animate-fade-in">
+              {/* DeepDive Banner */}
+              {deepDiveContext && (
+                <DeepDiveBanner
+                  source={deepDiveContext.source}
+                  virtualFolder={deepDiveContext.virtualFolder}
+                  onClose={handleCloseDeepDive}
+                />
+              )}
+              
               <ScrollArea className="flex-1">
                 <div className="p-4 sm:p-6">
                   <div className="max-w-4xl mx-auto space-y-6 pb-32">
@@ -576,6 +674,7 @@ const Index = () => {
                                   key={index}
                                   data={item.data}
                                   onPdfClick={openPdfDocument}
+                                  onDeepDive={handleDeepDive}
                                 />
                               );
                             
@@ -688,6 +787,10 @@ const Index = () => {
                   highlightedText={selectedPdfText}
                   pdfContext={pdfContext}
                   onClearHighlight={clearHighlight}
+                  isDeepDiveActive={!!deepDiveContext}
+                  screenshot={capturedScreenshot}
+                  onCaptureScreenshot={handleCaptureScreenshot}
+                  onClearScreenshot={handleClearScreenshot}
                 />
               </div>
             </div>
