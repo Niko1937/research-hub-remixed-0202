@@ -4,12 +4,23 @@ import { Mail, Building2, MessageSquare, Users, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import ExpertNetworkGraph from "@/components/charts/ExpertNetworkGraph";
 
+interface PathNode {
+  employee_id: string;
+  name: string;
+  role: string;
+  department: string;
+}
+
 interface Expert {
+  employee_id?: string;
   name: string;
   affiliation: string;
   role: string;
+  mail?: string;
   approachability: 'direct' | 'introduction' | 'via_manager';
   connectionPath?: string;
+  pathDetails?: PathNode[];
+  distance?: number;
   suggestedQuestions: string[];
   contactMethods: ('slack' | 'email' | 'request_intro' | 'ask_manager')[];
 }
