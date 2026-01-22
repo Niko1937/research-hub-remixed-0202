@@ -69,7 +69,54 @@ export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: Cited
 
   return (
     <div className="space-y-4">
-      {/* Sources Section - Collapsible (shown first) */}
+      {/* Answer Section - Markdown rendered first */}
+      {summary && (
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h1: ({ children }) => <h1 className="text-lg font-bold text-foreground mt-4 mb-2">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-base font-semibold text-foreground mt-3 mb-2">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-sm font-semibold text-foreground mt-2 mb-1">{children}</h3>,
+              p: ({ children }) => <p className="text-sm text-foreground leading-relaxed mb-3">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc list-inside text-sm text-foreground mb-3 space-y-1">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-foreground mb-3 space-y-1">{children}</ol>,
+              li: ({ children }) => <li className="text-sm text-foreground">{children}</li>,
+              a: ({ href, children }) => (
+                <a href={href} className="text-primary hover:text-highlight underline" target="_blank" rel="noopener noreferrer">
+                  {children}
+                </a>
+              ),
+              code: ({ children, className }) => {
+                const isInline = !className;
+                return isInline ? (
+                  <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
+                ) : (
+                  <code className="block bg-muted p-3 rounded-lg text-xs font-mono overflow-x-auto">{children}</code>
+                );
+              },
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-2 border-primary pl-4 italic text-muted-foreground my-3">
+                  {children}
+                </blockquote>
+              ),
+              table: ({ children }) => (
+                <div className="overflow-x-auto my-3">
+                  <table className="min-w-full border border-border text-sm">{children}</table>
+                </div>
+              ),
+              th: ({ children }) => <th className="border border-border bg-muted px-3 py-2 text-left font-medium">{children}</th>,
+              td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
+              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+              em: ({ children }) => <em className="italic">{children}</em>,
+            }}
+          >
+            {summary}
+          </ReactMarkdown>
+        </div>
+      )}
+
+      {/* Sources Section - Collapsible (shown after answer) */}
       {papers.length > 0 && (
         <Collapsible open={isSourcesOpen} onOpenChange={setIsSourcesOpen}>
           <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
@@ -97,7 +144,6 @@ export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: Cited
                     className="p-3 bg-card border-border hover:bg-card-hover hover:shadow-hover transition-all group"
                   >
                     <div className="flex items-start gap-3">
-                      {/* Citation Number */}
                       <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
                         {paper.id || index + 1}
                       </div>
@@ -141,7 +187,6 @@ export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: Cited
                           </Badge>
                           
                           <div className="flex items-center gap-2">
-                            {/* DeepDive Button */}
                             {paper.url && onDeepDive && (
                               <Button
                                 variant="ghost"
@@ -157,7 +202,6 @@ export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: Cited
                               </Button>
                             )}
                             
-                            {/* Open Button */}
                             <button
                               className="flex items-center gap-1 text-xs text-primary hover:text-highlight transition-colors"
                               onClick={() =>
@@ -182,62 +226,6 @@ export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: Cited
             </div>
           </CollapsibleContent>
         </Collapsible>
-      )}
-
-      {/* Answer Section - Markdown rendered below sources */}
-      {summary && (
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              // Style headers
-              h1: ({ children }) => <h1 className="text-lg font-bold text-foreground mt-4 mb-2">{children}</h1>,
-              h2: ({ children }) => <h2 className="text-base font-semibold text-foreground mt-3 mb-2">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-sm font-semibold text-foreground mt-2 mb-1">{children}</h3>,
-              // Style paragraphs
-              p: ({ children }) => <p className="text-sm text-foreground leading-relaxed mb-3">{children}</p>,
-              // Style lists
-              ul: ({ children }) => <ul className="list-disc list-inside text-sm text-foreground mb-3 space-y-1">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-foreground mb-3 space-y-1">{children}</ol>,
-              li: ({ children }) => <li className="text-sm text-foreground">{children}</li>,
-              // Style links
-              a: ({ href, children }) => (
-                <a href={href} className="text-primary hover:text-highlight underline" target="_blank" rel="noopener noreferrer">
-                  {children}
-                </a>
-              ),
-              // Style code
-              code: ({ children, className }) => {
-                const isInline = !className;
-                return isInline ? (
-                  <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
-                ) : (
-                  <code className="block bg-muted p-3 rounded-lg text-xs font-mono overflow-x-auto">{children}</code>
-                );
-              },
-              // Style blockquotes
-              blockquote: ({ children }) => (
-                <blockquote className="border-l-2 border-primary pl-4 italic text-muted-foreground my-3">
-                  {children}
-                </blockquote>
-              ),
-              // Style tables
-              table: ({ children }) => (
-                <div className="overflow-x-auto my-3">
-                  <table className="min-w-full border border-border text-sm">{children}</table>
-                </div>
-              ),
-              th: ({ children }) => <th className="border border-border bg-muted px-3 py-2 text-left font-medium">{children}</th>,
-              td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
-              // Style strong/bold
-              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-              // Style emphasis/italic
-              em: ({ children }) => <em className="italic">{children}</em>,
-            }}
-          >
-            {summary}
-          </ReactMarkdown>
-        </div>
       )}
     </div>
   );
