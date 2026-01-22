@@ -10,10 +10,8 @@ import { HTMLViewer } from "@/components/HTMLViewer";
 import { ThemeEvaluation } from "@/components/ThemeEvaluation";
 import { KnowWhoResults } from "@/components/KnowWhoResults";
 import { SearchResultItem } from "@/components/SearchResultItem";
-import { UseCaseCards } from "@/components/UseCaseCards";
 import { HeroSection } from "@/components/HeroSection";
-import { ConceptSections } from "@/components/ConceptSections";
-import { ExtensibilityMatrix } from "@/components/ExtensibilityMatrix";
+import { ValueProposition } from "@/components/ValueProposition";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
 import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { DeepDiveBanner, DeepDiveSource, VirtualFile } from "@/components/DeepDiveBanner";
@@ -550,7 +548,7 @@ const Index = () => {
                       <X className="h-5 w-5" />
                     </Button>
                     <HeroSection />
-                    <ExtensibilityMatrix />
+                    <ValueProposition />
                   </div>
                 ) : (
                   <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
