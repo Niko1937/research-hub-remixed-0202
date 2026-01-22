@@ -170,7 +170,7 @@ const Index = () => {
   const [clearHighlightSignal, setClearHighlightSignal] = useState(0);
   const [pendingHtmlAutoOpen, setPendingHtmlAutoOpen] = useState(false);
   const [lastHtmlItemTimestamp, setLastHtmlItemTimestamp] = useState<number | null>(null);
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
   const [deepDiveContext, setDeepDiveContext] = useState<DeepDiveContext | null>(null);
   const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
   const isMobile = useIsMobile();
