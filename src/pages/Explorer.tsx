@@ -16,6 +16,8 @@ import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { DeepDiveBanner, DeepDiveSource, VirtualFile } from "@/components/DeepDiveBanner";
 import { DeepFileSearchResults } from "@/components/DeepFileSearchResults";
 import { CitedAnswer } from "@/components/CitedAnswer";
+import { PromptSamples } from "@/components/PromptSamples";
+import { FollowUpActions, generateFollowUpActions, FollowUpAction } from "@/components/FollowUpActions";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -628,6 +630,7 @@ const Explorer = () => {
                         <p className="text-muted-foreground max-w-md">
                           研究に関する質問や、論文の解説、アイデアの整理など、何でもお手伝いします
                         </p>
+                        <PromptSamples onPromptClick={(prompt) => handleSubmit(prompt)} />
                       </div>
                     ) : (
                       <div className="space-y-6">
@@ -782,6 +785,45 @@ const Explorer = () => {
                             <span className="text-sm">AI が回答を生成中...</span>
                           </div>
                         )}
+
+                        {/* Follow-up Actions */}
+                        {!isLoading && timeline.length > 0 && (() => {
+                          // Find the last meaningful result to generate follow-ups
+                          const lastItem = [...timeline].reverse().find(item => 
+                            ["assistant_message", "research_result", "positioning_analysis", "knowwho_result", "deep_file_search"].includes(item.type)
+                          );
+                          
+                          if (!lastItem) return null;
+                          
+                          // Find the last user query
+                          const lastUserMessage = [...timeline].reverse().find(item => item.type === "user_message");
+                          const lastQuery = lastUserMessage?.data?.content || "";
+                          
+                          let resultType: "wide_knowledge" | "deep_file_search" | "research_result" | "positioning" | "knowwho" = "wide_knowledge";
+                          
+                          if (lastItem.type === "deep_file_search") {
+                            resultType = "deep_file_search";
+                          } else if (lastItem.type === "positioning_analysis") {
+                            resultType = "positioning";
+                          } else if (lastItem.type === "knowwho_result") {
+                            resultType = "knowwho";
+                          } else if (lastItem.type === "research_result") {
+                            resultType = "research_result";
+                          }
+                          
+                          const actions = generateFollowUpActions(lastQuery, resultType);
+                          
+                          const handleFollowUpClick = (action: FollowUpAction) => {
+                            handleSubmit(action.prompt, action.tool as any);
+                          };
+                          
+                          return (
+                            <FollowUpActions 
+                              actions={actions} 
+                              onActionClick={handleFollowUpClick}
+                            />
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
