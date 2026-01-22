@@ -173,7 +173,6 @@ const Index = () => {
   const [showIntro, setShowIntro] = useState(true);
   const [deepDiveContext, setDeepDiveContext] = useState<DeepDiveContext | null>(null);
   const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
-  const pdfViewerRef = useRef<{ captureCurrentView: () => Promise<string> } | null>(null);
   const isMobile = useIsMobile();
 
   const clearHighlight = useCallback(() => {
@@ -289,14 +288,8 @@ const Index = () => {
   }, []);
 
   const handleCaptureScreenshot = useCallback(async () => {
-    if (pdfViewerRef.current) {
-      try {
-        const screenshot = await pdfViewerRef.current.captureCurrentView();
-        setCapturedScreenshot(screenshot);
-      } catch (error) {
-        console.error("Failed to capture screenshot:", error);
-      }
-    }
+    // Screenshot feature temporarily disabled
+    console.log("Screenshot capture not yet implemented");
   }, []);
 
   const handleClearScreenshot = useCallback(() => {
