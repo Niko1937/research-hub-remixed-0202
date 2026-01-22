@@ -17,6 +17,7 @@ import { ExtensibilityMatrix } from "@/components/ExtensibilityMatrix";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
 import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { DeepDiveBanner, DeepDiveSource, VirtualFile } from "@/components/DeepDiveBanner";
+import { CitedAnswer } from "@/components/CitedAnswer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -751,6 +752,24 @@ const Index = () => {
                               if (prevItem && prevItem.type === "knowwho_result") {
                                 return null;
                               }
+                              
+                              // If message has sources, use CitedAnswer component
+                              if (item.data.sources && item.data.sources.length > 0) {
+                                return (
+                                  <div key={index} className="flex justify-start w-full">
+                                    <div className="w-full rounded-lg p-4">
+                                      <CitedAnswer
+                                        summary={item.data.content}
+                                        papers={item.data.sources}
+                                        onPaperClick={openPdfDocument}
+                                        onDeepDive={handleDeepDive}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              
+                              // Regular assistant message without sources
                               return (
                                 <div key={index} className="flex justify-start w-full">
                                   <div className="w-full rounded-lg p-4">

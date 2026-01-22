@@ -5,6 +5,17 @@ export interface Message {
   content: string;
 }
 
+export interface Source {
+  id: number;
+  title: string;
+  abstract?: string;
+  authors: string[];
+  year: string;
+  source: string;
+  url: string;
+  citations?: number;
+}
+
 export interface TimelineItem {
   type: "user_message" | "thinking" | "research_result" | "theme_evaluation" | "knowwho_result" | "positioning_analysis" | "seeds_needs_matching" | "html_generation" | "assistant_message";
   timestamp: number;
@@ -204,7 +215,23 @@ export function useResearchChat() {
                 continue;
               }
 
-              // Handle research data from search mode
+              // Handle final_answer with sources (consolidated Wide Research results)
+              if (parsed.type === "final_answer") {
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "assistant_message",
+                    timestamp: Date.now(),
+                    data: {
+                      content: parsed.content || "",
+                      sources: parsed.sources || [],
+                    },
+                  },
+                ]);
+                continue;
+              }
+
+              // Handle research data from search mode (legacy - still used for search mode)
               if (parsed.type === "research_data") {
                 setTimeline((prev) => [
                   ...prev,
@@ -424,18 +451,23 @@ export function useResearchChat() {
                 continue;
               }
 
-              // Handle AI response
+              // Handle AI response - only for regular streaming (non-final_answer)
               const content = parsed.choices?.[0]?.delta?.content as string | undefined;
               if (content) {
                 assistantContent += content;
                 setTimeline((prev) => {
                   const last = prev[prev.length - 1];
-                  if (last?.type === "assistant_message") {
+                  // Only update if last item is an assistant_message WITHOUT sources
+                  if (last?.type === "assistant_message" && !last.data.sources) {
                     return prev.map((item, i) =>
                       i === prev.length - 1
-                        ? { ...item, data: { content: assistantContent } }
+                        ? { ...item, data: { ...item.data, content: assistantContent } }
                         : item
                     );
+                  }
+                  // Don't create new assistant message if we already have one with sources
+                  if (last?.type === "assistant_message" && last.data.sources) {
+                    return prev;
                   }
                   return [
                     ...prev,

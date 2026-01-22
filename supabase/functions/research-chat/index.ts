@@ -556,7 +556,8 @@ ${paperContext}
                   console.error("Failed to generate summary:", e);
                 }
 
-                // Store results for later use (include summary)
+                // Store results for later use (include summary) - DO NOT send research_data event here
+                // Results will be accumulated and sent as final_answer at the end
                 toolResults.push({
                   tool: "wide-knowledge",
                   query: step.query,
@@ -564,15 +565,8 @@ ${paperContext}
                   summary: summary
                 });
 
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "research_data",
-                      summary: summary,
-                      external: numberedPapers,
-                    })}\n\n`
-                  )
-                );
+                // Log that we accumulated papers (no UI event sent)
+                console.log(`[wide-knowledge] Accumulated ${numberedPapers.length} papers for query: ${step.query}`);
               } else if (step.tool === "knowwho") {
                 // Build context from conversation history and previous tool results
                 let knowWhoContext = `ユーザーの質問「${userMessage}」に関連する専門家・研究者を検索します。`;
@@ -1298,32 +1292,101 @@ ${toolResultsContext}
               contextPrompt += `\n\n## 📸 スクリーンショット添付\nユーザーがPDFの特定部分のスクリーンショットを添付しています。この画像に含まれる図表やグラフを分析して回答に含めてください。`;
             }
 
-            const summaryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                model: "google/gemini-2.5-flash",
-                messages: [
-                  { role: "system", content: contextPrompt },
-                  ...messages,
-                ],
-                stream: true,
-              }),
-            });
-
-            if (summaryResponse.ok && summaryResponse.body) {
-              const reader = summaryResponse.body.getReader();
-              try {
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  controller.enqueue(value);
+            // Collect all sources from wide-knowledge tool results
+            const allSources: any[] = [];
+            let sourceIdCounter = 1;
+            for (const result of toolResults) {
+              if (result.tool === "wide-knowledge" && result.results) {
+                for (const paper of result.results) {
+                  // Re-assign sequential IDs across all wide-knowledge results
+                  allSources.push({
+                    ...paper,
+                    id: sourceIdCounter++
+                  });
                 }
-              } finally {
-                reader.releaseLock();
+              }
+            }
+
+            // If we have sources from wide-knowledge, use non-streaming and send final_answer
+            if (allSources.length > 0) {
+              // Build paper context for citation
+              const paperContext = allSources.map(p => 
+                `[${p.id}] "${p.title}" (${p.authors.slice(0, 3).join(", ")}${p.authors.length > 3 ? " et al." : ""}, ${p.year})\n概要: ${p.abstract?.substring(0, 300) || "N/A"}...`
+              ).join("\n\n");
+
+              const citedAnswerPrompt = `${contextPrompt}
+
+## 参照可能な論文（出典として引用してください）
+${paperContext}
+
+## 引用の指示
+- ユーザーの質問に対して、上記の論文を出典として引用しながら回答してください
+- 回答は400-800文字程度の日本語で
+- 文中で論文を引用する際は [1]、[2] のように番号で参照
+- 必ず複数の論文を引用して回答を裏付ける
+- 引用は自然な文脈で埋め込む（例：「〇〇という手法が提案されています[1]」）
+- Markdownフォーマットで回答してください（見出し、リスト、強調など使用可）`;
+
+              const summaryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "google/gemini-2.5-flash",
+                  messages: [
+                    { role: "system", content: citedAnswerPrompt },
+                    ...messages,
+                  ],
+                  max_tokens: 2000,
+                }),
+              });
+
+              if (summaryResponse.ok) {
+                const summaryData = await summaryResponse.json();
+                const finalContent = summaryData.choices?.[0]?.message?.content || "";
+                
+                // Send final_answer with content and sources
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "final_answer",
+                      content: finalContent,
+                      sources: allSources,
+                    })}\n\n`
+                  )
+                );
+              }
+            } else {
+              // No sources - use streaming for regular chat response
+              const summaryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "google/gemini-2.5-flash",
+                  messages: [
+                    { role: "system", content: contextPrompt },
+                    ...messages,
+                  ],
+                  stream: true,
+                }),
+              });
+
+              if (summaryResponse.ok && summaryResponse.body) {
+                const reader = summaryResponse.body.getReader();
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    controller.enqueue(value);
+                  }
+                } finally {
+                  reader.releaseLock();
+                }
               }
             }
 
