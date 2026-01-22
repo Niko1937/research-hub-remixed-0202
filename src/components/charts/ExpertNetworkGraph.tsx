@@ -333,28 +333,42 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
                 className="transition-all duration-150"
               />
               
+              {/* 有識者マーカー（★） */}
+              {isExpert && (
+                <text
+                  y={5}
+                  textAnchor="middle"
+                  fill="white"
+                  fontSize={12}
+                  fontWeight={700}
+                >
+                  ★
+                </text>
+              )}
+              
               {/* 名前ラベル */}
               <text
                 x={radius + 6}
                 y={3}
                 textAnchor="start"
                 fill="hsl(var(--foreground))"
-                fontSize={11}
+                fontSize={isExpert ? 12 : 11}
                 fontWeight={isExpert || isUser ? 600 : 400}
               >
                 {node.label}
+                {isExpert && " (有識者)"}
               </text>
 
               {/* 役職（エキスパートと自分のみ） */}
               {(isExpert || isUser) && (
                 <text
                   x={radius + 6}
-                  y={15}
+                  y={16}
                   textAnchor="start"
                   fill="hsl(var(--muted-foreground))"
-                  fontSize={9}
+                  fontSize={10}
                 >
-                  {node.role.length > 12 ? node.role.slice(0, 11) + '…' : node.role}
+                  {node.role.length > 15 ? node.role.slice(0, 14) + '…' : node.role}
                 </text>
               )}
             </g>
@@ -362,18 +376,18 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
         })}
 
         {/* 凡例 */}
-        <g transform={`translate(${svgWidth - 120}, ${svgHeight - 90})`}>
-          <rect x={-8} y={-14} width={110} height={85} fill="hsl(var(--background))" rx={4} opacity={0.9} />
+        <g transform={`translate(${svgWidth - 130}, ${svgHeight - 95})`}>
+          <rect x={-8} y={-14} width={120} height={90} fill="hsl(var(--background))" rx={4} opacity={0.9} />
           <text fill="hsl(var(--foreground))" fontSize={10} fontWeight={600}>凡例</text>
           {[
-            { color: 'hsl(var(--primary))', label: '自分' },
-            { color: 'hsl(142, 76%, 36%)', label: 'すぐ話せる' },
-            { color: 'hsl(38, 92%, 50%)', label: '紹介経由' },
-            { color: 'hsl(0, 84%, 60%)', label: '上司経由' },
+            { color: 'hsl(var(--primary))', label: '自分', marker: '' },
+            { color: 'hsl(142, 76%, 36%)', label: '有識者（直接）', marker: '★' },
+            { color: 'hsl(38, 92%, 50%)', label: '有識者（紹介経由）', marker: '★' },
+            { color: 'hsl(0, 84%, 60%)', label: '有識者（上司経由）', marker: '★' },
           ].map((item, idx) => (
-            <g key={item.label} transform={`translate(0, ${14 + idx * 16})`}>
+            <g key={item.label} transform={`translate(0, ${14 + idx * 17})`}>
               <circle r={5} cx={6} cy={0} fill={item.color} />
-              <text x={16} y={3} fill="hsl(var(--muted-foreground))" fontSize={9}>
+              <text x={16} y={4} fill="hsl(var(--muted-foreground))" fontSize={9}>
                 {item.label}
               </text>
             </g>

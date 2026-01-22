@@ -749,14 +749,44 @@ ${paperContext}
                   )
                 );
                 
-                // Search candidates from mock data
-                const candidates = mockEmployees.filter(e => 
-                  e.employee_id !== CURRENT_USER_ID && 
-                  (relevantDepartments.some(dept => e.department.includes(dept)) ||
-                   e.job_title.toLowerCase().includes("研究") ||
-                   e.job_title.toLowerCase().includes("ml") ||
-                   e.job_title.toLowerCase().includes("ai"))
-                );
+                // Search candidates from mock data - prioritize by organizational proximity
+                // 現実的な有識者選定: 近いチームから優先的に選ぶ
+                const currentUser = getEmployeeById(CURRENT_USER_ID);
+                
+                // Calculate organizational distance for all potential experts
+                const candidatesWithDistance = mockEmployees
+                  .filter(e => 
+                    e.employee_id !== CURRENT_USER_ID && 
+                    e.employee_id !== currentUser?.manager_employee_id && // 直属上司は除外
+                    !e.job_title.includes("CEO") && // 経営層は除外
+                    !e.job_title.includes("執行役") && // 役員は除外
+                    (relevantDepartments.some(dept => e.department.includes(dept)) ||
+                     e.job_title.toLowerCase().includes("研究") ||
+                     e.job_title.toLowerCase().includes("ml") ||
+                     e.job_title.toLowerCase().includes("ai") ||
+                     e.job_title.toLowerCase().includes("エンジニア"))
+                  )
+                  .map(e => {
+                    const { distance } = findPathBetween(CURRENT_USER_ID, e.employee_id);
+                    const sameDept = e.department === currentUser?.department;
+                    return { ...e, distance, sameDept };
+                  })
+                  .sort((a, b) => {
+                    // 同じ部署を優先、その次に距離が近い順
+                    if (a.sameDept && !b.sameDept) return -1;
+                    if (!a.sameDept && b.sameDept) return 1;
+                    return a.distance - b.distance;
+                  });
+                
+                // 現実的な有識者分布: 2-4名に絞る
+                // - 同じチーム（直接話せる）: 1-2名
+                // - 隣のチーム（紹介経由）: 1名
+                // - 遠いチーム（上司経由）: 0-1名（まれに）
+                const directCandidates = candidatesWithDistance.filter(c => c.sameDept).slice(0, 2);
+                const introCandidates = candidatesWithDistance.filter(c => !c.sameDept && c.distance <= 4).slice(0, 1);
+                const viaManagerCandidates = candidatesWithDistance.filter(c => !c.sameDept && c.distance > 4).slice(0, 1);
+                
+                const candidates = [...directCandidates, ...introCandidates, ...viaManagerCandidates].slice(0, 4);
                 
                 // Step 3: Stream thinking - calculating paths
                 controller.enqueue(
@@ -771,7 +801,7 @@ ${paperContext}
                 );
                 
                 // Calculate paths and build expert results
-                const experts = candidates.slice(0, 6).map(candidate => {
+                const experts = candidates.map(candidate => {
                   const { fullPath, distance } = findPathBetween(CURRENT_USER_ID, candidate.employee_id);
                   const approachability = calculateApproachability(CURRENT_USER_ID, candidate.employee_id);
                   
