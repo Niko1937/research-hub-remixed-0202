@@ -2,32 +2,39 @@ import researchHeroImage from "@/assets/research-hero.jpg";
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 to-transparent">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 md:pt-20 pb-6 sm:pb-8">
-        <div className="text-center mb-6 sm:mb-8 animate-fade-in">
-          <p className="text-xs sm:text-sm uppercase tracking-widest text-primary mb-3">
-            Research Assistant AI
+    <section className="relative overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+      
+      <div className="relative max-w-6xl mx-auto px-6 sm:px-8 pt-16 sm:pt-24 lg:pt-32 pb-8 sm:pb-12">
+        {/* Text Content */}
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
+          <p className="inline-block text-[10px] sm:text-xs uppercase tracking-[0.25em] text-primary/80 font-medium mb-4 sm:mb-6 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5">
+            Research Assistant
           </p>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-foreground leading-tight mb-4">
-            研究に集中できる時間を、
-            <br className="hidden sm:block" />
-            <span className="text-primary">もっと。</span>
+          
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-foreground leading-[1.1] tracking-tight mb-5 sm:mb-6">
+            研究に集中する時間を、
+            <span className="block text-primary mt-1">もっと。</span>
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            論文調査・理解・専門家探しを対話的AIが支援。
-            <br className="hidden sm:block" />
+          
+          <p className="text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto">
+            論文調査・理解・専門家探しを対話AIが支援。
+            <span className="hidden sm:inline"><br /></span>
             「調べる」から「理解する」「つながる」へ。
           </p>
         </div>
         
         {/* Hero Image */}
-        <div className="relative rounded-xl overflow-hidden aspect-[21/9] animate-fade-in shadow-xl max-w-4xl mx-auto">
-          <img 
-            src={researchHeroImage} 
-            alt="AI-powered research visualization"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
+        <div className="relative max-w-4xl mx-auto">
+          <div className="relative rounded-2xl overflow-hidden aspect-[2.4/1] shadow-2xl ring-1 ring-white/10">
+            <img 
+              src={researchHeroImage} 
+              alt="AI-powered research visualization"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+          </div>
         </div>
       </div>
     </section>

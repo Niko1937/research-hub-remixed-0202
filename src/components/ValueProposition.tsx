@@ -1,4 +1,4 @@
-import { Clock, Brain, Users, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Clock, Lightbulb, Users, ArrowRight, CheckCircle2, Layers } from "lucide-react";
 
 export function ValueProposition() {
   const painPoints = [
@@ -17,43 +17,43 @@ export function ValueProposition() {
   ];
 
   const valueFlow = [
-    { label: "調べる", sublabel: "Search", icon: Clock },
-    { label: "理解する", sublabel: "Understand", icon: Brain },
-    { label: "つながる", sublabel: "Connect", icon: Users },
+    { label: "調べる", icon: Clock },
+    { label: "理解する", icon: Lightbulb },
+    { label: "つながる", icon: Users },
   ];
 
   return (
-    <section className="py-10 sm:py-16">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        {/* Researcher Pain Points */}
-        <div className="text-center mb-10">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+    <section className="py-16 sm:py-24 lg:py-32">
+      <div className="max-w-5xl mx-auto px-6 sm:px-8">
+        
+        {/* Section Header */}
+        <div className="text-center mb-12 sm:mb-16">
+          <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
             For Researchers
           </p>
-          <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground tracking-tight">
             研究者の「時間」を取り戻す
           </h2>
-          <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-            論文調査、理解、専門家探し——研究の本質ではない作業に、どれだけの時間を費やしていますか？
-          </p>
         </div>
 
-        {/* Pain → Solution Cards */}
-        <div className="space-y-4 mb-12">
+        {/* Pain → Solution */}
+        <div className="space-y-3 sm:space-y-4 mb-16 sm:mb-20">
           {painPoints.map((item, index) => (
             <div
               key={index}
-              className="bg-card border border-border rounded-lg p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6"
+              className="group bg-card/60 backdrop-blur border border-border/50 rounded-xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 hover:bg-card/80 transition-colors"
             >
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground line-through decoration-muted-foreground/50">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm sm:text-base text-muted-foreground/70 line-through decoration-muted-foreground/30">
                   {item.problem}
                 </p>
               </div>
-              <ArrowRight className="w-4 h-4 text-primary hidden sm:block flex-shrink-0" />
-              <div className="flex-1 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm font-medium text-foreground">
+              
+              <ArrowRight className="w-4 h-4 text-primary/60 hidden sm:block flex-shrink-0 group-hover:text-primary transition-colors" />
+              
+              <div className="flex-1 min-w-0 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                <p className="text-sm sm:text-base font-medium text-foreground leading-relaxed">
                   {item.solution}
                 </p>
               </div>
@@ -61,40 +61,40 @@ export function ValueProposition() {
           ))}
         </div>
 
-        {/* Value Flow Visual */}
-        <div className="flex items-center justify-center gap-2 sm:gap-4 mb-10">
+        {/* Value Flow */}
+        <div className="flex items-center justify-center gap-4 sm:gap-8 lg:gap-12 mb-16 sm:mb-20">
           {valueFlow.map((step, index) => {
             const Icon = step.icon;
             return (
-              <div key={index} className="flex items-center gap-2 sm:gap-4">
+              <div key={index} className="flex items-center gap-4 sm:gap-8 lg:gap-12">
                 <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center mb-1">
-                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-2 sm:mb-3">
+                    <Icon className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-primary" />
                   </div>
-                  <span className="text-xs sm:text-sm font-semibold text-foreground">{step.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{step.sublabel}</span>
+                  <span className="text-sm sm:text-base lg:text-lg font-semibold text-foreground">{step.label}</span>
                 </div>
                 {index < valueFlow.length - 1 && (
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                  <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground/40" />
                 )}
               </div>
             );
           })}
         </div>
 
-        {/* Extensibility Note */}
-        <div className="bg-muted/30 border border-border rounded-lg p-4 sm:p-5 text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
-              Extensible Architecture
+        {/* Extensibility */}
+        <div className="bg-muted/20 border border-border/50 rounded-2xl p-6 sm:p-8 text-center">
+          <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+            <Layers className="w-3.5 h-3.5 text-primary" />
+            <span className="text-[10px] sm:text-xs font-semibold text-primary uppercase tracking-wider">
+              Extensible
             </span>
           </div>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto">
-            対話UIの裏側で、Agentを追加するだけで機能が拡張可能。
-            社内ナレッジ検索、定例報告自動生成、実験計画支援など、ニーズに応じて成長します。
+          <p className="text-sm sm:text-base text-muted-foreground max-w-lg mx-auto leading-relaxed">
+            対話UIの裏側で、Agentを追加するだけで機能拡張。
+            社内ナレッジ検索、定例報告自動生成など、ニーズに応じて成長します。
           </p>
         </div>
+        
       </div>
     </section>
   );
