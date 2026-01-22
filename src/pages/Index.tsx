@@ -17,6 +17,7 @@ import { ExtensibilityMatrix } from "@/components/ExtensibilityMatrix";
 import { PositioningAnalysis } from "@/components/PositioningAnalysis";
 import { SeedsNeedsMatching } from "@/components/SeedsNeedsMatching";
 import { DeepDiveBanner, DeepDiveSource, VirtualFile } from "@/components/DeepDiveBanner";
+import { DeepFileSearchResults } from "@/components/DeepFileSearchResults";
 import { CitedAnswer } from "@/components/CitedAnswer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
@@ -701,6 +702,14 @@ const Index = () => {
                                   seedTitle={item.data.seedTitle}
                                   seedDescription={item.data.seedDescription}
                                   candidates={item.data.candidates}
+                                />
+                              );
+                            
+                            case "deep_file_search":
+                              return (
+                                <DeepFileSearchResults
+                                  key={index}
+                                  results={item.data.results}
                                 />
                               );
                             
