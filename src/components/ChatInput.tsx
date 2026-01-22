@@ -75,14 +75,21 @@ export function ChatInput({
         {/* Unified Chat Input Component */}
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           {/* PDF Context Indicators */}
-          {(highlightedText || pdfContext || screenshot) && (
+          {(highlightedText || pdfContext || screenshot || isDeepDiveActive) && (
             <div className="px-4 pt-3 pb-2 space-y-2">
-              {pdfContext && (
-                <Badge variant="secondary" className="gap-1.5">
-                  <FileText className="w-3 h-3" />
-                  <span className="text-xs">PDF参照中</span>
-                </Badge>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                {isDeepDiveActive && (
+                  <Badge className="gap-1.5 bg-primary/20 text-primary border-primary/30">
+                    <span className="text-xs font-medium">🔬 DeepDive中</span>
+                  </Badge>
+                )}
+                {pdfContext && (
+                  <Badge variant="secondary" className="gap-1.5">
+                    <FileText className="w-3 h-3" />
+                    <span className="text-xs">PDF参照中</span>
+                  </Badge>
+                )}
+              </div>
               {highlightedText && (
                 <Badge 
                   className="gap-2 pr-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800 max-w-full"
