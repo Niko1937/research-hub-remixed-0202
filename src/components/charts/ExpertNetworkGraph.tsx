@@ -34,7 +34,7 @@ interface NetworkNode {
 interface NetworkEdge {
   source: string;
   target: string;
-  approachability?: 'direct' | 'introduction' | 'via_manager';
+  expertId: string; // どのエキスパートへの経路か
 }
 
 interface ExpertNetworkGraphProps {
@@ -48,7 +48,7 @@ const getRoleLevel = (role: string): number => {
   if (roleLower.includes('執行役') || roleLower.includes('vp') || roleLower.includes('vice president') || roleLower.includes('役員') || roleLower.includes('cto') || roleLower.includes('cso') || roleLower.includes('cfo')) return 3;
   if (roleLower.includes('部長') || roleLower.includes('director') || roleLower.includes('manager') || roleLower.includes('教授')) return 2;
   if (roleLower.includes('課長') || roleLower.includes('lead') || roleLower.includes('主任') || roleLower.includes('准教授') || roleLower.includes('講師')) return 1;
-  return 0; // 一般社員・研究員
+  return 0;
 };
 
 // 職階レベルのラベル
@@ -62,8 +62,8 @@ const getRoleLevelLabel = (level: number): string => {
   }
 };
 
-// アプローチ分類の色
-const getApproachabilityColor = (approachability?: string): string => {
+// エキスパートのアプローチ色
+const getExpertColor = (approachability?: string): string => {
   switch (approachability) {
     case 'direct': return 'hsl(142, 76%, 36%)';
     case 'introduction': return 'hsl(38, 92%, 50%)';
@@ -76,12 +76,12 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredExpertPath, setHoveredExpertPath] = useState<Set<string> | null>(null);
 
-  const svgWidth = 900;
-  const svgHeight = 500;
-  const topMargin = 50;
-  const bottomMargin = 70;
-  const leftMargin = 80;
-  const rightMargin = 40;
+  const svgWidth = 800;
+  const svgHeight = 420;
+  const topMargin = 40;
+  const bottomMargin = 60;
+  const leftMargin = 70;
+  const rightMargin = 30;
 
   const { nodes, edges, roleLevels, expertPaths } = useMemo(() => {
     const nodeMap = new Map<string, NetworkNode>();
@@ -89,10 +89,11 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
     const roleLevelSet = new Set<number>();
     const expertPathsMap = new Map<string, Set<string>>();
 
-    // 各エキスパートのpathDetailsからノードとエッジを抽出
     experts.forEach(expert => {
       if (expert.pathDetails && expert.pathDetails.length > 0) {
         const pathNodeIds = new Set<string>();
+        const expertNodeId = expert.pathDetails[expert.pathDetails.length - 1].employee_id || 
+                            `node-${expert.pathDetails[expert.pathDetails.length - 1].name}`;
         
         for (let i = 0; i < expert.pathDetails.length; i++) {
           const pathNode = expert.pathDetails[i];
@@ -102,12 +103,10 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
           const nodeId = pathNode.employee_id || `node-${pathNode.name}`;
           pathNodeIds.add(nodeId);
           
-          // ノードを追加（重複排除）
           if (!nodeMap.has(nodeId)) {
             const roleLevel = getRoleLevel(pathNode.role);
             roleLevelSet.add(roleLevel);
             
-            // 「自分」かどうかを判定
             const isUser = pathNode.name === '自分' || isFirst;
             
             nodeMap.set(nodeId, {
@@ -117,12 +116,11 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
               department: pathNode.department,
               type: isUser ? 'user' : (isLast ? 'expert' : 'intermediate'),
               approachability: isLast ? expert.approachability : undefined,
-              x: 0, // 後で計算
+              x: 0,
               y: 0,
               roleLevel
             });
           } else if (isLast) {
-            // 既存ノードがエキスパートの場合、タイプを更新
             const existingNode = nodeMap.get(nodeId)!;
             if (existingNode.type !== 'user') {
               existingNode.type = 'expert';
@@ -130,12 +128,10 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
             }
           }
 
-          // エッジを追加（経路上の隣接ノード間）
           if (i > 0) {
             const prevNode = expert.pathDetails[i - 1];
             const prevNodeId = prevNode.employee_id || `node-${prevNode.name}`;
             
-            // 重複エッジを防ぐ
             const edgeExists = edgeList.some(e => 
               (e.source === prevNodeId && e.target === nodeId) ||
               (e.source === nodeId && e.target === prevNodeId)
@@ -145,21 +141,17 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
               edgeList.push({
                 source: prevNodeId,
                 target: nodeId,
-                approachability: isLast ? expert.approachability : undefined
+                expertId: expertNodeId
               });
             }
           }
         }
 
-        // エキスパートごとの経路ノードIDを保存
-        const expertNodeId = expert.pathDetails[expert.pathDetails.length - 1].employee_id || 
-                            `node-${expert.pathDetails[expert.pathDetails.length - 1].name}`;
         expertPathsMap.set(expertNodeId, pathNodeIds);
       }
     });
 
-    // 職階レベルごとにノードをグループ化
-    const sortedLevels = Array.from(roleLevelSet).sort((a, b) => b - a); // 降順（上位が上）
+    const sortedLevels = Array.from(roleLevelSet).sort((a, b) => b - a);
     const nodesByLevel: Map<number, NetworkNode[]> = new Map();
     
     nodeMap.forEach(node => {
@@ -170,7 +162,6 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
       nodesByLevel.get(level)!.push(node);
     });
 
-    // 縦型レイアウト：職階が上のものほど画面上部に配置
     const usableHeight = svgHeight - topMargin - bottomMargin;
     const levelCount = sortedLevels.length || 1;
     const levelSpacing = usableHeight / Math.max(levelCount - 1, 1);
@@ -198,15 +189,12 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
       roleLevels: sortedLevels,
       expertPaths: expertPathsMap
     };
-  }, [experts, svgHeight, svgWidth, topMargin, bottomMargin, leftMargin, rightMargin]);
+  }, [experts]);
 
-  // ホバー時に経路全体をハイライト
   const getHighlightedPath = (nodeId: string): Set<string> | null => {
-    // エキスパートノードの場合、その経路を取得
     if (expertPaths.has(nodeId)) {
       return expertPaths.get(nodeId) || null;
     }
-    // 中間ノードの場合、そのノードを含む全経路を取得
     const allPathNodes = new Set<string>();
     expertPaths.forEach((pathNodes) => {
       if (pathNodes.has(nodeId)) {
@@ -235,202 +223,163 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
     return hoveredExpertPath.has(source) && hoveredExpertPath.has(target);
   };
 
-  // ノードが見つからない場合の表示
   if (nodes.length === 0) {
     return (
-      <div className="w-full p-4 text-center text-muted-foreground">
+      <div className="w-full p-4 text-center text-muted-foreground text-sm">
         経路データがありません
       </div>
     );
   }
 
   return (
-    <div className="w-full">
-      <h4 className="text-sm font-medium text-foreground mb-3">組織経路図</h4>
-      <div className="w-full overflow-x-auto">
-        <svg 
-          width={svgWidth} 
-          height={svgHeight} 
-          className="mx-auto"
-          style={{ minWidth: svgWidth }}
-        >
-          {/* 背景 */}
-          <rect width={svgWidth} height={svgHeight} fill="hsl(var(--card))" rx={8} />
+    <div className="w-full overflow-x-auto">
+      <svg 
+        width={svgWidth} 
+        height={svgHeight} 
+        className="mx-auto"
+        style={{ minWidth: svgWidth }}
+      >
+        {/* 背景 */}
+        <rect width={svgWidth} height={svgHeight} fill="hsl(var(--card))" rx={8} />
 
-          {/* 職階レベルのラベル（左側に縦配置） */}
-          {roleLevels.map((level, idx) => {
-            const usableHeight = svgHeight - topMargin - bottomMargin;
-            const levelCount = roleLevels.length || 1;
-            const y = topMargin + idx * (usableHeight / Math.max(levelCount - 1, 1));
-            
-            return (
-              <g key={`level-label-${level}`}>
-                {/* 横の点線ガイド */}
-                <line
-                  x1={leftMargin - 10}
-                  y1={y}
-                  x2={svgWidth - rightMargin + 10}
-                  y2={y}
-                  stroke="hsl(var(--border))"
-                  strokeWidth={1}
-                  strokeDasharray="4 4"
-                  opacity={0.4}
-                />
-                <text
-                  x={12}
-                  y={y + 4}
-                  fill="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  fontWeight={500}
-                  textAnchor="start"
-                >
-                  {getRoleLevelLabel(level)}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* エッジ */}
-          {edges.map((edge, idx) => {
-            const sourceNode = nodes.find(n => n.id === edge.source);
-            const targetNode = nodes.find(n => n.id === edge.target);
-            if (!sourceNode || !targetNode) return null;
-
-            const isHighlighted = isEdgeHighlighted(edge.source, edge.target);
-            const edgeColor = edge.approachability 
-              ? getApproachabilityColor(edge.approachability)
-              : 'hsl(var(--muted-foreground))';
-
-            // 曲線パスを使用してエッジを描画
-            const midY = (sourceNode.y + targetNode.y) / 2;
-            const pathD = `M ${sourceNode.x} ${sourceNode.y} Q ${(sourceNode.x + targetNode.x) / 2} ${midY} ${targetNode.x} ${targetNode.y}`;
-
-            return (
-              <path
-                key={`edge-${idx}`}
-                d={pathD}
-                fill="none"
-                stroke={isHighlighted ? edgeColor : 'hsl(var(--muted-foreground))'}
-                strokeWidth={isHighlighted ? 3 : 1.5}
-                opacity={hoveredNode && !isHighlighted ? 0.15 : isHighlighted ? 1 : 0.5}
-                className="transition-all duration-200"
+        {/* 職階ラベル */}
+        {roleLevels.map((level, idx) => {
+          const usableHeight = svgHeight - topMargin - bottomMargin;
+          const levelCount = roleLevels.length || 1;
+          const y = topMargin + idx * (usableHeight / Math.max(levelCount - 1, 1));
+          
+          return (
+            <g key={`level-label-${level}`}>
+              <line
+                x1={leftMargin - 10}
+                y1={y}
+                x2={svgWidth - rightMargin + 10}
+                y2={y}
+                stroke="hsl(var(--border))"
+                strokeWidth={1}
+                strokeDasharray="4 4"
+                opacity={0.3}
               />
-            );
-          })}
-
-          {/* ノード */}
-          {nodes.map((node) => {
-            const isUser = node.type === 'user';
-            const isExpert = node.type === 'expert';
-            const isIntermediate = node.type === 'intermediate';
-            const radius = isUser ? 26 : isExpert ? 22 : 16;
-            
-            let fillColor: string;
-            if (isUser) {
-              fillColor = 'hsl(var(--primary))';
-            } else if (isExpert) {
-              fillColor = getApproachabilityColor(node.approachability);
-            } else {
-              fillColor = 'hsl(var(--muted))';
-            }
-
-            const isHighlighted = hoveredNode === node.id || isNodeHighlighted(node.id);
-            const isDimmed = hoveredNode && !isHighlighted;
-
-            return (
-              <g
-                key={node.id}
-                transform={`translate(${node.x}, ${node.y})`}
-                onMouseEnter={() => handleNodeHover(node.id)}
-                onMouseLeave={() => handleNodeHover(null)}
-                style={{ cursor: 'pointer' }}
-                opacity={isDimmed ? 0.25 : 1}
-                className="transition-opacity duration-200"
+              <text
+                x={8}
+                y={y + 4}
+                fill="hsl(var(--muted-foreground))"
+                fontSize={10}
+                fontWeight={500}
               >
-                {/* ノード円 */}
-                <circle
-                  r={radius}
-                  fill={fillColor}
-                  stroke={isHighlighted ? "hsl(var(--foreground))" : "hsl(var(--background))"}
-                  strokeWidth={isHighlighted ? 3 : 2}
-                  className="transition-all duration-200"
-                />
-                
-                {/* ユーザーアイコン（自分の場合） */}
-                {isUser && (
-                  <text
-                    y={5}
-                    textAnchor="middle"
-                    fill="hsl(var(--primary-foreground))"
-                    fontSize={16}
-                    fontWeight={700}
-                  >
-                    ★
-                  </text>
-                )}
-                
-                {/* ノードラベル（名前） - 右側に配置 */}
-                <text
-                  x={radius + 8}
-                  y={4}
-                  textAnchor="start"
-                  fill="hsl(var(--foreground))"
-                  fontSize={isIntermediate ? 11 : 12}
-                  fontWeight={isExpert || isUser ? 600 : 500}
-                >
-                  {node.label}
-                </text>
-
-                {/* サブラベル（役職）- 名前の下 */}
-                <text
-                  x={radius + 8}
-                  y={18}
-                  textAnchor="start"
-                  fill="hsl(var(--muted-foreground))"
-                  fontSize={10}
-                >
-                  {node.role.length > 15 ? node.role.slice(0, 14) + '…' : node.role}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* 凡例 */}
-          <g transform={`translate(${svgWidth - 140}, ${svgHeight - 110})`}>
-            <rect 
-              x={-10} 
-              y={-20} 
-              width={130} 
-              height={105} 
-              fill="hsl(var(--background))" 
-              rx={6}
-              opacity={0.9}
-            />
-            <text fill="hsl(var(--foreground))" fontSize={11} fontWeight={600}>
-              アプローチ分類
-            </text>
-            {[
-              { color: 'hsl(142, 76%, 36%)', label: '直接連絡可' },
-              { color: 'hsl(38, 92%, 50%)', label: '紹介経由' },
-              { color: 'hsl(0, 84%, 60%)', label: '上司経由' },
-            ].map((item, idx) => (
-              <g key={item.label} transform={`translate(0, ${18 + idx * 20})`}>
-                <circle r={6} cx={8} cy={0} fill={item.color} />
-                <text x={20} y={4} fill="hsl(var(--muted-foreground))" fontSize={10}>
-                  {item.label}
-                </text>
-              </g>
-            ))}
-            {/* 自分のマーカー */}
-            <g transform={`translate(0, ${18 + 3 * 20})`}>
-              <circle r={6} cx={8} cy={0} fill="hsl(var(--primary))" />
-              <text x={20} y={4} fill="hsl(var(--muted-foreground))" fontSize={10}>
-                自分
+                {getRoleLevelLabel(level)}
               </text>
             </g>
-          </g>
-        </svg>
-      </div>
+          );
+        })}
+
+        {/* エッジ */}
+        {edges.map((edge, idx) => {
+          const sourceNode = nodes.find(n => n.id === edge.source);
+          const targetNode = nodes.find(n => n.id === edge.target);
+          if (!sourceNode || !targetNode) return null;
+
+          const isHighlighted = isEdgeHighlighted(edge.source, edge.target);
+
+          return (
+            <line
+              key={`edge-${idx}`}
+              x1={sourceNode.x}
+              y1={sourceNode.y}
+              x2={targetNode.x}
+              y2={targetNode.y}
+              stroke={isHighlighted ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+              strokeWidth={isHighlighted ? 2.5 : 1}
+              opacity={hoveredNode && !isHighlighted ? 0.1 : isHighlighted ? 1 : 0.3}
+              className="transition-all duration-150"
+            />
+          );
+        })}
+
+        {/* ノード */}
+        {nodes.map((node) => {
+          const isUser = node.type === 'user';
+          const isExpert = node.type === 'expert';
+          const radius = isUser ? 20 : isExpert ? 18 : 12;
+          
+          // 色: 自分=Primary、エキスパート=アプローチ色、中間=グレー
+          let fillColor: string;
+          if (isUser) {
+            fillColor = 'hsl(var(--primary))';
+          } else if (isExpert) {
+            fillColor = getExpertColor(node.approachability);
+          } else {
+            fillColor = 'hsl(var(--muted))';
+          }
+
+          const isHighlighted = hoveredNode === node.id || isNodeHighlighted(node.id);
+          const isDimmed = hoveredNode && !isHighlighted;
+
+          return (
+            <g
+              key={node.id}
+              transform={`translate(${node.x}, ${node.y})`}
+              onMouseEnter={() => handleNodeHover(node.id)}
+              onMouseLeave={() => handleNodeHover(null)}
+              style={{ cursor: 'pointer' }}
+              opacity={isDimmed ? 0.2 : 1}
+              className="transition-opacity duration-150"
+            >
+              <circle
+                r={radius}
+                fill={fillColor}
+                stroke={isHighlighted ? "hsl(var(--foreground))" : "hsl(var(--background))"}
+                strokeWidth={isHighlighted ? 2.5 : 1.5}
+                className="transition-all duration-150"
+              />
+              
+              {/* 名前ラベル */}
+              <text
+                x={radius + 6}
+                y={3}
+                textAnchor="start"
+                fill="hsl(var(--foreground))"
+                fontSize={11}
+                fontWeight={isExpert || isUser ? 600 : 400}
+              >
+                {node.label}
+              </text>
+
+              {/* 役職（エキスパートと自分のみ） */}
+              {(isExpert || isUser) && (
+                <text
+                  x={radius + 6}
+                  y={15}
+                  textAnchor="start"
+                  fill="hsl(var(--muted-foreground))"
+                  fontSize={9}
+                >
+                  {node.role.length > 12 ? node.role.slice(0, 11) + '…' : node.role}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* 凡例 */}
+        <g transform={`translate(${svgWidth - 120}, ${svgHeight - 90})`}>
+          <rect x={-8} y={-14} width={110} height={85} fill="hsl(var(--background))" rx={4} opacity={0.9} />
+          <text fill="hsl(var(--foreground))" fontSize={10} fontWeight={600}>凡例</text>
+          {[
+            { color: 'hsl(var(--primary))', label: '自分' },
+            { color: 'hsl(142, 76%, 36%)', label: 'すぐ話せる' },
+            { color: 'hsl(38, 92%, 50%)', label: '紹介経由' },
+            { color: 'hsl(0, 84%, 60%)', label: '上司経由' },
+          ].map((item, idx) => (
+            <g key={item.label} transform={`translate(0, ${14 + idx * 16})`}>
+              <circle r={5} cx={6} cy={0} fill={item.color} />
+              <text x={16} y={3} fill="hsl(var(--muted-foreground))" fontSize={9}>
+                {item.label}
+              </text>
+            </g>
+          ))}
+        </g>
+      </svg>
     </div>
   );
 };

@@ -1,7 +1,16 @@
-import { Card } from "@/components/ui/card";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Building2, MessageSquare, Users, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp, Mail, MessageSquare, Users, ArrowRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import ExpertNetworkGraph from "@/components/charts/ExpertNetworkGraph";
 
 interface PathNode {
@@ -34,23 +43,20 @@ const approachabilityConfig = {
   direct: {
     label: "すぐ話せる",
     icon: MessageSquare,
-    color: "text-green-500",
-    bgColor: "bg-green-500/10",
-    borderColor: "border-green-500/20",
+    badgeVariant: "default" as const,
+    className: "bg-green-500/20 text-green-400 border-green-500/30",
   },
   introduction: {
-    label: "紹介があるとスムーズ",
+    label: "紹介経由",
     icon: Users,
-    color: "text-yellow-500",
-    bgColor: "bg-yellow-500/10",
-    borderColor: "border-yellow-500/20",
+    badgeVariant: "default" as const,
+    className: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   },
   via_manager: {
-    label: "上司経由で依頼が必要",
+    label: "上司経由",
     icon: ArrowRight,
-    color: "text-red-500",
-    bgColor: "bg-red-500/10",
-    borderColor: "border-red-500/20",
+    badgeVariant: "default" as const,
+    className: "bg-red-500/20 text-red-400 border-red-500/30",
   },
 };
 
@@ -62,107 +68,100 @@ const contactMethodLabels = {
 };
 
 export function KnowWhoResults({ experts }: KnowWhoResultsProps) {
-  const groupedExperts = {
-    direct: experts.filter((e) => e.approachability === "direct"),
-    introduction: experts.filter((e) => e.approachability === "introduction"),
-    via_manager: experts.filter((e) => e.approachability === "via_manager"),
-  };
+  const [isGraphOpen, setIsGraphOpen] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">
-          アプローチガイド
+          有識者リスト
         </h3>
         <span className="text-xs text-muted-foreground">
-          {experts.length}名の有識者が見つかりました
+          {experts.length}名
         </span>
       </div>
 
-      {/* Network Graph */}
-      {experts.length > 0 && (
-        <ExpertNetworkGraph experts={experts} />
-      )}
-
-      {(Object.keys(groupedExperts) as Array<keyof typeof groupedExperts>).map((category) => {
-        const config = approachabilityConfig[category];
-        const categoryExperts = groupedExperts[category];
-        
-        if (categoryExperts.length === 0) return null;
-
-        return (
-          <div key={category} className="space-y-3">
-            <div className="flex items-center gap-2">
-              <config.icon className={`w-4 h-4 ${config.color}`} />
-              <h4 className="text-sm font-medium text-foreground">{config.label}</h4>
-              <span className="text-xs text-muted-foreground">({categoryExperts.length}名)</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {categoryExperts.map((expert, index) => (
-                <Card
-                  key={index}
-                  className={`bg-card border-border hover:border-primary/30 transition-all hover:shadow-lg ${config.borderColor}`}
-                >
-                  <div className="p-5 space-y-4">
-                    {/* Header */}
-                    <div>
-                      <h5 className="text-base font-semibold text-foreground mb-1">
-                        {expert.name}
-                      </h5>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <Building2 className="w-3 h-3" />
-                        <span>{expert.affiliation}</span>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {expert.role}
-                      </Badge>
-                    </div>
-
-                    {/* Connection Path */}
-                    {expert.connectionPath && (
-                      <div className={`${config.bgColor} p-3 rounded-md`}>
-                        <p className="text-xs text-muted-foreground">{expert.connectionPath}</p>
-                      </div>
-                    )}
-
-                    {/* Suggested Questions */}
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-foreground">聞けそうなこと</p>
-                      <ul className="space-y-1">
-                        {expert.suggestedQuestions.map((question, qIndex) => (
-                          <li key={qIndex} className="text-xs text-muted-foreground flex items-start gap-2">
-                            <span className="text-primary mt-0.5">•</span>
-                            <span>{question}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Contact Methods */}
-                    <div className="flex flex-wrap gap-2 pt-3 border-t border-border">
-                      {expert.contactMethods.map((method) => {
+      {/* Expert Table */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="w-[140px] text-xs font-medium">氏名</TableHead>
+              <TableHead className="w-[120px] text-xs font-medium">部署</TableHead>
+              <TableHead className="w-[140px] text-xs font-medium">役職</TableHead>
+              <TableHead className="w-[180px] text-xs font-medium">メールアドレス</TableHead>
+              <TableHead className="w-[100px] text-xs font-medium">アプローチ</TableHead>
+              <TableHead className="text-xs font-medium">アクション</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {experts.map((expert, index) => {
+              const config = approachabilityConfig[expert.approachability];
+              return (
+                <TableRow key={expert.employee_id || index} className="hover:bg-muted/30">
+                  <TableCell className="font-medium text-sm">{expert.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{expert.affiliation}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{expert.role}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground font-mono text-xs">
+                    {expert.mail || "-"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={`text-xs ${config.className}`}>
+                      {config.label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {expert.contactMethods.slice(0, 2).map((method) => {
                         const methodConfig = contactMethodLabels[method];
                         return (
                           <Button
                             key={method}
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="text-xs"
+                            className="h-7 px-2 text-xs"
                           >
-                            <methodConfig.icon className="w-3 h-3 mr-1" />
-                            {methodConfig.label}
+                            <methodConfig.icon className="w-3 h-3" />
                           </Button>
                         );
                       })}
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Collapsible Network Graph */}
+      {experts.length > 0 && experts.some(e => e.pathDetails && e.pathDetails.length > 0) && (
+        <Collapsible open={isGraphOpen} onOpenChange={setIsGraphOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-between text-sm"
+            >
+              <span className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                アプローチガイド（組織経路図）
+              </span>
+              {isGraphOpen ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3">
+            <div className="border border-border rounded-lg p-4 bg-card">
+              <ExpertNetworkGraph experts={experts} />
             </div>
-          </div>
-        );
-      })}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </div>
   );
 }
