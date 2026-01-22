@@ -17,9 +17,15 @@ export interface Source {
 }
 
 export interface TimelineItem {
-  type: "user_message" | "thinking" | "research_result" | "theme_evaluation" | "knowwho_result" | "positioning_analysis" | "seeds_needs_matching" | "html_generation" | "assistant_message";
+  type: "user_message" | "thinking" | "research_result" | "theme_evaluation" | "knowwho_result" | "positioning_analysis" | "seeds_needs_matching" | "html_generation" | "assistant_message" | "deep_file_search";
   timestamp: number;
   data: any;
+}
+
+export interface DeepFileSearchResult {
+  path: string;
+  relevantContent: string;
+  type: string;
 }
 
 export interface ResearchData {
@@ -350,6 +356,19 @@ export function useResearchChat() {
                   console.log("[FRONTEND] Updated timeline with positioning analysis");
                   return newTimeline;
                 });
+                continue;
+              }
+
+              // Handle deep file search results
+              if (parsed.type === "deep_file_search_result") {
+                setTimeline((prev) => [
+                  ...prev,
+                  {
+                    type: "deep_file_search",
+                    timestamp: Date.now(),
+                    data: { results: parsed.results || [] },
+                  },
+                ]);
                 continue;
               }
 
