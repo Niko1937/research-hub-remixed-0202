@@ -424,7 +424,7 @@ export function PDFViewer({
   return (
     <div
       ref={containerRef}
-      className="fixed right-0 top-0 h-screen bg-background border-l border-border shadow-2xl z-50 animate-slide-in-right flex
+      className="pdf-viewer-container fixed right-0 top-0 h-screen bg-background border-l border-border shadow-2xl z-50 animate-slide-in-right flex
         max-md:left-0 max-md:right-0 max-md:w-full"
       style={{ width: isMobile ? '100%' : `${width}px` }}
     >

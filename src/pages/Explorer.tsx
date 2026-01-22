@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import html2canvas from "html2canvas";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ResearchSidebar } from "@/components/ResearchSidebar";
@@ -286,8 +287,27 @@ const Explorer = () => {
   }, []);
 
   const handleCaptureScreenshot = useCallback(async () => {
-    // Screenshot feature temporarily disabled
-    console.log("Screenshot capture not yet implemented");
+    // Find the PDF viewer container
+    const pdfContainer = document.querySelector('.pdf-viewer-container');
+    if (!pdfContainer) {
+      console.error("PDF viewer not found");
+      return;
+    }
+
+    try {
+      const canvas = await html2canvas(pdfContainer as HTMLElement, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 1,
+        logging: false,
+      });
+      
+      const dataUrl = canvas.toDataURL('image/png');
+      setCapturedScreenshot(dataUrl);
+      console.log("Screenshot captured successfully");
+    } catch (error) {
+      console.error("Failed to capture screenshot:", error);
+    }
   }, []);
 
   const handleClearScreenshot = useCallback(() => {
