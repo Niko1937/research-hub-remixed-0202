@@ -259,7 +259,11 @@ export function PDFViewer({
         }
         
         const data = await res.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data }).promise;
+        const pdf = await pdfjsLib.getDocument({ 
+          data,
+          cMapUrl: 'https://unpkg.com/pdfjs-dist@4.0.379/cmaps/',
+          cMapPacked: true,
+        }).promise;
 
         if (cancelled) return;
 
