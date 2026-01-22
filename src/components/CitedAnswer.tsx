@@ -14,6 +14,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Paper {
   id?: number;
@@ -38,10 +40,8 @@ export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: Cited
   const sourceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   
   const scrollToSource = useCallback((id: number) => {
-    // Open sources section first if closed
     setIsSourcesOpen(true);
     
-    // Wait for collapsible to open, then scroll
     setTimeout(() => {
       const element = sourceRefs.current.get(id);
       if (element) {
@@ -58,82 +58,18 @@ export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: Cited
     return papers.find(p => p.id === id);
   }, [papers]);
 
-  // Parse summary and replace [1], [2] with clickable citations
-  const renderSummaryWithCitations = useCallback(() => {
-    const citationRegex = /\[(\d+)\]/g;
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = citationRegex.exec(summary)) !== null) {
-      // Add text before citation
-      if (match.index > lastIndex) {
-        parts.push(
-          <span key={`text-${lastIndex}`}>
-            {summary.slice(lastIndex, match.index)}
-          </span>
-        );
-      }
-
-      const citationId = parseInt(match[1], 10);
-      const paper = getPaperById(citationId);
-
-      if (paper) {
-        parts.push(
-          <TooltipProvider key={`citation-${match.index}`}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="inline-flex items-center text-primary hover:text-primary/80 font-medium transition-colors"
-                  onClick={() => scrollToSource(citationId)}
-                >
-                  <sup className="text-xs font-bold hover:underline">[{citationId}]</sup>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                <p className="font-medium text-sm">{paper.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {paper.authors.slice(0, 2).join(", ")}{paper.authors.length > 2 ? " et al." : ""}, {paper.year}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-      } else {
-        parts.push(
-          <sup key={`citation-${match.index}`} className="text-xs text-muted-foreground">
-            [{citationId}]
-          </sup>
-        );
-      }
-
-      lastIndex = match.index + match[0].length;
+  // Convert citation references [1] to clickable links in markdown
+  const processedSummary = summary.replace(/\[(\d+)\]/g, (match, num) => {
+    const paper = getPaperById(parseInt(num, 10));
+    if (paper) {
+      return `<cite data-id="${num}">[${num}]</cite>`;
     }
-
-    // Add remaining text
-    if (lastIndex < summary.length) {
-      parts.push(
-        <span key={`text-${lastIndex}`}>
-          {summary.slice(lastIndex)}
-        </span>
-      );
-    }
-
-    return parts;
-  }, [summary, getPaperById, scrollToSource]);
+    return match;
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Answer Section */}
-      {summary && (
-        <div className="bg-card/50 rounded-lg p-4 border border-border">
-          <p className="text-sm leading-relaxed text-foreground">
-            {renderSummaryWithCitations()}
-          </p>
-        </div>
-      )}
-
-      {/* Sources Section - Collapsible */}
+    <div className="space-y-4">
+      {/* Sources Section - Collapsible (shown first) */}
       {papers.length > 0 && (
         <Collapsible open={isSourcesOpen} onOpenChange={setIsSourcesOpen}>
           <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
@@ -246,6 +182,62 @@ export function CitedAnswer({ summary, papers, onPaperClick, onDeepDive }: Cited
             </div>
           </CollapsibleContent>
         </Collapsible>
+      )}
+
+      {/* Answer Section - Markdown rendered below sources */}
+      {summary && (
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // Style headers
+              h1: ({ children }) => <h1 className="text-lg font-bold text-foreground mt-4 mb-2">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-base font-semibold text-foreground mt-3 mb-2">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-sm font-semibold text-foreground mt-2 mb-1">{children}</h3>,
+              // Style paragraphs
+              p: ({ children }) => <p className="text-sm text-foreground leading-relaxed mb-3">{children}</p>,
+              // Style lists
+              ul: ({ children }) => <ul className="list-disc list-inside text-sm text-foreground mb-3 space-y-1">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-foreground mb-3 space-y-1">{children}</ol>,
+              li: ({ children }) => <li className="text-sm text-foreground">{children}</li>,
+              // Style links
+              a: ({ href, children }) => (
+                <a href={href} className="text-primary hover:text-highlight underline" target="_blank" rel="noopener noreferrer">
+                  {children}
+                </a>
+              ),
+              // Style code
+              code: ({ children, className }) => {
+                const isInline = !className;
+                return isInline ? (
+                  <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
+                ) : (
+                  <code className="block bg-muted p-3 rounded-lg text-xs font-mono overflow-x-auto">{children}</code>
+                );
+              },
+              // Style blockquotes
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-2 border-primary pl-4 italic text-muted-foreground my-3">
+                  {children}
+                </blockquote>
+              ),
+              // Style tables
+              table: ({ children }) => (
+                <div className="overflow-x-auto my-3">
+                  <table className="min-w-full border border-border text-sm">{children}</table>
+                </div>
+              ),
+              th: ({ children }) => <th className="border border-border bg-muted px-3 py-2 text-left font-medium">{children}</th>,
+              td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
+              // Style strong/bold
+              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+              // Style emphasis/italic
+              em: ({ children }) => <em className="italic">{children}</em>,
+            }}
+          >
+            {summary}
+          </ReactMarkdown>
+        </div>
       )}
     </div>
   );
