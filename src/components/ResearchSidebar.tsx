@@ -1,4 +1,4 @@
-import { Compass, FileText, Sparkles } from "lucide-react";
+import { Compass, FileText, Home, Sparkles } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -62,6 +62,16 @@ export function ResearchSidebar({ onExplorerClick }: ResearchSidebarProps) {
               <SidebarMenuItem>
                 <NavLink
                   to="/"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                >
+                  <Home className="w-5 h-5 shrink-0" />
+                  {open && <span className="text-sm font-medium">Home</span>}
+                </NavLink>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <NavLink
+                  to="/explorer"
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
                   activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
                   onClick={() => onExplorerClick?.()}
