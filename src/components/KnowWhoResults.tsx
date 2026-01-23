@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Mail, MessageSquare, Users, ArrowRight } from "lucide-react";
+import { ChevronDown, ChevronUp, Mail, MessageSquare, Users, ArrowRight, GitBranch, CircleDot, UserSquare2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -12,6 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import ExpertNetworkGraph from "@/components/charts/ExpertNetworkGraph";
+import ExpertTSNEMap from "@/components/charts/ExpertTSNEMap";
+import ExpertSkillCards from "@/components/charts/ExpertSkillCards";
 
 interface PathNode {
   employee_id: string;
@@ -135,8 +138,8 @@ export function KnowWhoResults({ experts }: KnowWhoResultsProps) {
         </Table>
       </div>
 
-      {/* Collapsible Network Graph */}
-      {experts.length > 0 && experts.some(e => e.pathDetails && e.pathDetails.length > 0) && (
+      {/* Collapsible Visualization Views */}
+      {experts.length > 0 && (
         <Collapsible open={isGraphOpen} onOpenChange={setIsGraphOpen}>
           <CollapsibleTrigger asChild>
             <Button
@@ -146,7 +149,7 @@ export function KnowWhoResults({ experts }: KnowWhoResultsProps) {
             >
               <span className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                アプローチガイド（組織経路図）
+                可視化ビュー
               </span>
               {isGraphOpen ? (
                 <ChevronUp className="w-4 h-4" />
@@ -157,7 +160,40 @@ export function KnowWhoResults({ experts }: KnowWhoResultsProps) {
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
             <div className="border border-border rounded-lg p-4 bg-card">
-              <ExpertNetworkGraph experts={experts} />
+              <Tabs defaultValue="org-tree" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 mb-4">
+                  <TabsTrigger value="org-tree" className="text-xs">
+                    <GitBranch className="w-3.5 h-3.5 mr-1" />
+                    組織経路図
+                  </TabsTrigger>
+                  <TabsTrigger value="tsne-map" className="text-xs">
+                    <CircleDot className="w-3.5 h-3.5 mr-1" />
+                    専門性マップ
+                  </TabsTrigger>
+                  <TabsTrigger value="skill-cards" className="text-xs">
+                    <UserSquare2 className="w-3.5 h-3.5 mr-1" />
+                    スキルカード
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="org-tree">
+                  {experts.some(e => e.pathDetails && e.pathDetails.length > 0) ? (
+                    <ExpertNetworkGraph experts={experts} />
+                  ) : (
+                    <div className="text-center text-muted-foreground text-sm py-8">
+                      経路データがありません
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="tsne-map">
+                  <ExpertTSNEMap experts={experts} />
+                </TabsContent>
+                
+                <TabsContent value="skill-cards">
+                  <ExpertSkillCards experts={experts} />
+                </TabsContent>
+              </Tabs>
             </div>
           </CollapsibleContent>
         </Collapsible>
