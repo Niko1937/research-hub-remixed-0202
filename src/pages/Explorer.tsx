@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, FileText, Search, MessageSquare, X } from "lucide-react";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { ToolSettingsProvider } from "@/contexts/ToolSettingsContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -543,7 +542,6 @@ const Explorer = () => {
   };
 
   return (
-    <ToolSettingsProvider>
     <SidebarProvider>
       <div className="flex h-screen bg-background w-full">
         <ResearchSidebar onExplorerClick={handleResetToExplorer} />
@@ -874,7 +872,6 @@ const Explorer = () => {
       )}
     </div>
     </SidebarProvider>
-    </ToolSettingsProvider>
   );
 };
 
