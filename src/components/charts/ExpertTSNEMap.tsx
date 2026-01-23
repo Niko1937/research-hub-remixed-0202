@@ -251,12 +251,42 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
                 </g>
               );
             })}
+
+            {/* クラスタラベル（マップ上に直接配置） */}
+            {Object.entries(CLUSTER_CENTERS).map(([name, center]) => {
+              const labelX = padding + (center.x / 100) * (svgWidth - 2 * padding);
+              const labelY = padding + (center.y / 100) * (svgHeight - 2 * padding);
+              
+              return (
+                <g key={`label-${name}`} transform={`translate(${labelX}, ${labelY})`}>
+                  <rect 
+                    x={-name.length * 4} 
+                    y={-10} 
+                    width={name.length * 8} 
+                    height={18} 
+                    fill="hsl(var(--card))" 
+                    opacity={0.9} 
+                    rx={4} 
+                  />
+                  <text 
+                    textAnchor="middle" 
+                    dominantBaseline="middle"
+                    fill="hsl(var(--foreground))" 
+                    fontSize={10} 
+                    fontWeight={600}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {name}
+                  </text>
+                </g>
+              );
+            })}
           </g>
 
-          {/* 凡例（固定位置） */}
-          <g transform={`translate(${svgWidth - 130}, 15)`}>
-            <rect x={-10} y={-10} width={125} height={145} fill="hsl(var(--background))" rx={6} opacity={0.95} stroke="hsl(var(--border))" strokeWidth={1} />
-            <text fill="hsl(var(--foreground))" fontSize={10} fontWeight={600}>マーカー</text>
+          {/* 凡例（固定位置） - マーカーのみ */}
+          <g transform={`translate(${svgWidth - 90}, 15)`}>
+            <rect x={-10} y={-10} width={85} height={55} fill="hsl(var(--background))" rx={6} opacity={0.95} stroke="hsl(var(--border))" strokeWidth={1} />
+            <text fill="hsl(var(--foreground))" fontSize={10} fontWeight={600}>凡例</text>
             {[
               { color: 'hsl(var(--primary))', label: '自分' },
               { color: 'hsl(0, 75%, 55%)', label: '有識者' },
@@ -265,16 +295,6 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
                 <circle r={5} cx={6} cy={0} fill={item.color} stroke="hsl(var(--background))" strokeWidth={1.5} />
                 <text x={18} y={4} fill="hsl(var(--muted-foreground))" fontSize={10}>
                   {item.label}
-                </text>
-              </g>
-            ))}
-            
-            <text y={58} fill="hsl(var(--foreground))" fontSize={10} fontWeight={600}>専門領域</text>
-            {Object.entries(CLUSTER_CENTERS).map(([name, center], idx) => (
-              <g key={name} transform={`translate(0, ${74 + idx * 14})`}>
-                <circle r={4} cx={6} cy={0} fill={center.color} opacity={0.8} />
-                <text x={18} y={3} fill="hsl(var(--muted-foreground))" fontSize={9}>
-                  {name}
                 </text>
               </g>
             ))}
