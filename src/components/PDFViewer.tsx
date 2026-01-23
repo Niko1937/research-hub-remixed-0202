@@ -77,7 +77,8 @@ export function PDFViewer({
   onPdfLoaded,
   clearHighlightSignal
 }: PDFViewerProps) {
-  const [width, setWidth] = useState(500);
+  const getInitialWidth = () => Math.min(500, window.innerWidth * 0.5);
+  const [width, setWidth] = useState(getInitialWidth);
   const [isDragging, setIsDragging] = useState(false);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [totalPages, setTotalPages] = useState(0);
@@ -86,6 +87,18 @@ export function PDFViewer({
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const highlightDataRef = useRef<HighlightData | null>(null);
   const isMobile = useIsMobile();
+
+  // Dynamic resize on window resize
+  useEffect(() => {
+    if (isMobile) return;
+    
+    const handleResize = () => {
+      setWidth(prev => Math.min(prev, window.innerWidth * 0.9));
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isMobile]);
 
   const clearHighlightOverlays = useCallback(() => {
     if (!pdfContainerRef.current) return;

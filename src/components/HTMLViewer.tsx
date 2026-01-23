@@ -11,11 +11,24 @@ interface HTMLViewerProps {
 }
 
 export function HTMLViewer({ html, onClose, onWidthChange }: HTMLViewerProps) {
-  const [width, setWidth] = useState(500);
+  const getInitialWidth = () => Math.min(500, window.innerWidth * 0.5);
+  const [width, setWidth] = useState(getInitialWidth);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const isMobile = useIsMobile();
+
+  // Dynamic resize on window resize
+  useEffect(() => {
+    if (isMobile) return;
+    
+    const handleResize = () => {
+      setWidth(prev => Math.min(prev, window.innerWidth * 0.9));
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isMobile]);
 
   useEffect(() => {
     onWidthChange?.(width);
