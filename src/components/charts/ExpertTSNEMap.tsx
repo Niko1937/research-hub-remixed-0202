@@ -232,19 +232,22 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
               </g>
             ))}
 
-            {/* 従業員ドット */}
+            {/* 従業員ドット - 通常は薄いグレー、有識者は赤でハイライト */}
             {employeePositions.map((emp) => {
-              const isHighlighted = emp.isExpert || emp.isUser;
-              const isDimmed = hoveredEmployee && hoveredEmployee !== emp.employee_id && !emp.isExpert && !emp.isUser;
-              const radius = emp.isUser ? 10 : emp.isExpert ? 8 : 5;
+              const isHovered = hoveredEmployee === emp.employee_id;
+              const radius = emp.isUser ? 8 : emp.isExpert ? 7 : 4;
               
               let fillColor: string;
+              let opacity: number;
               if (emp.isUser) {
                 fillColor = 'hsl(var(--primary))';
+                opacity = 1;
               } else if (emp.isExpert) {
-                fillColor = 'hsl(142, 76%, 36%)';
+                fillColor = 'hsl(0, 80%, 55%)'; // 赤でハイライト
+                opacity = 1;
               } else {
                 fillColor = 'hsl(var(--muted-foreground))';
+                opacity = 0.4;
               }
 
               return (
@@ -254,42 +257,31 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
                   onMouseEnter={() => setHoveredEmployee(emp.employee_id)}
                   onMouseLeave={() => setHoveredEmployee(null)}
                   style={{ cursor: 'pointer' }}
-                  opacity={isDimmed ? 0.3 : 1}
                   className="transition-opacity duration-150"
                 >
                   <circle
-                    r={radius}
+                    r={isHovered ? radius + 2 : radius}
                     fill={fillColor}
-                    stroke={isHighlighted ? "hsl(var(--background))" : "none"}
-                    strokeWidth={2}
+                    opacity={opacity}
+                    stroke={emp.isUser || emp.isExpert ? "hsl(var(--background))" : "none"}
+                    strokeWidth={emp.isUser || emp.isExpert ? 2 : 0}
                   />
-                  {emp.isExpert && (
-                    <text
-                      y={3}
-                      textAnchor="middle"
-                      fill="white"
-                      fontSize={8}
-                      fontWeight={700}
-                    >
-                      ★
-                    </text>
-                  )}
                 </g>
               );
             })}
           </g>
 
           {/* 凡例（固定位置） */}
-          <g transform={`translate(${svgWidth - 120}, 15)`}>
-            <rect x={-10} y={-10} width={115} height={75} fill="hsl(var(--background))" rx={6} opacity={0.95} stroke="hsl(var(--border))" strokeWidth={1} />
+          <g transform={`translate(${svgWidth - 110}, 15)`}>
+            <rect x={-10} y={-10} width={105} height={70} fill="hsl(var(--background))" rx={6} opacity={0.95} stroke="hsl(var(--border))" strokeWidth={1} />
             <text fill="hsl(var(--foreground))" fontSize={10} fontWeight={600}>凡例</text>
             {[
-              { color: 'hsl(var(--primary))', label: '自分', marker: '●' },
-              { color: 'hsl(142, 76%, 36%)', label: '有識者', marker: '★' },
-              { color: 'hsl(var(--muted-foreground))', label: 'その他', marker: '○' },
+              { color: 'hsl(var(--primary))', label: '自分', opacity: 1 },
+              { color: 'hsl(0, 80%, 55%)', label: '有識者', opacity: 1 },
+              { color: 'hsl(var(--muted-foreground))', label: 'その他', opacity: 0.4 },
             ].map((item, idx) => (
               <g key={item.label} transform={`translate(0, ${16 + idx * 16})`}>
-                <circle r={5} cx={6} cy={0} fill={item.color} />
+                <circle r={5} cx={6} cy={0} fill={item.color} opacity={item.opacity} />
                 <text x={18} y={4} fill="hsl(var(--muted-foreground))" fontSize={10}>
                   {item.label}
                 </text>
