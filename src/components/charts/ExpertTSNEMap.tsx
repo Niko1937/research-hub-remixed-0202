@@ -208,46 +208,28 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
             {/* 背景 */}
             <rect width={svgWidth} height={svgHeight} fill="hsl(var(--card))" />
 
-            {/* クラスタ領域（楕円） */}
-            {Object.entries(CLUSTER_CENTERS).map(([name, center]) => (
-              <g key={name}>
-                <ellipse
-                  cx={padding + (center.x / 100) * (svgWidth - 2 * padding)}
-                  cy={padding + (center.y / 100) * (svgHeight - 2 * padding)}
-                  rx={60}
-                  ry={45}
-                  fill={center.color}
-                  opacity={0.1}
-                />
-                <text
-                  x={padding + (center.x / 100) * (svgWidth - 2 * padding)}
-                  y={padding + (center.y / 100) * (svgHeight - 2 * padding) - 35}
-                  textAnchor="middle"
-                  fill="hsl(var(--muted-foreground))"
-                  fontSize={10}
-                  fontWeight={500}
-                >
-                  {name}
-                </text>
-              </g>
-            ))}
-
-            {/* 従業員ドット - 通常は薄いグレー、有識者は赤でハイライト */}
+            {/* 従業員ドット - クラスタの色で表示、有識者は赤でハイライト */}
             {employeePositions.map((emp) => {
               const isHovered = hoveredEmployee === emp.employee_id;
+              const clusterColor = CLUSTER_CENTERS[emp.cluster]?.color || 'hsl(200, 50%, 60%)';
               const radius = emp.isUser ? 8 : emp.isExpert ? 7 : 4;
               
               let fillColor: string;
-              let opacity: number;
+              let strokeColor: string | undefined;
+              let strokeWidth: number;
+              
               if (emp.isUser) {
                 fillColor = 'hsl(var(--primary))';
-                opacity = 1;
+                strokeColor = 'hsl(var(--background))';
+                strokeWidth = 2;
               } else if (emp.isExpert) {
-                fillColor = 'hsl(0, 80%, 55%)'; // 赤でハイライト
-                opacity = 1;
+                fillColor = 'hsl(0, 75%, 55%)'; // 赤でハイライト
+                strokeColor = 'hsl(var(--background))';
+                strokeWidth = 2;
               } else {
-                fillColor = 'hsl(var(--muted-foreground))';
-                opacity = 0.4;
+                fillColor = clusterColor;
+                strokeColor = undefined;
+                strokeWidth = 0;
               }
 
               return (
@@ -257,14 +239,14 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
                   onMouseEnter={() => setHoveredEmployee(emp.employee_id)}
                   onMouseLeave={() => setHoveredEmployee(null)}
                   style={{ cursor: 'pointer' }}
-                  className="transition-opacity duration-150"
+                  className="transition-all duration-150"
                 >
                   <circle
                     r={isHovered ? radius + 2 : radius}
                     fill={fillColor}
-                    opacity={opacity}
-                    stroke={emp.isUser || emp.isExpert ? "hsl(var(--background))" : "none"}
-                    strokeWidth={emp.isUser || emp.isExpert ? 2 : 0}
+                    opacity={isHovered ? 1 : 0.8}
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
                   />
                 </g>
               );
@@ -273,15 +255,14 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
 
           {/* 凡例（固定位置） */}
           <g transform={`translate(${svgWidth - 110}, 15)`}>
-            <rect x={-10} y={-10} width={105} height={70} fill="hsl(var(--background))" rx={6} opacity={0.95} stroke="hsl(var(--border))" strokeWidth={1} />
+            <rect x={-10} y={-10} width={105} height={55} fill="hsl(var(--background))" rx={6} opacity={0.95} stroke="hsl(var(--border))" strokeWidth={1} />
             <text fill="hsl(var(--foreground))" fontSize={10} fontWeight={600}>凡例</text>
             {[
-              { color: 'hsl(var(--primary))', label: '自分', opacity: 1 },
-              { color: 'hsl(0, 80%, 55%)', label: '有識者', opacity: 1 },
-              { color: 'hsl(var(--muted-foreground))', label: 'その他', opacity: 0.4 },
+              { color: 'hsl(var(--primary))', label: '自分' },
+              { color: 'hsl(0, 75%, 55%)', label: '有識者' },
             ].map((item, idx) => (
               <g key={item.label} transform={`translate(0, ${16 + idx * 16})`}>
-                <circle r={5} cx={6} cy={0} fill={item.color} opacity={item.opacity} />
+                <circle r={5} cx={6} cy={0} fill={item.color} />
                 <text x={18} y={4} fill="hsl(var(--muted-foreground))" fontSize={10}>
                   {item.label}
                 </text>
