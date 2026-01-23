@@ -1,8 +1,9 @@
-import { Compass, FileText, Home, Sparkles } from "lucide-react";
+import { Compass, FileText, Home, Settings, Sparkles } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { SettingsDialog } from "@/components/SettingsDialog";
 import {
   Sidebar,
   SidebarContent,
@@ -79,6 +80,16 @@ export function ResearchSidebar({ onExplorerClick }: ResearchSidebarProps) {
                   <Compass className="w-5 h-5 shrink-0" />
                   {open && <span className="text-sm font-medium">Explorer</span>}
                 </NavLink>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SettingsDialog
+                  trigger={
+                    <button className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors text-left">
+                      <Settings className="w-5 h-5 shrink-0" />
+                      {open && <span className="text-sm font-medium">設定</span>}
+                    </button>
+                  }
+                />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

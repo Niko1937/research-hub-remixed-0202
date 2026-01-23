@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { useToolSettings } from "@/contexts/ToolSettingsContext";
+import { TOOL_DEFINITIONS, ToolId } from "@/types/toolSettings";
 
-type Tool = "wide-knowledge" | "knowwho" | "positioning-analysis" | "seeds-needs-matching" | "html-generation" | "deep-file-search";
+type Tool = ToolId;
 type Mode = "search" | "assistant";
 
 interface ChatInputProps {
@@ -36,6 +38,15 @@ export function ChatInput({
   const [message, setMessage] = useState("");
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [toolPopoverOpen, setToolPopoverOpen] = useState(false);
+  const { isToolEnabled } = useToolSettings();
+
+  // Filter visible tools based on settings and context
+  const visibleTools = TOOL_DEFINITIONS.filter(tool => {
+    // DeepDive-only tools only show in DeepDive mode
+    if (tool.isDeepDiveOnly && !isDeepDiveActive) return false;
+    // Check if tool is enabled in settings
+    return isToolEnabled(tool.id);
+  });
 
   const handleSubmit = () => {
     if (message.trim()) {
@@ -51,13 +62,9 @@ export function ChatInput({
     }
   };
 
-  const toolLabels: Record<Tool, string> = {
-    "wide-knowledge": "ワイドナレッジ検索",
-    "knowwho": "KnowWho検索",
-    "positioning-analysis": "ポジショニング分析",
-    "seeds-needs-matching": "シーズ・ニーズマッチング",
-    "html-generation": "HTML資料生成",
-    "deep-file-search": "🔍 DeepFileSearch",
+  const getToolLabel = (toolId: Tool): string => {
+    const tool = TOOL_DEFINITIONS.find(t => t.id === toolId);
+    return tool ? tool.name : toolId;
   };
 
   const handleToolSelect = (tool: Tool) => {
@@ -190,53 +197,38 @@ export function ChatInput({
                         <span>Tools</span>
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-64 p-2" align="start">
+                  <PopoverContent className="w-64 p-2" align="start">
                       <div className="space-y-1">
-                        {/* DeepDive専用ツール */}
-                        {isDeepDiveActive && (
-                          <button
-                            onClick={() => handleToolSelect("deep-file-search")}
-                            className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                          >
-                            <div className="text-sm font-medium text-blue-700 dark:text-blue-300">🔍 DeepFileSearch</div>
-                            <div className="text-xs text-blue-600 dark:text-blue-400">論文の仮想データフォルダから関連資料を検索</div>
-                          </button>
+                        {visibleTools.length === 0 ? (
+                          <div className="text-sm text-muted-foreground px-3 py-2">
+                            有効なツールがありません。設定から追加してください。
+                          </div>
+                        ) : (
+                          visibleTools.map((tool) => (
+                            <button
+                              key={tool.id}
+                              onClick={() => handleToolSelect(tool.id)}
+                              className={`w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors ${
+                                tool.isDeepDiveOnly 
+                                  ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800" 
+                                  : ""
+                              }`}
+                            >
+                              <div className={`text-sm font-medium ${
+                                tool.isDeepDiveOnly ? "text-blue-700 dark:text-blue-300" : ""
+                              }`}>
+                                {tool.isDeepDiveOnly ? "🔍 " : ""}{tool.name}
+                              </div>
+                              <div className={`text-xs ${
+                                tool.isDeepDiveOnly 
+                                  ? "text-blue-600 dark:text-blue-400" 
+                                  : "text-muted-foreground"
+                              }`}>
+                                {tool.description}
+                              </div>
+                            </button>
+                          ))
                         )}
-                        <button
-                          onClick={() => handleToolSelect("wide-knowledge")}
-                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                        >
-                          <div className="text-sm font-medium">ワイドナレッジ検索</div>
-                          <div className="text-xs text-muted-foreground">幅広い知識ベースから検索</div>
-                        </button>
-                        <button
-                          onClick={() => handleToolSelect("knowwho")}
-                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                        >
-                          <div className="text-sm font-medium">KnowWho検索</div>
-                          <div className="text-xs text-muted-foreground">専門家・研究者を検索</div>
-                        </button>
-                        <button
-                          onClick={() => handleToolSelect("positioning-analysis")}
-                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                        >
-                          <div className="text-sm font-medium">ポジショニング分析</div>
-                          <div className="text-xs text-muted-foreground">比較検討軸でビジュアル分析</div>
-                        </button>
-                        <button
-                          onClick={() => handleToolSelect("seeds-needs-matching")}
-                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                        >
-                          <div className="text-sm font-medium">シーズ・ニーズマッチング</div>
-                          <div className="text-xs text-muted-foreground">研究シーズとニーズ候補を評価</div>
-                        </button>
-                        <button
-                          onClick={() => handleToolSelect("html-generation")}
-                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                        >
-                          <div className="text-sm font-medium">HTML資料生成</div>
-                          <div className="text-xs text-muted-foreground">会話内容をインフォグラフィックス化</div>
-                        </button>
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -244,7 +236,7 @@ export function ChatInput({
                   {/* Selected Tool Badge */}
                   {selectedTool && (
                     <Badge variant="secondary" className="gap-2 pr-1">
-                      <span className="text-xs">{toolLabels[selectedTool]}</span>
+                      <span className="text-xs">{getToolLabel(selectedTool)}</span>
                       <Button
                         variant="ghost"
                         size="icon"
