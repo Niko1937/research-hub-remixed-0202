@@ -1,73 +1,130 @@
-# Welcome to your Lovable project
+# Research Hub
 
-## Project info
+研究情報検索・分析プラットフォーム
 
-**URL**: https://lovable.dev/projects/c5cdbc8e-6024-4cec-b0aa-d583053fe0f2
+## 技術スタック
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/c5cdbc8e-6024-4cec-b0aa-d583053fe0f2) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
+### フロントエンド
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
+### バックエンド
+- Python 3.11+
+- FastAPI
+- uvicorn
 
-Simply open [Lovable](https://lovable.dev/projects/c5cdbc8e-6024-4cec-b0aa-d583053fe0f2) and click on Share -> Publish.
+## セットアップ
 
-## Can I connect a custom domain to my Lovable project?
+### 前提条件
+- Node.js 18+ & npm ([nvm](https://github.com/nvm-sh/nvm#installing-and-updating)でインストール推奨)
+- Python 3.11+
 
-Yes, you can!
+### 1. リポジトリをクローン
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```bash
+git clone https://github.com/yoshi2210/remix-of-research-hub-30.git
+cd remix-of-research-hub-30
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### 2. 環境変数の設定
+
+プロジェクトルートに`.env`ファイルを作成:
+
+```env
+LLM_BASE_URL=https://your-llm-api-endpoint.com
+LLM_API_KEY=your-api-key
+LLM_MODEL=vertex_ai.gemini-2.5-flash
+```
+
+### 3. フロントエンドのセットアップ
+
+```bash
+# 依存関係をインストール
+npm install
+
+# 開発サーバーを起動
+npm run dev
+```
+
+フロントエンドは http://localhost:5173 で起動します。
+
+### 4. バックエンドのセットアップ
+
+```bash
+# backendディレクトリに移動
+cd backend
+
+# 仮想環境を作成
+python -m venv .venv
+
+# 仮想環境を有効化
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
+
+# 依存関係をインストール
+pip install -r requirements.txt
+
+# 開発サーバーを起動
+uvicorn app.main:app --reload --port 8000
+```
+
+バックエンドは http://localhost:8000 で起動します。
+
+## 開発
+
+### フロントエンド開発サーバー
+```bash
+npm run dev
+```
+
+### バックエンド開発サーバー
+```bash
+cd backend
+uvicorn app.main:app --reload --port 8000
+```
+
+### 両方を同時に起動
+ターミナルを2つ開いて、それぞれでフロントエンドとバックエンドを起動してください。
+
+## API エンドポイント
+
+- `GET /` - ヘルスチェック
+- `GET /health` - ヘルスチェック
+- `POST /api/research-chat` - メインチャットエンドポイント (SSE streaming)
+
+## プロジェクト構造
+
+```
+remix-of-research-hub-30/
+├── src/                    # フロントエンドソースコード
+│   ├── components/         # Reactコンポーネント
+│   ├── hooks/              # カスタムフック
+│   ├── pages/              # ページコンポーネント
+│   └── lib/                # ユーティリティ
+├── backend/                # バックエンドソースコード
+│   ├── app/
+│   │   ├── main.py         # FastAPIエントリーポイント
+│   │   ├── config.py       # 環境設定
+│   │   ├── routers/        # APIルーター
+│   │   ├── services/       # ビジネスロジック
+│   │   └── models/         # Pydanticモデル
+│   ├── data/               # JSONデータストレージ
+│   └── requirements.txt    # Python依存関係
+├── public/                 # 静的ファイル
+├── package.json            # Node.js依存関係
+└── .env                    # 環境変数（gitignore対象）
+```
+
+## 注意事項
+
+- `.env`ファイルはGitにコミットしないでください（`.gitignore`で除外済み）
+- `node_modules/`と`backend/.venv/`もGitにコミットしないでください
+
+## ライセンス
+
+Private
