@@ -8,7 +8,7 @@ const getApiBaseUrl = (): string => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  return "http://localhost:8000";
+  return "http://localhost:5000";
 };
 
 export interface ArxivProxyRequest {

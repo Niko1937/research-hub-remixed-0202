@@ -11,11 +11,15 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
-# Load .env from project root
+# Load .env from project root or parent directory
 project_root = Path(__file__).parent.parent.parent
 env_file = project_root / ".env"
+if not env_file.exists():
+    # Try parent directory (LabApp/.env)
+    env_file = project_root.parent / ".env"
 if env_file.exists():
     load_dotenv(env_file)
+    print(f"Loaded .env from: {env_file}")
 
 
 class Settings(BaseSettings):
@@ -27,7 +31,7 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"]
+    cors_origins: list[str] = ["http://localhost:8000", "http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:8000"]
 
     # LLM Configuration
     llm_base_url: str = ""

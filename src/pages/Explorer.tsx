@@ -247,11 +247,36 @@ const Explorer = () => {
       .finally(() => setRecommendedLoading(false));
   }, [clearMessages, closePdfViewer, handleHtmlViewerClose]);
 
+  // Check if paper is from arXiv (PDF preview only available for arXiv)
+  const isArxivPaper = useCallback((paper: { url?: string; source?: string }) => {
+    if (paper.source?.toLowerCase() === "arxiv") return true;
+    if (paper.url?.includes("arxiv.org")) return true;
+    return false;
+  }, []);
+
   // Handle DeepDive activation
   const handleDeepDive = useCallback((paper: { id?: number; title: string; url: string; authors?: string[]; source?: string; year?: string }) => {
+    // Only allow PDF preview for arXiv papers
+    if (!isArxivPaper(paper)) {
+      console.log("PDF preview only available for arXiv papers");
+      // Still set context for metadata display, but don't open PDF
+      setDeepDiveContext({
+        source: {
+          id: paper.id,
+          title: paper.title,
+          url: paper.url,
+          authors: paper.authors,
+          source: paper.source,
+          year: paper.year,
+        },
+        virtualFolder: [],
+      });
+      return;
+    }
+
     // Generate mock virtual folder
     const virtualFolder = generateMockVirtualFolder(paper.title);
-    
+
     setDeepDiveContext({
       source: {
         id: paper.id,
@@ -264,7 +289,7 @@ const Explorer = () => {
       virtualFolder,
       pdfText: pdfContext, // Use current PDF text if available
     });
-    
+
     // Open the PDF if not already open
     if (!pdfViewer || pdfViewer.url !== paper.url) {
       setMode("assistant");
@@ -277,7 +302,7 @@ const Explorer = () => {
         openedAt: Date.now(),
       });
     }
-  }, [pdfViewer, pdfContext, handleHtmlViewerClose]);
+  }, [pdfViewer, pdfContext, handleHtmlViewerClose, isArxivPaper]);
 
   const handleCloseDeepDive = useCallback(() => {
     setDeepDiveContext(null);
@@ -667,7 +692,14 @@ const Explorer = () => {
                               );
                             
                             case "knowwho_result":
-                              return <KnowWhoResults key={index} experts={item.data.experts} />;
+                              return (
+                                <KnowWhoResults
+                                  key={index}
+                                  experts={item.data.experts}
+                                  allEmployees={item.data.allEmployees}
+                                  clusters={item.data.clusters}
+                                />
+                              );
                             
                             case "positioning_analysis":
                               return (

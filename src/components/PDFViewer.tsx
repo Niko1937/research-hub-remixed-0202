@@ -264,7 +264,7 @@ export function PDFViewer({
           pdfContainerRef.current.innerHTML = "";
         }
         // Use proxy to fetch PDF to avoid CORS issues
-        const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+        const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
         const proxyUrl = `${apiBaseUrl}/api/pdf-proxy?url=${encodeURIComponent(url)}`;
         const res = await fetch(proxyUrl);
         

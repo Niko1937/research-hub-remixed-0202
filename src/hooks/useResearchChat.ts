@@ -98,7 +98,7 @@ const getApiUrl = () => {
   if (import.meta.env.VITE_SUPABASE_URL) {
     return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
   }
-  return "http://localhost:8000/api/research-chat";
+  return "http://localhost:5000/api/research-chat";
 };
 
 // Headers helper

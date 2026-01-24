@@ -172,7 +172,7 @@ async def search_arxiv(query: str, timeout: int = 15) -> list[ExternalPaper]:
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(
-                "http://export.arxiv.org/api/query",
+                "https://export.arxiv.org/api/query",
                 params={
                     "search_query": f"all:{query}",
                     "start": 0,
@@ -225,29 +225,74 @@ async def search_arxiv(query: str, timeout: int = 15) -> list[ExternalPaper]:
 
 async def search_all_sources(query: str) -> list[ExternalPaper]:
     """
-    Search all external sources in parallel
+    Search arXiv only (PDF preview is only available for arXiv)
 
     Args:
         query: Search query
 
     Returns:
-        Combined list of papers, sorted by citations
+        List of papers from arXiv
     """
-    results = await asyncio.gather(
-        search_openalex(query),
-        search_semantic_scholar(query),
-        search_arxiv(query),
-    )
-
-    all_papers = []
-    for papers in results:
-        all_papers.extend(papers)
-
-    # Sort by citations (descending) and limit to 5
-    all_papers.sort(key=lambda p: p.citations or 0, reverse=True)
+    # Only search arXiv since PDF preview only works for arXiv
+    papers = await search_arxiv(query)
 
     # Assign IDs
-    for i, paper in enumerate(all_papers[:5], start=1):
+    for i, paper in enumerate(papers, start=1):
         paper.id = i
 
-    return all_papers[:5]
+    return papers
+
+
+async def generate_search_keywords(
+    query: str,
+    chat_history: list[dict] = None,
+    llm_client = None,
+) -> str:
+    """
+    Use LLM to generate better search keywords from user query and chat history.
+
+    Args:
+        query: User's current query
+        chat_history: Previous chat messages
+        llm_client: LLM client instance
+
+    Returns:
+        Optimized search keywords for arXiv
+    """
+    if not llm_client:
+        # Fallback: extract key terms
+        return query
+
+    # Build context from chat history
+    history_context = ""
+    if chat_history:
+        recent_messages = chat_history[-6:]  # Last 6 messages
+        history_context = "\n".join(
+            f"{msg.get('role', 'user')}: {msg.get('content', '')[:200]}"
+            for msg in recent_messages
+        )
+
+    prompt = f"""あなたは学術論文検索の専門家です。ユーザーの質問と会話履歴から、arXiv検索に最適な英語キーワードを生成してください。
+
+## 会話履歴
+{history_context if history_context else "(なし)"}
+
+## ユーザーの質問
+{query}
+
+## 指示
+- 3-5個の英語キーワードまたはフレーズを生成
+- 専門用語を優先
+- キーワードのみを出力（説明不要）
+- スペースで区切る
+
+キーワード:"""
+
+    try:
+        keywords = await llm_client.generate_text(prompt, max_tokens=100)
+        # Clean up the response
+        keywords = keywords.strip().replace("\n", " ").replace(",", " ")
+        return keywords if keywords else query
+    except Exception as e:
+        print(f"Keyword generation failed: {e}")
+        return query

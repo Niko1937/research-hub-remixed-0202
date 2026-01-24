@@ -15,7 +15,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.models.schemas import ResearchChatRequest, ChatMessage
 from app.services.llm_client import LLMClient, ChatMessage as LLMChatMessage, get_llm_client
-from app.services.external_search import search_all_sources, search_openalex, search_semantic_scholar, search_arxiv
+from app.services.external_search import search_all_sources, search_openalex, search_semantic_scholar, search_arxiv, generate_search_keywords
 from app.services.mock_data import (
     search_internal_research,
     search_business_challenges,
@@ -110,8 +110,14 @@ Keep it concise, 2-4 steps. Always end with "chat"."""
         query = step.get("query", user_message)
 
         if tool_name == "wide-knowledge":
-            # Search external papers
-            papers = await search_all_sources(query)
+            # Generate optimized search keywords using LLM
+            chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
+            optimized_query = await generate_search_keywords(query, chat_history, llm_client)
+            print(f"[wide-knowledge] Original query: {query}")
+            print(f"[wide-knowledge] Optimized query: {optimized_query}")
+
+            # Search arXiv only (PDF preview is only available for arXiv)
+            papers = await search_all_sources(optimized_query)
 
             # Generate summary with citations
             summary = ""
