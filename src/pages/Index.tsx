@@ -1,5 +1,6 @@
 import { HeroSection } from "@/components/HeroSection";
 import { ValueProposition } from "@/components/ValueProposition";
+import { ExpansionMatrix } from "@/components/ExpansionMatrix";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Search } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -32,6 +33,7 @@ const Index = () => {
       <main className="pt-14 sm:pt-16">
         <HeroSection />
         <ValueProposition />
+        <ExpansionMatrix />
         
         {/* CTA Section */}
         <section className="py-16 sm:py-24 text-center">
