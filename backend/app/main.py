@@ -1,0 +1,89 @@
+"""
+FastAPI Backend Application
+
+Research Hub API Server
+"""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import get_settings
+from app.routers import research_chat, arxiv_proxy, pdf_proxy
+
+settings = get_settings()
+
+app = FastAPI(
+    title="Research Hub API",
+    description="Research Hub Backend API - FastAPI Version",
+    version="1.0.0",
+)
+
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins + ["*"],  # Allow all for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {
+        "status": "ok",
+        "message": "Research Hub API is running",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+
+# Register routers
+app.include_router(
+    research_chat.router,
+    prefix="/api/research-chat",
+    tags=["research-chat"],
+)
+
+app.include_router(
+    arxiv_proxy.router,
+    prefix="/api/arxiv-proxy",
+    tags=["arxiv-proxy"],
+)
+
+app.include_router(
+    pdf_proxy.router,
+    prefix="/api/pdf-proxy",
+    tags=["pdf-proxy"],
+)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    print(f"""
+╔════════════════════════════════════════════╗
+║     Research Hub API Server                ║
+╠════════════════════════════════════════════╣
+║  Status: Starting...                       ║
+║  Port:   {settings.port}                              ║
+║  API:    http://localhost:{settings.port}/api         ║
+╚════════════════════════════════════════════╝
+    """)
+    print("Environment:")
+    print(f"  LLM_BASE_URL: {settings.llm_base_url or 'NOT SET'}")
+    print(f"  LLM_MODEL:    {settings.llm_model or 'NOT SET'}")
+    print(f"  LLM_API_KEY:  {'SET' if settings.llm_api_key else 'NOT SET'}")
+
+    uvicorn.run(
+        "app.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+    )

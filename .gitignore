@@ -22,9 +22,11 @@ dist-ssr
 
 # Python virtual environment
 .venv
+venv
 __pycache__
 *.py[cod]
 *$py.class
+*.egg-info
 
 # Editor directories and files
 .vscode/*

@@ -1,7 +1,6 @@
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { mockEmployees, CURRENT_USER_ID, type Employee } from '@/data/mockEmployees';
 
 interface PathNode {
   employee_id: string;
@@ -19,70 +18,51 @@ interface Expert {
   pathDetails?: PathNode[];
 }
 
-interface ExpertTSNEMapProps {
-  experts: Expert[];
+interface ClusterInfo {
+  label: string;
+  center_x: number;
+  center_y: number;
+  count: number;
 }
 
-// クラスタ中心座標
-const CLUSTER_CENTERS: Record<string, { x: number; y: number; color: string }> = {
-  "NLP/自然言語": { x: 20, y: 25, color: "hsl(210, 80%, 60%)" },
-  "CV/画像認識": { x: 75, y: 20, color: "hsl(280, 70%, 60%)" },
-  "LLM/生成AI": { x: 35, y: 55, color: "hsl(150, 70%, 50%)" },
-  "MLOps/基盤": { x: 70, y: 65, color: "hsl(30, 80%, 55%)" },
-  "戦略/企画": { x: 50, y: 85, color: "hsl(340, 70%, 60%)" },
-  "経営": { x: 50, y: 10, color: "hsl(0, 0%, 50%)" },
+interface EmployeeForTSNE {
+  employee_id: string;
+  name: string;
+  department: string;
+  role: string;
+  expertise?: string[];
+  keywords?: string[];
+  tsne_x: number;
+  tsne_y: number;
+  cluster_id?: number;
+  cluster_label?: string;
+  is_current_user?: boolean;
+}
+
+interface ExpertTSNEMapProps {
+  experts: Expert[];
+  allEmployees?: EmployeeForTSNE[];
+  clusters?: Record<string, ClusterInfo>;
+}
+
+// クラスタIDに基づく色を生成
+const CLUSTER_COLORS = [
+  "hsl(210, 80%, 60%)",  // 青
+  "hsl(280, 70%, 60%)",  // 紫
+  "hsl(150, 70%, 50%)",  // 緑
+  "hsl(30, 80%, 55%)",   // オレンジ
+  "hsl(340, 70%, 60%)",  // ピンク
+  "hsl(180, 60%, 50%)",  // シアン
+  "hsl(60, 70%, 50%)",   // 黄
+  "hsl(0, 0%, 50%)",     // グレー
+];
+
+const getClusterColor = (clusterId: number | undefined): string => {
+  if (clusterId === undefined) return "hsl(200, 50%, 60%)";
+  return CLUSTER_COLORS[clusterId % CLUSTER_COLORS.length];
 };
 
-// 部署・職種からクラスタを推定
-const inferCluster = (employee: Employee): string => {
-  const dept = employee.department.toLowerCase();
-  const job = employee.job_title.toLowerCase();
-  
-  if (job.includes('llm') || job.includes('プロンプト') || dept.includes('ai推進')) {
-    return "LLM/生成AI";
-  }
-  if (job.includes('nlp') || job.includes('自然言語') || (dept.includes('研究') && job.includes('リサーチ'))) {
-    return "NLP/自然言語";
-  }
-  if (job.includes('cv') || job.includes('画像') || job.includes('vision')) {
-    return "CV/画像認識";
-  }
-  if (job.includes('mlops') || job.includes('基盤') || job.includes('インフラ')) {
-    return "MLOps/基盤";
-  }
-  if (dept.includes('企画') || dept.includes('事業開発') || dept.includes('戦略')) {
-    return "戦略/企画";
-  }
-  if (dept.includes('経営') || job.includes('ceo') || job.includes('代表')) {
-    return "経営";
-  }
-  // デフォルト: 部署に基づいて振り分け
-  if (dept.includes('研究')) return "NLP/自然言語";
-  if (dept.includes('ai')) return "LLM/生成AI";
-  return "戦略/企画";
-};
-
-// 座標を生成（クラスタ中心 + ランダム散らし）
-const generateCoordinates = (employee: Employee): { x: number; y: number } => {
-  if (employee.embedding_x !== undefined && employee.embedding_y !== undefined) {
-    return { x: employee.embedding_x, y: employee.embedding_y };
-  }
-  
-  const cluster = employee.expertise_cluster || inferCluster(employee);
-  const center = CLUSTER_CENTERS[cluster] || { x: 50, y: 50 };
-  
-  // 従業員IDからシードを生成して一貫した散らしを実現
-  const seed = employee.employee_id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const angle = (seed % 360) * (Math.PI / 180);
-  const radius = (seed % 15) + 5;
-  
-  return {
-    x: Math.max(5, Math.min(95, center.x + Math.cos(angle) * radius)),
-    y: Math.max(5, Math.min(95, center.y + Math.sin(angle) * radius)),
-  };
-};
-
-const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
+const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts, allEmployees, clusters }) => {
   const [hoveredEmployee, setHoveredEmployee] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
@@ -107,40 +87,67 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
     return ids;
   }, [experts]);
 
-  // 全従業員の座標を計算
+  // 全従業員の座標を計算 - バックエンドからのt-SNE座標を使用
   const employeePositions = useMemo(() => {
-    return mockEmployees.map(emp => {
-      const coords = generateCoordinates(emp);
-      const cluster = emp.expertise_cluster || inferCluster(emp);
+    if (!allEmployees || allEmployees.length === 0) {
+      return [];
+    }
+
+    return allEmployees.map(emp => {
+      // バックエンドからのt-SNE座標を使用 (0-1の範囲を想定)
+      const x = padding + emp.tsne_x * (svgWidth - 2 * padding);
+      const y = padding + emp.tsne_y * (svgHeight - 2 * padding);
+
       return {
         ...emp,
-        x: padding + (coords.x / 100) * (svgWidth - 2 * padding),
-        y: padding + (coords.y / 100) * (svgHeight - 2 * padding),
-        cluster,
+        x,
+        y,
         isExpert: expertIds.has(emp.employee_id),
-        isUser: emp.employee_id === CURRENT_USER_ID,
+        isUser: emp.is_current_user || false,
       };
     });
-  }, [expertIds]);
+  }, [allEmployees, expertIds]);
 
-  // Zoom handlers
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.min(Math.max(scale * delta, 0.5), 3);
-    
-    if (svgRef.current) {
-      const rect = svgRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      
-      const newTranslateX = mouseX - (mouseX - translate.x) * (newScale / scale);
-      const newTranslateY = mouseY - (mouseY - translate.y) * (newScale / scale);
-      
-      setScale(newScale);
-      setTranslate({ x: newTranslateX, y: newTranslateY });
-    }
-  }, [scale, translate]);
+  // クラスタラベルの位置を計算
+  const clusterLabels = useMemo(() => {
+    if (!clusters) return [];
+
+    return Object.entries(clusters).map(([id, info]) => ({
+      id,
+      label: info.label,
+      x: padding + info.center_x * (svgWidth - 2 * padding),
+      y: padding + info.center_y * (svgHeight - 2 * padding),
+      color: getClusterColor(parseInt(id)),
+    }));
+  }, [clusters]);
+
+  // Zoom handlers - use native event listener with passive: false
+  useEffect(() => {
+    const svgElement = svgRef.current;
+    if (!svgElement) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setScale(prevScale => {
+        const newScale = Math.min(Math.max(prevScale * delta, 0.5), 3);
+
+        const rect = svgElement.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        setTranslate(prevTranslate => ({
+          x: mouseX - (mouseX - prevTranslate.x) * (newScale / prevScale),
+          y: mouseY - (mouseY - prevTranslate.y) * (newScale / prevScale),
+        }));
+
+        return newScale;
+      });
+    };
+
+    svgElement.addEventListener('wheel', handleWheel, { passive: false });
+    return () => svgElement.removeEventListener('wheel', handleWheel);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 0) {
@@ -171,6 +178,16 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
 
   const hoveredEmp = employeePositions.find(e => e.employee_id === hoveredEmployee);
 
+  // データがない場合の表示
+  if (!allEmployees || allEmployees.length === 0) {
+    return (
+      <div className="w-full p-8 text-center text-muted-foreground text-sm">
+        <p>t-SNEデータがありません</p>
+        <p className="text-xs mt-2">バックエンドでクラスタリングを実行してください</p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-2">
       {/* Zoom controls */}
@@ -188,16 +205,15 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
       </div>
 
       {/* Graph container */}
-      <div 
+      <div
         className="w-full overflow-hidden rounded-lg border border-border bg-card relative"
         style={{ height: 350, cursor: isPanning ? 'grabbing' : 'grab' }}
       >
-        <svg 
+        <svg
           ref={svgRef}
-          width="100%" 
+          width="100%"
           height="100%"
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -211,13 +227,13 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
             {/* 従業員ドット - クラスタの色で表示、有識者は赤でハイライト */}
             {employeePositions.map((emp) => {
               const isHovered = hoveredEmployee === emp.employee_id;
-              const clusterColor = CLUSTER_CENTERS[emp.cluster]?.color || 'hsl(200, 50%, 60%)';
+              const clusterColor = getClusterColor(emp.cluster_id);
               const radius = emp.isUser ? 8 : emp.isExpert ? 7 : 4;
-              
+
               let fillColor: string;
               let strokeColor: string | undefined;
               let strokeWidth: number;
-              
+
               if (emp.isUser) {
                 fillColor = 'hsl(var(--primary))';
                 strokeColor = 'hsl(var(--background))';
@@ -252,38 +268,33 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
               );
             })}
 
-            {/* クラスタラベル（マップ上に直接配置） */}
-            {Object.entries(CLUSTER_CENTERS).map(([name, center]) => {
-              const labelX = padding + (center.x / 100) * (svgWidth - 2 * padding);
-              const labelY = padding + (center.y / 100) * (svgHeight - 2 * padding);
-              
-              return (
-                <g key={`label-${name}`} transform={`translate(${labelX}, ${labelY})`}>
-                  <rect 
-                    x={-name.length * 4} 
-                    y={-10} 
-                    width={name.length * 8} 
-                    height={18} 
-                    fill="hsl(var(--card))" 
-                    opacity={0.9} 
-                    rx={4} 
-                  />
-                  <text 
-                    textAnchor="middle" 
-                    dominantBaseline="middle"
-                    fill="hsl(var(--foreground))" 
-                    fontSize={10} 
-                    fontWeight={600}
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    {name}
-                  </text>
-                </g>
-              );
-            })}
+            {/* クラスタラベル（LLMで生成されたラベル） */}
+            {clusterLabels.map((cluster) => (
+              <g key={`label-${cluster.id}`} transform={`translate(${cluster.x}, ${cluster.y})`}>
+                <rect
+                  x={-cluster.label.length * 5}
+                  y={-12}
+                  width={cluster.label.length * 10}
+                  height={20}
+                  fill="hsl(var(--card))"
+                  opacity={0.9}
+                  rx={4}
+                />
+                <text
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="hsl(var(--foreground))"
+                  fontSize={11}
+                  fontWeight={600}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {cluster.label}
+                </text>
+              </g>
+            ))}
           </g>
 
-          {/* 凡例（固定位置） - マーカーのみ */}
+          {/* 凡例（固定位置） */}
           <g transform={`translate(${svgWidth - 90}, 15)`}>
             <rect x={-10} y={-10} width={85} height={55} fill="hsl(var(--background))" rx={6} opacity={0.95} stroke="hsl(var(--border))" strokeWidth={1} />
             <text fill="hsl(var(--foreground))" fontSize={10} fontWeight={600}>凡例</text>
@@ -303,19 +314,22 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
 
         {/* Tooltip */}
         {hoveredEmp && (
-          <div 
+          <div
             className="absolute bg-popover border border-border rounded-lg shadow-lg p-3 pointer-events-none z-10"
-            style={{ 
+            style={{
               left: Math.min(hoveredEmp.x * scale + translate.x + 15, svgWidth - 200),
               top: Math.min(hoveredEmp.y * scale + translate.y - 10, svgHeight - 100),
             }}
           >
-            <div className="font-medium text-sm">{hoveredEmp.display_name}</div>
+            <div className="font-medium text-sm">{hoveredEmp.name}</div>
             <div className="text-xs text-muted-foreground">{hoveredEmp.department}</div>
-            <div className="text-xs text-muted-foreground">{hoveredEmp.job_title}</div>
-            {hoveredEmp.skills && hoveredEmp.skills.length > 0 && (
+            <div className="text-xs text-muted-foreground">{hoveredEmp.role}</div>
+            {hoveredEmp.cluster_label && (
+              <div className="text-xs text-primary mt-1">クラスタ: {hoveredEmp.cluster_label}</div>
+            )}
+            {hoveredEmp.expertise && hoveredEmp.expertise.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
-                {hoveredEmp.skills.slice(0, 4).map(skill => (
+                {hoveredEmp.expertise.slice(0, 4).map(skill => (
                   <span key={skill} className="px-1.5 py-0.5 text-[10px] bg-muted rounded">
                     {skill}
                   </span>
@@ -327,7 +341,7 @@ const ExpertTSNEMap: React.FC<ExpertTSNEMapProps> = ({ experts }) => {
       </div>
 
       <p className="text-xs text-muted-foreground text-center">
-        専門性の類似度に基づく2D配置。ホバーで詳細表示。
+        t-SNE + k-meansクラスタリング（LLMラベル付き）。ホバーで詳細表示。
       </p>
     </div>
   );

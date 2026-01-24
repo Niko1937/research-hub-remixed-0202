@@ -37,8 +37,31 @@ interface Expert {
   contactMethods: ('slack' | 'email' | 'request_intro' | 'ask_manager')[];
 }
 
+interface ClusterInfo {
+  label: string;
+  center_x: number;
+  center_y: number;
+  count: number;
+}
+
+interface EmployeeForTSNE {
+  employee_id: string;
+  name: string;
+  department: string;
+  role: string;
+  expertise?: string[];
+  keywords?: string[];
+  tsne_x: number;
+  tsne_y: number;
+  cluster_id?: number;
+  cluster_label?: string;
+  is_current_user?: boolean;
+}
+
 interface KnowWhoResultsProps {
   experts: Expert[];
+  allEmployees?: EmployeeForTSNE[];
+  clusters?: Record<string, ClusterInfo>;
   hideFollowUpText?: boolean;
 }
 
@@ -70,7 +93,7 @@ const contactMethodLabels = {
   ask_manager: { label: "上司に相談", icon: ArrowRight },
 };
 
-export function KnowWhoResults({ experts }: KnowWhoResultsProps) {
+export function KnowWhoResults({ experts, allEmployees, clusters }: KnowWhoResultsProps) {
   const [isGraphOpen, setIsGraphOpen] = useState(false);
 
   return (
@@ -116,16 +139,19 @@ export function KnowWhoResults({ experts }: KnowWhoResultsProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      {expert.contactMethods.slice(0, 2).map((method) => {
+                      {(expert.contactMethods || []).slice(0, 2).map((method) => {
                         const methodConfig = contactMethodLabels[method];
+                        if (!methodConfig) return null;
+                        const IconComponent = methodConfig.icon;
                         return (
                           <Button
                             key={method}
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2 text-xs"
+                            title={methodConfig.label}
                           >
-                            <methodConfig.icon className="w-3 h-3" />
+                            <IconComponent className="w-3 h-3" />
                           </Button>
                         );
                       })}
@@ -187,7 +213,11 @@ export function KnowWhoResults({ experts }: KnowWhoResultsProps) {
                 </TabsContent>
                 
                 <TabsContent value="tsne-map">
-                  <ExpertTSNEMap experts={experts} />
+                  <ExpertTSNEMap
+                    experts={experts}
+                    allEmployees={allEmployees}
+                    clusters={clusters}
+                  />
                 </TabsContent>
                 
                 <TabsContent value="skill-cards">

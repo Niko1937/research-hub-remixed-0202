@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -230,25 +230,33 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
     return hoveredExpertPath.has(source) && hoveredExpertPath.has(target);
   };
 
-  // Zoom handlers
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.min(Math.max(scale * delta, 0.5), 3);
-    
-    // Zoom toward mouse position
-    if (svgRef.current) {
-      const rect = svgRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      
-      const newTranslateX = mouseX - (mouseX - translate.x) * (newScale / scale);
-      const newTranslateY = mouseY - (mouseY - translate.y) * (newScale / scale);
-      
-      setScale(newScale);
-      setTranslate({ x: newTranslateX, y: newTranslateY });
-    }
-  }, [scale, translate]);
+  // Zoom handlers - use native event listener with passive: false
+  useEffect(() => {
+    const svgElement = svgRef.current;
+    if (!svgElement) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setScale(prevScale => {
+        const newScale = Math.min(Math.max(prevScale * delta, 0.5), 3);
+
+        const rect = svgElement.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        setTranslate(prevTranslate => ({
+          x: mouseX - (mouseX - prevTranslate.x) * (newScale / prevScale),
+          y: mouseY - (mouseY - prevTranslate.y) * (newScale / prevScale),
+        }));
+
+        return newScale;
+      });
+    };
+
+    svgElement.addEventListener('wheel', handleWheel, { passive: false });
+    return () => svgElement.removeEventListener('wheel', handleWheel);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 0) { // Left click
@@ -312,12 +320,11 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
         className="w-full overflow-hidden rounded-lg border border-border bg-card"
         style={{ height: 400, cursor: isPanning ? 'grabbing' : 'grab' }}
       >
-        <svg 
+        <svg
           ref={svgRef}
-          width="100%" 
+          width="100%"
           height="100%"
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}

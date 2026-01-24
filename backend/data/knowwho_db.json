@@ -1,0 +1,285 @@
+{
+  "employees": [
+    {
+      "employee_id": "E001",
+      "display_name": "山田 太郎",
+      "mail": "yamada.taro@company.com",
+      "job_title": "代表取締役CEO",
+      "department": "経営",
+      "manager_employee_id": null,
+      "profile": {
+        "research_summary": "企業経営戦略とイノベーション推進。技術経営(MOT)の観点から、R&D投資と企業価値向上の関係性を研究。",
+        "expertise": ["経営戦略", "技術経営", "イノベーション"],
+        "keywords": ["MOT", "R&D投資", "企業価値", "オープンイノベーション"],
+        "bio": "東京大学工学部卒。MITスローン経営大学院MBA。大手製造業にてR&D部門長を経て現職。"
+      }
+    },
+    {
+      "employee_id": "E010",
+      "display_name": "佐藤 一郎",
+      "mail": "sato.ichiro@company.com",
+      "job_title": "執行役員 CTO",
+      "department": "技術本部",
+      "manager_employee_id": "E001",
+      "profile": {
+        "research_summary": "AI・機械学習の産業応用と技術戦略。特に製造業DXにおけるAI活用アーキテクチャの設計に注力。",
+        "expertise": ["AI戦略", "機械学習", "製造DX", "技術アーキテクチャ"],
+        "keywords": ["AI", "機械学習", "DX", "製造業", "アーキテクチャ"],
+        "bio": "京都大学情報学研究科博士課程修了。Google Japanを経て入社。IEEE Senior Member。"
+      }
+    },
+    {
+      "employee_id": "E011",
+      "display_name": "鈴木 花子",
+      "mail": "suzuki.hanako@company.com",
+      "job_title": "執行役員 CSO",
+      "department": "戦略本部",
+      "manager_employee_id": "E001",
+      "profile": {
+        "research_summary": "事業戦略と新規事業開発。市場分析とテクノロジーロードマップの統合による戦略立案手法を研究。",
+        "expertise": ["事業戦略", "新規事業開発", "市場分析"],
+        "keywords": ["戦略", "新規事業", "ロードマップ", "市場分析"],
+        "bio": "慶應義塾大学経済学部卒。BCG出身。複数のスタートアップのアドバイザーも兼任。"
+      }
+    },
+    {
+      "employee_id": "E012",
+      "display_name": "高橋 健一",
+      "mail": "takahashi.kenichi@company.com",
+      "job_title": "執行役員 CFO",
+      "department": "管理本部",
+      "manager_employee_id": "E001",
+      "profile": {
+        "research_summary": "コーポレートファイナンスとリスク管理。R&D投資の財務評価手法とリアルオプション分析。",
+        "expertise": ["財務管理", "リスク管理", "投資評価"],
+        "keywords": ["ファイナンス", "リスク管理", "ROI", "リアルオプション"],
+        "bio": "一橋大学商学部卒。公認会計士。Big4監査法人を経て現職。"
+      }
+    },
+    {
+      "employee_id": "E020",
+      "display_name": "田中 誠",
+      "mail": "tanaka.makoto@company.com",
+      "job_title": "研究開発部長",
+      "department": "研究開発部",
+      "manager_employee_id": "E010",
+      "profile": {
+        "research_summary": "自然言語処理と知識グラフの研究。企業内ナレッジマネジメントへの応用に注力。論文50編以上。",
+        "expertise": ["自然言語処理", "知識グラフ", "情報抽出"],
+        "keywords": ["NLP", "知識グラフ", "BERT", "Transformer", "情報抽出"],
+        "bio": "東北大学情報科学研究科博士。ACL、EMNLP等で発表多数。言語処理学会評議員。"
+      }
+    },
+    {
+      "employee_id": "E021",
+      "display_name": "伊藤 美咲",
+      "mail": "ito.misaki@company.com",
+      "job_title": "AI推進部長",
+      "department": "AI推進部",
+      "manager_employee_id": "E010",
+      "profile": {
+        "research_summary": "大規模言語モデルの業務適用とRAGシステム設計。プロンプトエンジニアリングの体系化。",
+        "expertise": ["LLM", "RAG", "プロンプトエンジニアリング"],
+        "keywords": ["LLM", "GPT", "RAG", "プロンプト", "生成AI"],
+        "bio": "東京工業大学情報理工学院修了。OpenAI API公開直後からLLM活用を推進。"
+      }
+    },
+    {
+      "employee_id": "E022",
+      "display_name": "渡辺 剛",
+      "mail": "watanabe.tsuyoshi@company.com",
+      "job_title": "技術戦略室長",
+      "department": "技術戦略室",
+      "manager_employee_id": "E010",
+      "profile": {
+        "research_summary": "技術トレンド分析と知財戦略。特許ポートフォリオ分析とテクノロジースカウティング。",
+        "expertise": ["技術戦略", "知財戦略", "特許分析"],
+        "keywords": ["技術戦略", "特許", "知財", "トレンド分析"],
+        "bio": "大阪大学工学部卒。弁理士資格保有。知財部門を経て現職。"
+      }
+    },
+    {
+      "employee_id": "E023",
+      "display_name": "小林 真理",
+      "mail": "kobayashi.mari@company.com",
+      "job_title": "企画部長",
+      "department": "企画部",
+      "manager_employee_id": "E011",
+      "profile": {
+        "research_summary": "プロダクト企画とUXリサーチ。デザイン思考を活用した新製品開発プロセスの構築。",
+        "expertise": ["プロダクト企画", "UXリサーチ", "デザイン思考"],
+        "keywords": ["UX", "プロダクト", "デザイン思考", "顧客開発"],
+        "bio": "武蔵野美術大学卒。IDEOでの経験を経て入社。HCD-Net認定人間中心設計専門家。"
+      }
+    },
+    {
+      "employee_id": "E024",
+      "display_name": "加藤 隆",
+      "mail": "kato.takashi@company.com",
+      "job_title": "事業開発部長",
+      "department": "事業開発部",
+      "manager_employee_id": "E011",
+      "profile": {
+        "research_summary": "オープンイノベーションとスタートアップ連携。CVC運営とM&A戦略の立案・実行。",
+        "expertise": ["事業開発", "オープンイノベーション", "CVC"],
+        "keywords": ["CVC", "M&A", "スタートアップ", "アライアンス"],
+        "bio": "早稲田大学商学部卒。VCでの投資経験を経て現職。複数社の社外取締役。"
+      }
+    },
+    {
+      "employee_id": "E030",
+      "display_name": "吉田 健太",
+      "mail": "yoshida.kenta@company.com",
+      "job_title": "NLP研究課長",
+      "department": "研究開発部",
+      "manager_employee_id": "E020",
+      "profile": {
+        "research_summary": "日本語BERTの事前学習と固有表現抽出。製造業ドメインに特化した言語モデルの構築。",
+        "expertise": ["BERT", "固有表現抽出", "事前学習"],
+        "keywords": ["BERT", "NER", "事前学習", "日本語処理", "ドメイン適応"],
+        "bio": "奈良先端科学技術大学院大学修了。言語処理学会年次大会で最優秀論文賞受賞。"
+      }
+    },
+    {
+      "employee_id": "E031",
+      "display_name": "山本 愛",
+      "mail": "yamamoto.ai@company.com",
+      "job_title": "CV研究課長",
+      "department": "研究開発部",
+      "manager_employee_id": "E020",
+      "profile": {
+        "research_summary": "コンピュータビジョンと異常検知。製造ラインの外観検査AI開発と実装。",
+        "expertise": ["コンピュータビジョン", "異常検知", "画像認識"],
+        "keywords": ["CV", "異常検知", "外観検査", "CNN", "Vision Transformer"],
+        "bio": "名古屋大学情報学研究科博士。CVPR、ICCVで発表。製造業向けAI導入実績多数。"
+      }
+    },
+    {
+      "employee_id": "E032",
+      "display_name": "中村 翔",
+      "mail": "nakamura.sho@company.com",
+      "job_title": "LLM推進課長",
+      "department": "AI推進部",
+      "manager_employee_id": "E021",
+      "profile": {
+        "research_summary": "エンタープライズLLM導入とファインチューニング。社内データを活用したRAGシステム構築。",
+        "expertise": ["LLM導入", "ファインチューニング", "RAG"],
+        "keywords": ["LLM", "ファインチューニング", "RAG", "ベクトルDB", "LangChain"],
+        "bio": "筑波大学情報学群卒。複数企業でのLLM導入プロジェクトをリード。"
+      }
+    },
+    {
+      "employee_id": "E033",
+      "display_name": "小川 裕子",
+      "mail": "ogawa.yuko@company.com",
+      "job_title": "MLOps課長",
+      "department": "AI推進部",
+      "manager_employee_id": "E021",
+      "profile": {
+        "research_summary": "機械学習基盤とMLOpsパイプライン構築。モデル監視とドリフト検知の自動化。",
+        "expertise": ["MLOps", "機械学習基盤", "モデル監視"],
+        "keywords": ["MLOps", "Kubernetes", "MLflow", "モデル監視", "CI/CD"],
+        "bio": "東京大学情報理工学系研究科修了。AWSソリューションアーキテクト。"
+      }
+    },
+    {
+      "employee_id": "E034",
+      "display_name": "藤田 大輔",
+      "mail": "fujita.daisuke@company.com",
+      "job_title": "技術調査課長",
+      "department": "技術戦略室",
+      "manager_employee_id": "E022",
+      "profile": {
+        "research_summary": "先端技術調査とテクノロジーロードマップ作成。量子コンピューティングと次世代AIの動向分析。",
+        "expertise": ["技術調査", "ロードマップ", "量子コンピューティング"],
+        "keywords": ["技術調査", "量子", "次世代AI", "トレンド"],
+        "bio": "東京理科大学理工学部卒。技術系シンクタンクを経て現職。"
+      }
+    },
+    {
+      "employee_id": "E100",
+      "display_name": "自分",
+      "mail": "me@company.com",
+      "job_title": "AIリサーチャー",
+      "department": "研究開発部",
+      "manager_employee_id": "E030",
+      "profile": {
+        "research_summary": "マルチモーダルAIと論文解析。研究支援システムの開発と研究者ネットワーク分析。",
+        "expertise": ["マルチモーダルAI", "論文解析", "研究支援"],
+        "keywords": ["マルチモーダル", "論文解析", "RAG", "研究支援"],
+        "bio": "現在の利用者。研究開発部でAI研究に従事。"
+      }
+    },
+    {
+      "employee_id": "E101",
+      "display_name": "松本 理沙",
+      "mail": "matsumoto.risa@company.com",
+      "job_title": "シニアリサーチャー",
+      "department": "研究開発部",
+      "manager_employee_id": "E030",
+      "profile": {
+        "research_summary": "対話システムとチャットボット開発。タスク指向対話の状態追跡と応答生成。",
+        "expertise": ["対話システム", "チャットボット", "応答生成"],
+        "keywords": ["対話", "チャットボット", "状態追跡", "応答生成"],
+        "bio": "北海道大学情報科学研究科修了。対話システムライブチャレンジで入賞経験。"
+      }
+    },
+    {
+      "employee_id": "E102",
+      "display_name": "井上 拓也",
+      "mail": "inoue.takuya@company.com",
+      "job_title": "リサーチャー",
+      "department": "研究開発部",
+      "manager_employee_id": "E031",
+      "profile": {
+        "research_summary": "3D点群処理とセンサーフュージョン。LiDARとカメラの統合による環境認識。",
+        "expertise": ["3D点群", "センサーフュージョン", "自動運転"],
+        "keywords": ["点群", "LiDAR", "センサーフュージョン", "3D認識"],
+        "bio": "九州大学工学府修了。ロボティクス企業での開発経験あり。"
+      }
+    },
+    {
+      "employee_id": "E103",
+      "display_name": "木村 優太",
+      "mail": "kimura.yuta@company.com",
+      "job_title": "MLエンジニア",
+      "department": "AI推進部",
+      "manager_employee_id": "E032",
+      "profile": {
+        "research_summary": "LLMアプリケーション開発とAPI設計。Streamlit/Gradioによるプロトタイピング。",
+        "expertise": ["LLMアプリ開発", "API設計", "プロトタイピング"],
+        "keywords": ["LLM", "API", "Streamlit", "Gradio", "FastAPI"],
+        "bio": "電気通信大学情報理工学域卒。個人開発でLLMアプリを多数公開。"
+      }
+    },
+    {
+      "employee_id": "E104",
+      "display_name": "林 さくら",
+      "mail": "hayashi.sakura@company.com",
+      "job_title": "シニアMLエンジニア",
+      "department": "AI推進部",
+      "manager_employee_id": "E032",
+      "profile": {
+        "research_summary": "分散学習とモデル最適化。大規模モデルの効率的な推論とエッジデプロイメント。",
+        "expertise": ["分散学習", "モデル最適化", "エッジAI"],
+        "keywords": ["分散学習", "量子化", "蒸留", "ONNX", "TensorRT"],
+        "bio": "東京大学工学系研究科修了。NVIDIA認定ディープラーニングインストラクター。"
+      }
+    },
+    {
+      "employee_id": "E105",
+      "display_name": "清水 龍一",
+      "mail": "shimizu.ryuichi@company.com",
+      "job_title": "MLOpsエンジニア",
+      "department": "AI推進部",
+      "manager_employee_id": "E033",
+      "profile": {
+        "research_summary": "Kubernetesによる機械学習基盤構築。GitOpsとCI/CDパイプラインの自動化。",
+        "expertise": ["Kubernetes", "GitOps", "CI/CD"],
+        "keywords": ["Kubernetes", "Docker", "GitOps", "ArgoCD", "GitHub Actions"],
+        "bio": "慶應義塾大学理工学部卒。SREエンジニアとしてのキャリアを経て現職。"
+      }
+    }
+  ],
+  "current_user_id": "E100"
+}

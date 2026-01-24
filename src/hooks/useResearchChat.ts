@@ -90,6 +90,29 @@ const stripLeadingCodeFence = (input: string) =>
 const stripTrailingCodeFence = (input: string) =>
   input.replace(/\n?\s*```[^\n]*\s*$/i, "");
 
+// API URL helper - FastAPI backend or fallback to Supabase
+const getApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return `${import.meta.env.VITE_API_URL}/api/research-chat`;
+  }
+  if (import.meta.env.VITE_SUPABASE_URL) {
+    return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
+  }
+  return "http://localhost:8000/api/research-chat";
+};
+
+// Headers helper
+const getHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  // Only add auth header for Supabase (not for FastAPI backend)
+  if (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY && !import.meta.env.VITE_API_URL) {
+    headers.Authorization = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+  }
+  return headers;
+};
+
 export function useResearchChat() {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -123,7 +146,7 @@ export function useResearchChat() {
       setIsLoading(true);
 
       try {
-        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
+        const CHAT_URL = getApiUrl();
         const allMessages = [
           ...timeline
             .filter((item) => item.type === "user_message" || item.type === "assistant_message")
@@ -137,10 +160,7 @@ export function useResearchChat() {
 
         const response = await fetch(CHAT_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
+          headers: getHeaders(),
           body: JSON.stringify({
             messages: allMessages,
             mode,
@@ -223,6 +243,11 @@ export function useResearchChat() {
 
               // Handle final_answer with sources (consolidated Wide Research results)
               if (parsed.type === "final_answer") {
+                console.log("[DEBUG] final_answer received:", {
+                  contentLength: parsed.content?.length,
+                  sourcesCount: parsed.sources?.length,
+                  sources: parsed.sources,
+                });
                 setTimeline((prev) => [
                   ...prev,
                   {
@@ -327,7 +352,11 @@ export function useResearchChat() {
                   {
                     type: "knowwho_result",
                     timestamp: Date.now(),
-                    data: { experts: parsed.experts || [] },
+                    data: {
+                      experts: parsed.experts || [],
+                      allEmployees: parsed.allEmployees || [],
+                      clusters: parsed.clusters || {},
+                    },
                   },
                 ]);
                 continue;
@@ -565,13 +594,9 @@ export function useResearchChat() {
     async (positioningData: any, axisName: string, axisType: "quantitative" | "qualitative") => {
       setIsLoading(true);
       try {
-        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
-        const response = await fetch(CHAT_URL, {
+        const response = await fetch(getApiUrl(), {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
+          headers: getHeaders(),
           body: JSON.stringify({
             messages: [{ role: "user", content: "add-axis" }],
             mode: "assistant",
@@ -631,13 +656,9 @@ export function useResearchChat() {
     async (positioningData: any, axisName: string) => {
       setIsLoading(true);
       try {
-        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
-        const response = await fetch(CHAT_URL, {
+        const response = await fetch(getApiUrl(), {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
+          headers: getHeaders(),
           body: JSON.stringify({
             messages: [{ role: "user", content: "remove-axis" }],
             mode: "assistant",
@@ -697,13 +718,9 @@ export function useResearchChat() {
     async (positioningData: any, axisName: string) => {
       setIsLoading(true);
       try {
-        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/research-chat`;
-        const response = await fetch(CHAT_URL, {
+        const response = await fetch(getApiUrl(), {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
+          headers: getHeaders(),
           body: JSON.stringify({
             messages: [{ role: "user", content: "regenerate-axis" }],
             mode: "assistant",

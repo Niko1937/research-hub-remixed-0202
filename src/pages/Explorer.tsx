@@ -25,7 +25,7 @@ import { Sparkles, Loader2, FileText, Search, MessageSquare, X } from "lucide-re
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchArxivProxy } from "@/lib/api";
 
 // Mock virtual folder generator based on paper metadata
 function generateMockVirtualFolder(title: string): VirtualFile[] {
@@ -204,15 +204,11 @@ const Explorer = () => {
     // Reset to initial recommendations
     setRecommendedLoading(true);
     
-    supabase.functions
-      .invoke("arxiv-proxy", {
-        body: { 
-          searchQuery: DEFAULT_RECOMMEND_QUERY,
-          maxResults: 7 
-        },
+    fetchArxivProxy({
+        searchQuery: DEFAULT_RECOMMEND_QUERY,
+        maxResults: 7
       })
-      .then(({ data, error }) => {
-        if (error) throw error;
+      .then((data) => {
         if (!data?.xmlData) throw new Error("No data returned");
         
         const parser = new DOMParser();
@@ -346,14 +342,11 @@ const Explorer = () => {
         setRecommendedLoading(true);
         setRecommendedError(null);
 
-        const { data, error } = await supabase.functions.invoke("arxiv-proxy", {
-          body: { 
-            searchQuery: DEFAULT_RECOMMEND_QUERY,
-            maxResults: 7 
-          },
+        const data = await fetchArxivProxy({
+          searchQuery: DEFAULT_RECOMMEND_QUERY,
+          maxResults: 7
         });
 
-        if (error) throw error;
         if (!data?.xmlData) {
           throw new Error("No data returned from arXiv proxy");
         }
@@ -744,7 +737,13 @@ const Explorer = () => {
                               if (prevItem && prevItem.type === "knowwho_result") {
                                 return null;
                               }
-                              
+
+                              console.log("[DEBUG] assistant_message render:", {
+                                hasSources: !!item.data.sources,
+                                sourcesLength: item.data.sources?.length,
+                                contentPreview: item.data.content?.slice(0, 50),
+                              });
+
                               // If message has sources, use CitedAnswer component
                               if (item.data.sources && item.data.sources.length > 0) {
                                 return (
