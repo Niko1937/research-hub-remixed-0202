@@ -115,19 +115,18 @@ export function ValueProposition() {
           </h2>
         </div>
 
-        {/* Alternating Feature Sections */}
+        {/* Feature Sections - Text Left, Visual Right */}
         <div className="space-y-24 sm:space-y-32">
           {features.map((feature, index) => {
             const Icon = feature.icon;
-            const isReversed = index % 2 === 1;
             
             return (
               <div 
                 key={index}
-                className={`grid lg:grid-cols-2 gap-12 lg:gap-20 items-center ${isReversed ? '' : ''}`}
+                className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center"
               >
-                {/* Text */}
-                <div className={`${isReversed ? 'lg:order-2' : 'lg:order-1'}`}>
+                {/* Text - Always Left */}
+                <div>
                   <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
                     <Icon className="w-4 h-4 text-primary" />
                     <span className="text-xs font-semibold text-primary uppercase tracking-wider">
@@ -142,8 +141,8 @@ export function ValueProposition() {
                   </p>
                 </div>
                 
-                {/* Visual */}
-                <div className={`${isReversed ? 'lg:order-1' : 'lg:order-2'}`}>
+                {/* Visual - Always Right */}
+                <div>
                   {feature.visual}
                 </div>
               </div>
