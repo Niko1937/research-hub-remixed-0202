@@ -6,7 +6,7 @@ export function HeroSection() {
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
       
-      <div className="relative max-w-6xl mx-auto px-6 sm:px-8 pt-16 sm:pt-24 lg:pt-32 pb-8 sm:pb-12">
+      <div className="relative max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 pt-16 sm:pt-24 lg:pt-32 pb-8 sm:pb-12">
         {/* Text Content */}
         <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
           <p className="inline-block text-[10px] sm:text-xs uppercase tracking-[0.25em] text-primary/80 font-medium mb-4 sm:mb-6 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5">
@@ -26,7 +26,7 @@ export function HeroSection() {
         </div>
         
         {/* Hero Image */}
-        <div className="relative max-w-4xl mx-auto">
+        <div className="relative max-w-5xl mx-auto">
           <div className="relative rounded-2xl overflow-hidden aspect-[2.4/1] shadow-2xl ring-1 ring-white/10">
             <img 
               src={researchHeroImage} 
