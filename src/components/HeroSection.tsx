@@ -14,14 +14,14 @@ export function HeroSection() {
           </p>
           
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-foreground leading-[1.1] tracking-tight mb-5 sm:mb-6">
-            研究に集中する時間を、
-            <span className="block text-primary mt-1">もっと。</span>
+            研究を、
+            <span className="block text-primary mt-1">もっと前へ。</span>
           </h1>
           
           <p className="text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto">
-            論文調査・理解・専門家探しを対話AIが支援。
+            論文調査から新アイデアの壁打ち、研究の高度化まで。
             <span className="hidden sm:inline"><br /></span>
-            「調べる」から「理解する」「つながる」へ。
+            対話AIがあなたの研究を加速させる。
           </p>
         </div>
         

@@ -1,5 +1,6 @@
 import { HeroSection } from "@/components/HeroSection";
 import { ValueProposition } from "@/components/ValueProposition";
+import { ExpansionMatrix } from "@/components/ExpansionMatrix";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Search } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -32,15 +33,18 @@ const Index = () => {
       <main className="pt-14 sm:pt-16">
         <HeroSection />
         <ValueProposition />
+        <ExpansionMatrix />
         
         {/* CTA Section */}
         <section className="py-16 sm:py-24 text-center">
           <div className="max-w-2xl mx-auto px-6 sm:px-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
-              今すぐ試してみる
+              研究を次のステージへ
             </h2>
             <p className="text-muted-foreground mb-8">
-              論文検索、専門家探し、研究テーマの深掘りをAIと対話しながら進めましょう。
+              文献調査、アイデアの壁打ち、専門家探し、研究の高度化。
+              <br className="hidden sm:inline" />
+              すべてを対話AIと一緒に。
             </p>
             <Link to="/explorer">
               <Button size="lg" className="gap-2 text-base px-8">
