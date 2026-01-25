@@ -1,53 +1,112 @@
-import { Clock, Lightbulb, Users, ArrowRight, CheckCircle2, Layers, Sparkles, FlaskConical, Target } from "lucide-react";
+import { Clock, Lightbulb, Users, ArrowRight, CheckCircle2, Layers, Sparkles, FlaskConical, Target, Search, FileText, Brain } from "lucide-react";
 
 export function ValueProposition() {
-  const painPoints = [
+  const features = [
     {
-      problem: "論文を探すのに時間がかかりすぎる",
-      solution: "自然言語で質問するだけで、関連論文を瞬時にサーベイ",
+      icon: Search,
+      title: "文献を瞬時にサーベイ",
+      description: "自然言語で質問するだけ。関連論文を見つけ出し、要点を整理。時間のかかる文献調査をAIが代行します。",
+      visual: (
+        <div className="bg-card/80 backdrop-blur border border-border/50 rounded-xl p-6 space-y-3">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <Search className="w-4 h-4 text-primary" />
+            <span>「量子コンピューティングの最新動向は？」</span>
+          </div>
+          <div className="space-y-2 pl-7">
+            <div className="flex items-start gap-2">
+              <FileText className="w-4 h-4 text-primary/60 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Nature 2024 - Quantum Error Correction</p>
+                <p className="text-xs text-muted-foreground">エラー訂正率99.9%を達成した新手法...</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <FileText className="w-4 h-4 text-primary/60 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Science 2024 - Scalable Qubits</p>
+                <p className="text-xs text-muted-foreground">1000量子ビット規模の実装に成功...</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <FileText className="w-4 h-4 text-primary/60 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">arXiv 2024 - Hybrid Algorithms</p>
+                <p className="text-xs text-muted-foreground">古典-量子ハイブリッド手法の比較...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
     },
     {
-      problem: "読んでも専門外だと理解が追いつかない",
-      solution: "AIが対話形式で噛み砕いて解説、図表も深掘り",
+      icon: Lightbulb,
+      title: "対話で深く理解",
+      description: "専門外の論文も、AIが対話形式で噛み砕いて解説。図表の意味も、数式の導出も、質問するだけで理解が進みます。",
+      visual: (
+        <div className="bg-card/80 backdrop-blur border border-border/50 rounded-xl p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+              <span className="text-xs">🧑‍🔬</span>
+            </div>
+            <div className="bg-muted/50 rounded-lg rounded-tl-none px-4 py-2">
+              <p className="text-sm text-foreground">この論文のFig.3が理解できません</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <Brain className="w-4 h-4 text-primary" />
+            </div>
+            <div className="bg-primary/10 rounded-lg rounded-tl-none px-4 py-2 flex-1">
+              <p className="text-sm text-foreground">
+                Fig.3は<span className="text-primary font-medium">エントロピー変化</span>を時間軸で示しています。
+                縦軸のS(t)は系全体のエントロピーで、
+                <span className="text-primary font-medium">赤い破線</span>が理論予測、
+                <span className="text-primary font-medium">青いプロット</span>が実測値です...
+              </p>
+            </div>
+          </div>
+        </div>
+      ),
     },
     {
-      problem: "誰に相談すればいいかわからない",
-      solution: "研究領域から最適な専門家・共同研究候補を推薦",
-    },
-  ];
-
-  const valueFlow = [
-    { label: "調べる", icon: Clock, desc: "文献調査" },
-    { label: "理解する", icon: Lightbulb, desc: "対話学習" },
-    { label: "つながる", icon: Users, desc: "専門家発見" },
-    { label: "創る", icon: Sparkles, desc: "アイデア創出" },
-  ];
-
-  const futureVision = [
-    {
-      icon: Sparkles,
-      title: "アイデアの壁打ち",
-      description: "新しい研究テーマや仮説をAIと対話しながらブラッシュアップ",
-    },
-    {
-      icon: Target,
-      title: "研究の高度化",
-      description: "既存研究の発展可能性、未踏領域の発見を支援",
-    },
-    {
-      icon: FlaskConical,
-      title: "実験の指示・実行",
-      description: "将来的には実験計画から実行までを対話的にコントロール",
-      isFuture: true,
+      icon: Users,
+      title: "最適な専門家を発見",
+      description: "研究領域から、社内外の専門家や共同研究候補を推薦。「誰に相談すればいいか」の悩みを解消します。",
+      visual: (
+        <div className="bg-card/80 backdrop-blur border border-border/50 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+            <Users className="w-4 h-4 text-primary" />
+            <span>量子エラー訂正の専門家</span>
+          </div>
+          <div className="space-y-3">
+            {[
+              { name: "田中 博士", org: "量子情報研究所", match: 95 },
+              { name: "Dr. Smith", org: "MIT CSAIL", match: 88 },
+              { name: "佐藤 教授", org: "東京大学", match: 82 },
+            ].map((expert, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
+                  <span className="text-sm font-medium text-primary">{expert.name[0]}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{expert.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{expert.org}</p>
+                </div>
+                <div className="text-xs font-medium text-primary">{expert.match}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
     },
   ];
 
   return (
-    <section className="py-16 sm:py-24 lg:py-32">
+    <section className="py-20 sm:py-28 lg:py-36">
       <div className="max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16">
         
         {/* Section Header */}
-        <div className="text-center mb-12 sm:mb-16">
+        <div className="text-center mb-16 sm:mb-24">
           <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
             For Researchers
           </p>
@@ -56,98 +115,40 @@ export function ValueProposition() {
           </h2>
         </div>
 
-        {/* Pain → Solution */}
-        <div className="space-y-3 sm:space-y-4 mb-16 sm:mb-20">
-          {painPoints.map((item, index) => (
-            <div
-              key={index}
-              className="group bg-card/60 backdrop-blur border border-border/50 rounded-xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 hover:bg-card/80 transition-colors"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm sm:text-base text-muted-foreground/70 line-through decoration-muted-foreground/30">
-                  {item.problem}
-                </p>
-              </div>
-              
-              <ArrowRight className="w-4 h-4 text-primary/60 hidden sm:block flex-shrink-0 group-hover:text-primary transition-colors" />
-              
-              <div className="flex-1 min-w-0 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm sm:text-base font-medium text-foreground leading-relaxed">
-                  {item.solution}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Value Flow - Extended */}
-        <div className="flex items-center justify-center gap-3 sm:gap-6 lg:gap-10 mb-16 sm:mb-20 flex-wrap">
-          {valueFlow.map((step, index) => {
-            const Icon = step.icon;
+        {/* Alternating Feature Sections */}
+        <div className="space-y-24 sm:space-y-32">
+          {features.map((feature, index) => {
+            const Icon = feature.icon;
+            const isReversed = index % 2 === 1;
+            
             return (
-              <div key={index} className="flex items-center gap-3 sm:gap-6 lg:gap-10">
-                <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-2">
-                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-primary" />
+              <div 
+                key={index}
+                className={`grid lg:grid-cols-2 gap-12 lg:gap-20 items-center ${isReversed ? '' : ''}`}
+              >
+                {/* Text */}
+                <div className={`${isReversed ? 'lg:order-2' : 'lg:order-1'}`}>
+                  <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+                    <Icon className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                      Feature {String(index + 1).padStart(2, '0')}
+                    </span>
                   </div>
-                  <span className="text-xs sm:text-sm lg:text-base font-semibold text-foreground">{step.label}</span>
-                  <span className="text-[10px] sm:text-xs text-muted-foreground">{step.desc}</span>
+                  <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-4 tracking-tight">
+                    {feature.title}
+                  </h3>
+                  <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-lg">
+                    {feature.description}
+                  </p>
                 </div>
-                {index < valueFlow.length - 1 && (
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground/40" />
-                )}
+                
+                {/* Visual */}
+                <div className={`${isReversed ? 'lg:order-1' : 'lg:order-2'}`}>
+                  {feature.visual}
+                </div>
               </div>
             );
           })}
-        </div>
-
-        {/* Future Vision Cards */}
-        <div className="mb-16 sm:mb-20">
-          <h3 className="text-lg sm:text-xl font-bold text-foreground text-center mb-6 sm:mb-8">
-            研究の可能性を広げる
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {futureVision.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={index}
-                  className={`relative bg-card/60 backdrop-blur border rounded-xl p-5 sm:p-6 ${
-                    item.isFuture 
-                      ? 'border-primary/30 bg-primary/5' 
-                      : 'border-border/50'
-                  }`}
-                >
-                  {item.isFuture && (
-                    <span className="absolute top-3 right-3 text-[10px] uppercase tracking-wider text-primary font-semibold px-2 py-0.5 rounded-full bg-primary/10">
-                      Future
-                    </span>
-                  )}
-                  <Icon className={`w-8 h-8 mb-3 ${item.isFuture ? 'text-primary' : 'text-primary/70'}`} />
-                  <h4 className="font-semibold text-foreground mb-2">{item.title}</h4>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Extensibility */}
-        <div className="bg-muted/20 border border-border/50 rounded-2xl p-6 sm:p-8 text-center">
-          <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-            <Layers className="w-3.5 h-3.5 text-primary" />
-            <span className="text-[10px] sm:text-xs font-semibold text-primary uppercase tracking-wider">
-              Extensible Platform
-            </span>
-          </div>
-          <p className="text-sm sm:text-base text-muted-foreground max-w-lg mx-auto leading-relaxed">
-            対話UIの裏側で、Agentを追加するだけで機能拡張。
-            社内ナレッジ検索、自動報告生成、そして将来的には実験制御まで。
-            <span className="font-medium text-foreground">研究のすべてを、ここから。</span>
-          </p>
         </div>
         
       </div>
