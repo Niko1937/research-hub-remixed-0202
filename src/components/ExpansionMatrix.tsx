@@ -18,7 +18,7 @@ const aiLevels = [
 export function ExpansionMatrix() {
   return (
     <section className="py-16 sm:py-24 bg-muted/10">
-      <div className="max-w-4xl mx-auto px-6 sm:px-8">
+      <div className="max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16">
         {/* Header */}
         <div className="text-center mb-12 sm:mb-16">
           <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
@@ -33,7 +33,7 @@ export function ExpansionMatrix() {
         </div>
 
         {/* Concept Diagram */}
-        <div className="relative max-w-2xl mx-auto">
+        <div className="relative max-w-4xl mx-auto">
           
           {/* Main visual area */}
           <div className="relative ml-8 sm:ml-12 mb-8">

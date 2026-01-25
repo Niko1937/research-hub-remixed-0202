@@ -10,7 +10,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
-        <div className="max-w-6xl mx-auto px-6 sm:px-8 h-14 sm:h-16 flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 h-14 sm:h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <Search className="w-4 h-4 text-primary" />
@@ -37,7 +37,7 @@ const Index = () => {
         
         {/* CTA Section */}
         <section className="py-16 sm:py-24 text-center">
-          <div className="max-w-2xl mx-auto px-6 sm:px-8">
+          <div className="max-w-3xl mx-auto px-6 sm:px-10 lg:px-16">
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
               研究を次のステージへ
             </h2>
@@ -58,7 +58,7 @@ const Index = () => {
       
       {/* Footer */}
       <footer className="border-t border-border/50 py-8">
-        <div className="max-w-6xl mx-auto px-6 sm:px-8 text-center text-sm text-muted-foreground">
+        <div className="max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 text-center text-sm text-muted-foreground">
           © 2024 ResearchAI. Built for researchers.
         </div>
       </footer>

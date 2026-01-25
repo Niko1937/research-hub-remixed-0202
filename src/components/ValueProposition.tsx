@@ -44,7 +44,7 @@ export function ValueProposition() {
 
   return (
     <section className="py-16 sm:py-24 lg:py-32">
-      <div className="max-w-5xl mx-auto px-6 sm:px-8">
+      <div className="max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16">
         
         {/* Section Header */}
         <div className="text-center mb-12 sm:mb-16">
