@@ -11,6 +11,16 @@ import re
 
 import httpx
 
+from ..config import settings
+
+
+def _get_httpx_kwargs(timeout: int = 15) -> dict:
+    """Get httpx.AsyncClient kwargs including proxy if configured"""
+    kwargs = {"timeout": timeout}
+    if settings.proxy_enabled and settings.proxy_url:
+        kwargs["proxy"] = settings.proxy_url
+    return kwargs
+
 
 @dataclass
 class ExternalPaper:
@@ -49,7 +59,7 @@ async def search_openalex(query: str, timeout: int = 15) -> list[ExternalPaper]:
         List of ExternalPaper
     """
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(**_get_httpx_kwargs(timeout=timeout)) as client:
             response = await client.get(
                 "https://api.openalex.org/works",
                 params={
@@ -112,7 +122,7 @@ async def search_semantic_scholar(query: str, timeout: int = 15) -> list[Externa
         List of ExternalPaper
     """
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(**_get_httpx_kwargs(timeout=timeout)) as client:
             response = await client.get(
                 "https://api.semanticscholar.org/graph/v1/paper/search",
                 params={
@@ -170,7 +180,7 @@ async def search_arxiv(query: str, timeout: int = 15) -> list[ExternalPaper]:
         List of ExternalPaper
     """
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(**_get_httpx_kwargs(timeout=timeout)) as client:
             response = await client.get(
                 "https://export.arxiv.org/api/query",
                 params={

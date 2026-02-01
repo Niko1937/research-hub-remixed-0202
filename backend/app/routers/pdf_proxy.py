@@ -9,7 +9,17 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
+from ..config import settings
+
 router = APIRouter()
+
+
+def _get_httpx_kwargs(timeout: float = 60.0) -> dict:
+    """Get httpx.AsyncClient kwargs including proxy if configured"""
+    kwargs = {"timeout": timeout, "follow_redirects": True}
+    if settings.proxy_enabled and settings.proxy_url:
+        kwargs["proxy"] = settings.proxy_url
+    return kwargs
 
 
 @router.get("")
@@ -30,8 +40,8 @@ async def pdf_proxy(url: str):
         raise HTTPException(status_code=403, detail="Only arXiv PDFs are allowed")
 
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(url, timeout=60.0)
+        async with httpx.AsyncClient(**_get_httpx_kwargs(timeout=60.0)) as client:
+            response = await client.get(url)
             response.raise_for_status()
 
         return Response(
