@@ -34,10 +34,27 @@ cd remix-of-research-hub-30
 プロジェクトルートに`.env`ファイルを作成:
 
 ```env
+# LLM設定（必須）
 LLM_BASE_URL=https://your-llm-api-endpoint.com
 LLM_API_KEY=your-api-key
 LLM_MODEL=vertex_ai.gemini-2.5-flash
+
+# プロキシ設定（オプション）
+# プロキシ環境で使用する場合は以下を設定
+# PROXY_ENABLED=true
+# PROXY_URL=http://proxy.example.com:8080
 ```
+
+#### プロキシ環境での設定
+
+プロキシサーバー経由でLLM APIにアクセスする必要がある場合:
+
+```env
+PROXY_ENABLED=true
+PROXY_URL=http://proxy.example.com:8080
+```
+
+プロキシが不要な環境では、`PROXY_ENABLED`と`PROXY_URL`は設定不要です（デフォルトでプロキシは無効）。
 
 ### 3. フロントエンドのセットアップ
 

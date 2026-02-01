@@ -51,6 +51,11 @@ class LLMClient:
         self.model = model or settings.llm_model
         self.timeout = timeout
 
+        # Proxy configuration
+        self.proxy_url: Optional[str] = None
+        if settings.proxy_enabled and settings.proxy_url:
+            self.proxy_url = settings.proxy_url
+
         if not self.base_url or not self.api_key:
             raise ValueError("LLM_BASE_URL and LLM_API_KEY must be set")
 
@@ -66,6 +71,13 @@ class LLMClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+
+    def _get_client_kwargs(self) -> dict:
+        """Get httpx.AsyncClient kwargs including proxy if configured"""
+        kwargs = {"timeout": self.timeout}
+        if self.proxy_url:
+            kwargs["proxy"] = self.proxy_url
+        return kwargs
 
     async def chat_completion(
         self,
@@ -99,7 +111,7 @@ class LLMClient:
 
         payload.update(kwargs)
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
             response = await client.post(
                 self._get_endpoint(),
                 headers=self._get_headers(),
@@ -146,7 +158,7 @@ class LLMClient:
 
         payload.update(kwargs)
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
             async with client.stream(
                 "POST",
                 self._get_endpoint(),

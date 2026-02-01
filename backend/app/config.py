@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     llm_model: str = "vertex_ai.gemini-2.5-flash"
     llm_timeout: int = 60
 
+    # Proxy Configuration
+    proxy_enabled: bool = False
+    proxy_url: str = ""  # e.g., "http://proxy.example.com:8080"
+
     class Config:
         env_prefix = ""
         case_sensitive = False
