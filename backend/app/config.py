@@ -53,3 +53,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance"""
     return Settings()
+
+
+# Module-level settings instance for convenience
+settings = get_settings()
