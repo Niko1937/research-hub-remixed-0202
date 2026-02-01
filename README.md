@@ -48,6 +48,9 @@ LLM_MODEL=vertex_ai.gemini-2.5-flash
 # OPENSEARCH_URL=https://your-opensearch-endpoint:9200
 # OPENSEARCH_USERNAME=admin
 # OPENSEARCH_PASSWORD=your-password
+# OPENSEARCH_VERIFY_SSL=false
+# OPENSEARCH_PROXY_ENABLED=false
+# OPENSEARCH_PROXY_URL=http://proxy.example.com:8080
 
 # エンベディングAPI設定（前処理スクリプト用）
 # EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
@@ -76,6 +79,19 @@ OPENSEARCH_URL=https://your-opensearch-endpoint:9200
 OPENSEARCH_USERNAME=admin
 OPENSEARCH_PASSWORD=your-password
 ```
+
+**SSL検証とプロキシ設定**（ローカルOpenSearch向け）:
+
+```env
+# 自己署名証明書の場合はSSL検証を無効化（デフォルト: false）
+OPENSEARCH_VERIFY_SSL=false
+
+# OpenSearch専用のプロキシ設定（LLM/Embedding APIとは別に設定可能）
+OPENSEARCH_PROXY_ENABLED=true
+OPENSEARCH_PROXY_URL=http://proxy.example.com:8080
+```
+
+**注意**: OpenSearchへのアクセスは `OPENSEARCH_PROXY_*` で個別に設定します。`PROXY_ENABLED`/`PROXY_URL` はLLM/Embedding API用です。
 
 #### エンベディングAPI設定
 

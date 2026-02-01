@@ -59,6 +59,8 @@ class OpenSearchConfig:
     username: str = ""
     password: str = ""
     verify_ssl: bool = False
+    proxy_enabled: bool = False
+    proxy_url: str = ""
 
     @classmethod
     def from_env(cls) -> "OpenSearchConfig":
@@ -67,6 +69,8 @@ class OpenSearchConfig:
             username=os.getenv("OPENSEARCH_USERNAME", ""),
             password=os.getenv("OPENSEARCH_PASSWORD", ""),
             verify_ssl=os.getenv("OPENSEARCH_VERIFY_SSL", "false").lower() == "true",
+            proxy_enabled=os.getenv("OPENSEARCH_PROXY_ENABLED", "false").lower() == "true",
+            proxy_url=os.getenv("OPENSEARCH_PROXY_URL", ""),
         )
 
     @property
@@ -79,6 +83,13 @@ class OpenSearchConfig:
     def is_configured(self) -> bool:
         """Check if OpenSearch is properly configured"""
         return bool(self.url)
+
+    def get_httpx_kwargs(self) -> dict:
+        """Get httpx client kwargs with proxy if configured"""
+        kwargs = {}
+        if self.proxy_enabled and self.proxy_url:
+            kwargs["proxy"] = self.proxy_url
+        return kwargs
 
 
 @dataclass
@@ -172,6 +183,7 @@ class Config:
         print(f"OpenSearch: {'Configured' if self.opensearch.is_configured() else 'NOT CONFIGURED'}")
         if self.opensearch.is_configured():
             print(f"  URL: {self.opensearch.url}")
+            print(f"  Proxy: {'Enabled (' + self.opensearch.proxy_url + ')' if self.opensearch.proxy_enabled else 'Disabled'}")
 
         print(f"Embedding: {'Configured' if self.embedding.is_configured() else 'NOT CONFIGURED'}")
         if self.embedding.is_configured():

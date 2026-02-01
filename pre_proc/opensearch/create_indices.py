@@ -27,15 +27,16 @@ else:
 
 
 def get_opensearch_client_kwargs() -> dict:
-    """Get httpx client kwargs including proxy if configured"""
+    """Get httpx client kwargs including OpenSearch-specific proxy if configured"""
     kwargs = {"timeout": 30.0}
 
-    proxy_enabled = os.getenv("PROXY_ENABLED", "false").lower() == "true"
-    proxy_url = os.getenv("PROXY_URL", "")
+    # Use OpenSearch-specific proxy settings
+    proxy_enabled = os.getenv("OPENSEARCH_PROXY_ENABLED", "false").lower() == "true"
+    proxy_url = os.getenv("OPENSEARCH_PROXY_URL", "")
 
     if proxy_enabled and proxy_url:
         kwargs["proxy"] = proxy_url
-        print(f"Using proxy: {proxy_url}")
+        print(f"Using proxy for OpenSearch: {proxy_url}")
 
     return kwargs
 

@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
 
-from common.config import config, OpenSearchConfig, ProxyConfig
+from common.config import config, OpenSearchConfig
 
 
 @dataclass
@@ -52,9 +52,9 @@ class OpenSearchClient:
         url: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
-        verify_ssl: bool = False,
+        verify_ssl: Optional[bool] = None,
         timeout: int = 30,
-        proxy_config: Optional[ProxyConfig] = None,
+        opensearch_config: Optional[OpenSearchConfig] = None,
     ):
         """
         Initialize OpenSearch client
@@ -63,16 +63,16 @@ class OpenSearchClient:
             url: OpenSearch URL (default: from env)
             username: Username (default: from env)
             password: Password (default: from env)
-            verify_ssl: Whether to verify SSL certificates
+            verify_ssl: Whether to verify SSL certificates (default: from env)
             timeout: Request timeout in seconds
-            proxy_config: Proxy configuration (default: from env)
+            opensearch_config: OpenSearch configuration including proxy (default: from env)
         """
-        self.url = (url or config.opensearch.url).rstrip("/")
-        self.username = username or config.opensearch.username
-        self.password = password or config.opensearch.password
-        self.verify_ssl = verify_ssl
+        self._config = opensearch_config or config.opensearch
+        self.url = (url or self._config.url).rstrip("/")
+        self.username = username or self._config.username
+        self.password = password or self._config.password
+        self.verify_ssl = verify_ssl if verify_ssl is not None else self._config.verify_ssl
         self.timeout = timeout
-        self.proxy_config = proxy_config or config.proxy
 
         if not self.url:
             raise ValueError("OPENSEARCH_URL is not configured")
@@ -93,7 +93,8 @@ class OpenSearchClient:
         if self.auth:
             kwargs["auth"] = self.auth
 
-        proxy_kwargs = self.proxy_config.get_httpx_kwargs()
+        # Use OpenSearch-specific proxy settings
+        proxy_kwargs = self._config.get_httpx_kwargs()
         kwargs.update(proxy_kwargs)
         return kwargs
 
@@ -425,4 +426,5 @@ if __name__ == "__main__":
     print("OpenSearch Client Configuration:")
     print(f"  URL: {config.opensearch.url or 'NOT SET'}")
     print(f"  Username: {config.opensearch.username or 'NOT SET'}")
-    print(f"  Proxy: {'Enabled' if config.proxy.enabled else 'Disabled'}")
+    print(f"  Verify SSL: {config.opensearch.verify_ssl}")
+    print(f"  Proxy: {'Enabled (' + config.opensearch.proxy_url + ')' if config.opensearch.proxy_enabled else 'Disabled'}")
