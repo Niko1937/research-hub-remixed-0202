@@ -50,6 +50,7 @@ class ProcessingStats:
     failed_files: int = 0
     skipped_files: int = 0
     unsupported_files: int = 0  # Files with unsupported extensions (path-only indexed)
+    too_large_files: int = 0  # Files exceeding max size limit (skipped)
     indexed_documents: int = 0
     failed_index: int = 0
     errors: list[str] = field(default_factory=list)
@@ -63,6 +64,7 @@ class ProcessingStats:
             "failed_files": self.failed_files,
             "skipped_files": self.skipped_files,
             "unsupported_files": self.unsupported_files,
+            "too_large_files": self.too_large_files,
             "indexed_documents": self.indexed_documents,
             "failed_index": self.failed_index,
             "error_count": len(self.errors),
@@ -84,8 +86,8 @@ class FolderEmbeddingsPipeline:
         opensearch_client: Optional[OpenSearchClient] = None,
         index_name: str = "oipf-details",
         chunk_size: int = 1000,
-        max_file_size_mb: float = 50.0,
-        max_depth: int = 4,
+        max_file_size_mb: Optional[float] = None,
+        max_depth: Optional[int] = None,
         dry_run: bool = False,
         verbose: bool = True,
         max_concurrency: int = 1,
@@ -99,8 +101,8 @@ class FolderEmbeddingsPipeline:
             opensearch_client: OpenSearch client
             index_name: Target index name
             chunk_size: Text chunk size for processing
-            max_file_size_mb: Maximum file size to process
-            max_depth: Maximum folder depth to traverse
+            max_file_size_mb: Maximum file size to process (default: from env MAX_FILE_SIZE_MB or 100MB)
+            max_depth: Maximum folder depth to traverse (default: from env MAX_FOLDER_DEPTH or 4)
             dry_run: If True, don't actually index documents
             verbose: Enable verbose output
             max_concurrency: Maximum concurrent API calls (default: 1)
@@ -110,8 +112,8 @@ class FolderEmbeddingsPipeline:
         self.opensearch_client = opensearch_client
         self.index_name = index_name
         self.chunk_size = chunk_size
-        self.max_file_size_mb = max_file_size_mb
-        self.max_depth = max_depth
+        self.max_file_size_mb = max_file_size_mb if max_file_size_mb is not None else config.processing.max_file_size_mb
+        self.max_depth = max_depth if max_depth is not None else config.processing.max_depth
         self.dry_run = dry_run
         self.verbose = verbose
         self.max_concurrency = max_concurrency
@@ -308,20 +310,27 @@ class FolderEmbeddingsPipeline:
             include_unsupported=True,  # Include unsupported files for path-only indexing
         )
 
-        # Separate unsupported files from truly failed loads
+        # Separate unsupported files and too large files from truly failed loads
         unsupported_files = [f for f in failed_loads if f.unsupported]
-        truly_failed = [f for f in failed_loads if not f.unsupported]
+        too_large_files = [f for f in failed_loads if f.too_large]
+        truly_failed = [f for f in failed_loads if not f.unsupported and not f.too_large]
 
         self.stats.total_files = len(successful_loads) + len(failed_loads)
         self.stats.failed_files = len(truly_failed)
+        self.stats.too_large_files = len(too_large_files)
 
         self._log(f"Found {len(successful_loads)} supported files to process")
         self._log(f"Found {len(unsupported_files)} unsupported files (path-only indexing)")
+        self._log(f"Skipped {len(too_large_files)} files exceeding size limit ({self.max_file_size_mb}MB)")
         self._log(f"Failed to load: {len(truly_failed)} files")
 
         # Log truly failed loads
         for failed in truly_failed:
             self.stats.errors.append(f"{failed.file_path}: {failed.error}")
+
+        # Log too large files (info only, not as errors)
+        for large_file in too_large_files:
+            self._log(f"  Skipped (too large): {large_file.file_path}")
 
         if not successful_loads and not unsupported_files:
             self._log("No files to process.")
@@ -380,7 +389,8 @@ class FolderEmbeddingsPipeline:
         self._log(f"Total files: {self.stats.total_files}")
         self._log(f"Processed (content extracted): {self.stats.processed_files}")
         self._log(f"Unsupported (path-only): {self.stats.unsupported_files}")
-        self._log(f"Skipped: {self.stats.skipped_files}")
+        self._log(f"Too large (skipped): {self.stats.too_large_files}")
+        self._log(f"Skipped (empty): {self.stats.skipped_files}")
         self._log(f"Failed: {self.stats.failed_files}")
         self._log(f"Indexed: {self.stats.indexed_documents}")
         self._log(f"Index failed: {self.stats.failed_index}")
@@ -445,8 +455,8 @@ def main():
     parser.add_argument(
         "--depth",
         type=int,
-        default=4,
-        help="最大探索深度（デフォルト: 4）"
+        default=None,
+        help=f"最大探索深度（デフォルト: 環境変数 MAX_FOLDER_DEPTH または {config.processing.max_depth}、0で無制限）"
     )
     parser.add_argument(
         "--chunk-size",
@@ -457,8 +467,8 @@ def main():
     parser.add_argument(
         "--max-file-size",
         type=float,
-        default=50.0,
-        help="最大ファイルサイズ（MB）（デフォルト: 50）"
+        default=None,
+        help=f"最大ファイルサイズ（MB）（デフォルト: 環境変数 MAX_FILE_SIZE_MB または {config.processing.max_file_size_mb}）"
     )
     parser.add_argument(
         "--ignore",
@@ -511,12 +521,12 @@ def main():
         ".DS_Store",
     ] + args.ignore
 
-    # Create pipeline
+    # Create pipeline (use args if specified, otherwise fall back to config/defaults)
     pipeline = FolderEmbeddingsPipeline(
         index_name=args.index,
         chunk_size=args.chunk_size,
-        max_file_size_mb=args.max_file_size,
-        max_depth=args.depth,
+        max_file_size_mb=args.max_file_size,  # None uses config default
+        max_depth=args.depth,  # None uses config default
         dry_run=args.dry_run,
         verbose=not args.quiet,
         max_concurrency=args.parallel,

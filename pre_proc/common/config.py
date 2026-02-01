@@ -141,12 +141,27 @@ class LLMConfig:
 
 
 @dataclass
+class ProcessingConfig:
+    """File processing configuration"""
+    max_file_size_mb: float = 100.0  # Default: 100MB
+    max_depth: int = 4
+
+    @classmethod
+    def from_env(cls) -> "ProcessingConfig":
+        return cls(
+            max_file_size_mb=float(os.getenv("MAX_FILE_SIZE_MB", "100.0")),
+            max_depth=int(os.getenv("MAX_FOLDER_DEPTH", "4")),
+        )
+
+
+@dataclass
 class Config:
     """Main configuration container"""
     proxy: ProxyConfig = field(default_factory=ProxyConfig.from_env)
     opensearch: OpenSearchConfig = field(default_factory=OpenSearchConfig.from_env)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig.from_env)
     llm: LLMConfig = field(default_factory=LLMConfig.from_env)
+    processing: ProcessingConfig = field(default_factory=ProcessingConfig.from_env)
 
     @classmethod
     def load(cls) -> "Config":
@@ -156,6 +171,7 @@ class Config:
             opensearch=OpenSearchConfig.from_env(),
             embedding=EmbeddingConfig.from_env(),
             llm=LLMConfig.from_env(),
+            processing=ProcessingConfig.from_env(),
         )
 
     def validate(self) -> list[str]:
@@ -193,6 +209,10 @@ class Config:
         print(f"LLM: {'Configured' if self.llm.is_configured() else 'NOT CONFIGURED'}")
         if self.llm.is_configured():
             print(f"  Model: {self.llm.model}")
+
+        print(f"Processing:")
+        print(f"  Max File Size: {self.processing.max_file_size_mb}MB")
+        print(f"  Max Folder Depth: {self.processing.max_depth}")
         print("=" * 28 + "\n")
 
 

@@ -40,6 +40,7 @@ class LoaderResult:
     file_path: str = ""
     file_type: str = ""
     unsupported: bool = False  # True if file type is not supported by LangChain
+    too_large: bool = False  # True if file exceeds max size limit
 
 
 # File extension to loader mapping
@@ -119,7 +120,7 @@ def get_loader_for_file(file_path: Path) -> Optional[tuple[type, dict]]:
 
 def load_document(
     file_path: Path,
-    max_file_size_mb: float = 50.0,
+    max_file_size_mb: float = 100.0,
 ) -> LoaderResult:
     """
     Load document using appropriate LangChain loader
@@ -151,6 +152,7 @@ def load_document(
             error=f"File too large: {file_size_mb:.2f}MB (max: {max_file_size_mb}MB)",
             file_path=str(file_path),
             file_type=file_path.suffix.lower(),
+            too_large=True,
         )
 
     # Get loader
@@ -208,7 +210,7 @@ def load_documents_from_folder(
     folder_path: Path,
     recursive: bool = True,
     max_depth: int = 4,
-    max_file_size_mb: float = 50.0,
+    max_file_size_mb: float = 100.0,
     ignore_patterns: Optional[list[str]] = None,
     on_progress: Optional[Callable[[str, int, int], None]] = None,
     include_unsupported: bool = False,
@@ -261,7 +263,8 @@ def load_documents_from_folder(
         return False
 
     def collect_files(current_path: Path, current_depth: int):
-        if current_depth > max_depth:
+        # max_depth=0 means unlimited depth
+        if max_depth > 0 and current_depth > max_depth:
             return
 
         try:

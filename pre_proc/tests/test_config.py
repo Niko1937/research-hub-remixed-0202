@@ -14,6 +14,7 @@ from common.config import (
     OpenSearchConfig,
     EmbeddingConfig,
     LLMConfig,
+    ProcessingConfig,
     Config,
 )
 
@@ -122,6 +123,22 @@ class TestLLMConfig:
         assert config.is_configured() is True
 
 
+class TestProcessingConfig:
+    """Tests for ProcessingConfig"""
+
+    def test_default_values(self):
+        """Test default processing config values"""
+        config = ProcessingConfig()
+        assert config.max_file_size_mb == 100.0
+        assert config.max_depth == 4
+
+    def test_custom_values(self):
+        """Test custom processing config values"""
+        config = ProcessingConfig(max_file_size_mb=200.0, max_depth=6)
+        assert config.max_file_size_mb == 200.0
+        assert config.max_depth == 6
+
+
 class TestConfig:
     """Tests for main Config class"""
 
@@ -132,6 +149,7 @@ class TestConfig:
             opensearch=OpenSearchConfig(),
             embedding=EmbeddingConfig(),
             llm=LLMConfig(),
+            processing=ProcessingConfig(),
         )
         errors = config.validate()
         assert len(errors) == 3  # OpenSearch, Embedding, LLM
@@ -146,6 +164,7 @@ class TestConfig:
             opensearch=OpenSearchConfig(url="https://localhost:9200"),
             embedding=EmbeddingConfig(api_url="https://api.example.com", api_key="key"),
             llm=LLMConfig(base_url="https://api.example.com", api_key="key"),
+            processing=ProcessingConfig(),
         )
         errors = config.validate()
         assert len(errors) == 0

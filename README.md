@@ -57,6 +57,10 @@ LLM_MODEL=vertex_ai.gemini-2.5-flash
 # EMBEDDING_API_KEY=your-api-key
 # EMBEDDING_MODEL=text-embedding-3-large
 # EMBEDDING_DIMENSIONS=1024
+
+# ファイル処理設定（前処理スクリプト用）
+# MAX_FILE_SIZE_MB=100
+# MAX_FOLDER_DEPTH=4  # 0で無制限
 ```
 
 #### プロキシ環境での設定
@@ -105,6 +109,22 @@ EMBEDDING_DIMENSIONS=1024
 ```
 
 **注意**: エンベディングの次元数は `oipf-details` インデックスのスキーマ（1024次元）に合わせてください。
+
+#### ファイル処理設定
+
+前処理スクリプトのファイル処理制限:
+
+```env
+# 最大ファイルサイズ（MB）- これを超えるファイルはスキップ（デフォルト: 100）
+MAX_FILE_SIZE_MB=100
+
+# 最大フォルダ探索深度（デフォルト: 4、0で無制限）
+MAX_FOLDER_DEPTH=4
+```
+
+**注意**:
+- サイズ制限を超えたファイルは要約・エンベディング処理をスキップします
+- `MAX_FOLDER_DEPTH=0` を設定すると、フォルダ階層を無制限に探索します
 
 ### 3. フロントエンドのセットアップ
 

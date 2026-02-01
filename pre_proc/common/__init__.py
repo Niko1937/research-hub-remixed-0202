@@ -4,7 +4,7 @@ Pre-proc Common Module
 共通モジュール
 """
 
-from .config import Config, config, ProxyConfig, OpenSearchConfig, EmbeddingConfig, LLMConfig
+from .config import Config, config, ProxyConfig, OpenSearchConfig, EmbeddingConfig, LLMConfig, ProcessingConfig
 
 __all__ = [
     "Config",
@@ -13,4 +13,5 @@ __all__ = [
     "OpenSearchConfig",
     "EmbeddingConfig",
     "LLMConfig",
+    "ProcessingConfig",
 ]
