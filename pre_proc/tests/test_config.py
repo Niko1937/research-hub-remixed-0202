@@ -92,6 +92,8 @@ class TestEmbeddingConfig:
         assert config.dimensions == 1024
         assert config.batch_size == 10
         assert config.timeout == 60
+        assert config.proxy_enabled is False
+        assert config.proxy_url == ""
 
     def test_is_configured(self):
         """Test is_configured method"""
@@ -104,6 +106,18 @@ class TestEmbeddingConfig:
         config = EmbeddingConfig(api_url="https://api.example.com", api_key="")
         assert config.is_configured() is False
 
+    def test_get_httpx_kwargs_proxy_disabled(self):
+        """Test httpx kwargs when proxy is disabled"""
+        config = EmbeddingConfig(proxy_enabled=False, proxy_url="http://proxy:8080")
+        kwargs = config.get_httpx_kwargs()
+        assert "proxy" not in kwargs
+
+    def test_get_httpx_kwargs_proxy_enabled(self):
+        """Test httpx kwargs when proxy is enabled"""
+        config = EmbeddingConfig(proxy_enabled=True, proxy_url="http://proxy:8080")
+        kwargs = config.get_httpx_kwargs()
+        assert kwargs["proxy"] == "http://proxy:8080"
+
 
 class TestLLMConfig:
     """Tests for LLMConfig"""
@@ -113,6 +127,8 @@ class TestLLMConfig:
         config = LLMConfig()
         assert config.model == "vertex_ai.gemini-2.5-flash"
         assert config.timeout == 60
+        assert config.proxy_enabled is False
+        assert config.proxy_url == ""
 
     def test_is_configured(self):
         """Test is_configured method"""
@@ -121,6 +137,18 @@ class TestLLMConfig:
 
         config = LLMConfig(base_url="https://api.example.com", api_key="key")
         assert config.is_configured() is True
+
+    def test_get_httpx_kwargs_proxy_disabled(self):
+        """Test httpx kwargs when proxy is disabled"""
+        config = LLMConfig(proxy_enabled=False, proxy_url="http://proxy:8080")
+        kwargs = config.get_httpx_kwargs()
+        assert "proxy" not in kwargs
+
+    def test_get_httpx_kwargs_proxy_enabled(self):
+        """Test httpx kwargs when proxy is enabled"""
+        config = LLMConfig(proxy_enabled=True, proxy_url="http://proxy:8080")
+        kwargs = config.get_httpx_kwargs()
+        assert kwargs["proxy"] == "http://proxy:8080"
 
 
 class TestProcessingConfig:

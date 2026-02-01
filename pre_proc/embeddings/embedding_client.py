@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
 
-from common.config import config, EmbeddingConfig, ProxyConfig
+from common.config import config, EmbeddingConfig
 
 
 @dataclass
@@ -50,7 +50,7 @@ class EmbeddingClient:
         dimensions: Optional[int] = None,
         encoding_format: str = "float",
         timeout: int = 60,
-        proxy_config: Optional[ProxyConfig] = None,
+        embedding_config: Optional[EmbeddingConfig] = None,
         max_concurrency: int = 1,
     ):
         """
@@ -63,16 +63,16 @@ class EmbeddingClient:
             dimensions: Embedding dimensions (default: from env)
             encoding_format: Encoding format (default: float)
             timeout: Request timeout in seconds
-            proxy_config: Proxy configuration (default: from env)
+            embedding_config: Embedding configuration including proxy (default: from env)
             max_concurrency: Maximum concurrent requests (default: 1)
         """
-        self.api_url = (api_url or config.embedding.api_url).rstrip("/")
-        self.api_key = api_key or config.embedding.api_key
-        self.model = model or config.embedding.model
-        self.dimensions = dimensions or config.embedding.dimensions
+        self._config = embedding_config or config.embedding
+        self.api_url = (api_url or self._config.api_url).rstrip("/")
+        self.api_key = api_key or self._config.api_key
+        self.model = model or self._config.model
+        self.dimensions = dimensions or self._config.dimensions
         self.encoding_format = encoding_format
         self.timeout = timeout
-        self.proxy_config = proxy_config or config.proxy
         self.max_concurrency = max_concurrency
         self._semaphore: Optional[asyncio.Semaphore] = None
 
@@ -98,7 +98,7 @@ class EmbeddingClient:
     def _get_client_kwargs(self) -> dict:
         """Get httpx client kwargs including proxy if configured"""
         kwargs = {"timeout": self.timeout}
-        proxy_kwargs = self.proxy_config.get_httpx_kwargs()
+        proxy_kwargs = self._config.get_httpx_kwargs()
         kwargs.update(proxy_kwargs)
         return kwargs
 
@@ -518,8 +518,8 @@ def main():
         print(f"  Model: {client.model}")
         print(f"  Dimensions: {client.dimensions}")
         print(f"  Parallel: {args.parallel}")
-        if config.proxy.enabled:
-            print(f"  Proxy: {config.proxy.url}")
+        if config.embedding.proxy_enabled:
+            print(f"  Proxy: {config.embedding.proxy_url}")
 
     # Progress callback
     def on_progress(completed, total):

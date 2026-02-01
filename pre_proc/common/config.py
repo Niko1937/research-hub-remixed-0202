@@ -101,6 +101,8 @@ class EmbeddingConfig:
     dimensions: int = 1024
     batch_size: int = 10
     timeout: int = 60
+    proxy_enabled: bool = False
+    proxy_url: str = ""
 
     @classmethod
     def from_env(cls) -> "EmbeddingConfig":
@@ -111,11 +113,20 @@ class EmbeddingConfig:
             dimensions=int(os.getenv("EMBEDDING_DIMENSIONS", "1024")),
             batch_size=int(os.getenv("EMBEDDING_BATCH_SIZE", "10")),
             timeout=int(os.getenv("EMBEDDING_TIMEOUT", "60")),
+            proxy_enabled=os.getenv("EMBEDDING_PROXY_ENABLED", "false").lower() == "true",
+            proxy_url=os.getenv("EMBEDDING_PROXY_URL", ""),
         )
 
     def is_configured(self) -> bool:
         """Check if embedding API is properly configured"""
         return bool(self.api_url and self.api_key)
+
+    def get_httpx_kwargs(self) -> dict:
+        """Get httpx client kwargs with proxy if configured"""
+        kwargs = {}
+        if self.proxy_enabled and self.proxy_url:
+            kwargs["proxy"] = self.proxy_url
+        return kwargs
 
 
 @dataclass
@@ -125,6 +136,8 @@ class LLMConfig:
     api_key: str = ""
     model: str = "vertex_ai.gemini-2.5-flash"
     timeout: int = 60
+    proxy_enabled: bool = False
+    proxy_url: str = ""
 
     @classmethod
     def from_env(cls) -> "LLMConfig":
@@ -133,11 +146,20 @@ class LLMConfig:
             api_key=os.getenv("LLM_API_KEY", ""),
             model=os.getenv("LLM_MODEL", "vertex_ai.gemini-2.5-flash"),
             timeout=int(os.getenv("LLM_TIMEOUT", "60")),
+            proxy_enabled=os.getenv("LLM_PROXY_ENABLED", "false").lower() == "true",
+            proxy_url=os.getenv("LLM_PROXY_URL", ""),
         )
 
     def is_configured(self) -> bool:
         """Check if LLM API is properly configured"""
         return bool(self.base_url and self.api_key)
+
+    def get_httpx_kwargs(self) -> dict:
+        """Get httpx client kwargs with proxy if configured"""
+        kwargs = {}
+        if self.proxy_enabled and self.proxy_url:
+            kwargs["proxy"] = self.proxy_url
+        return kwargs
 
 
 @dataclass
@@ -205,10 +227,12 @@ class Config:
         if self.embedding.is_configured():
             print(f"  Model: {self.embedding.model}")
             print(f"  Dimensions: {self.embedding.dimensions}")
+            print(f"  Proxy: {'Enabled (' + self.embedding.proxy_url + ')' if self.embedding.proxy_enabled else 'Disabled'}")
 
         print(f"LLM: {'Configured' if self.llm.is_configured() else 'NOT CONFIGURED'}")
         if self.llm.is_configured():
             print(f"  Model: {self.llm.model}")
+            print(f"  Proxy: {'Enabled (' + self.llm.proxy_url + ')' if self.llm.proxy_enabled else 'Disabled'}")
 
         print(f"Processing:")
         print(f"  Max File Size: {self.processing.max_file_size_mb}MB")

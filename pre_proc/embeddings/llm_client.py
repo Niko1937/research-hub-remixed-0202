@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
 
-from common.config import config, LLMConfig, ProxyConfig
+from common.config import config, LLMConfig
 
 
 @dataclass
@@ -44,7 +44,7 @@ class LLMClient:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         timeout: int = 60,
-        proxy_config: Optional[ProxyConfig] = None,
+        llm_config: Optional[LLMConfig] = None,
     ):
         """
         Initialize LLM client
@@ -54,13 +54,13 @@ class LLMClient:
             api_key: API key (default: from env)
             model: Model name (default: from env)
             timeout: Request timeout in seconds
-            proxy_config: Proxy configuration (default: from env)
+            llm_config: LLM configuration including proxy (default: from env)
         """
-        self.base_url = (base_url or config.llm.base_url).rstrip("/")
-        self.api_key = api_key or config.llm.api_key
-        self.model = model or config.llm.model
+        self._config = llm_config or config.llm
+        self.base_url = (base_url or self._config.base_url).rstrip("/")
+        self.api_key = api_key or self._config.api_key
+        self.model = model or self._config.model
         self.timeout = timeout
-        self.proxy_config = proxy_config or config.proxy
 
         if not self.base_url:
             raise ValueError("LLM_BASE_URL is not configured")
@@ -77,7 +77,7 @@ class LLMClient:
     def _get_client_kwargs(self) -> dict:
         """Get httpx client kwargs including proxy if configured"""
         kwargs = {"timeout": self.timeout}
-        proxy_kwargs = self.proxy_config.get_httpx_kwargs()
+        proxy_kwargs = self._config.get_httpx_kwargs()
         kwargs.update(proxy_kwargs)
         return kwargs
 
@@ -259,4 +259,4 @@ if __name__ == "__main__":
     print("LLM Client Configuration:")
     print(f"  Base URL: {config.llm.base_url or 'NOT SET'}")
     print(f"  Model: {config.llm.model}")
-    print(f"  Proxy: {'Enabled' if config.proxy.enabled else 'Disabled'}")
+    print(f"  Proxy: {'Enabled (' + config.llm.proxy_url + ')' if config.llm.proxy_enabled else 'Disabled'}")

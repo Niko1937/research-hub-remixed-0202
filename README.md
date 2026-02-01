@@ -38,11 +38,8 @@ cd remix-of-research-hub-30
 LLM_BASE_URL=https://your-llm-api-endpoint.com
 LLM_API_KEY=your-api-key
 LLM_MODEL=vertex_ai.gemini-2.5-flash
-
-# プロキシ設定（オプション）
-# プロキシ環境で使用する場合は以下を設定
-# PROXY_ENABLED=true
-# PROXY_URL=http://proxy.example.com:8080
+# LLM_PROXY_ENABLED=false
+# LLM_PROXY_URL=http://proxy.example.com:8080
 
 # OpenSearch設定（オプション）
 # OPENSEARCH_URL=https://your-opensearch-endpoint:9200
@@ -57,6 +54,8 @@ LLM_MODEL=vertex_ai.gemini-2.5-flash
 # EMBEDDING_API_KEY=your-api-key
 # EMBEDDING_MODEL=text-embedding-3-large
 # EMBEDDING_DIMENSIONS=1024
+# EMBEDDING_PROXY_ENABLED=false
+# EMBEDDING_PROXY_URL=http://proxy.example.com:8080
 
 # ファイル処理設定（前処理スクリプト用）
 # MAX_FILE_SIZE_MB=100
@@ -65,14 +64,30 @@ LLM_MODEL=vertex_ai.gemini-2.5-flash
 
 #### プロキシ環境での設定
 
-プロキシサーバー経由でLLM APIにアクセスする必要がある場合:
+各サービス（LLM、Embedding、OpenSearch）には個別にプロキシを設定できます。
+
+**LLMプロキシ設定**:
 
 ```env
-PROXY_ENABLED=true
-PROXY_URL=http://proxy.example.com:8080
+LLM_PROXY_ENABLED=true
+LLM_PROXY_URL=http://proxy.example.com:8080
 ```
 
-プロキシが不要な環境では、`PROXY_ENABLED`と`PROXY_URL`は設定不要です（デフォルトでプロキシは無効）。
+**Embeddingプロキシ設定**:
+
+```env
+EMBEDDING_PROXY_ENABLED=true
+EMBEDDING_PROXY_URL=http://proxy.example.com:8080
+```
+
+**OpenSearchプロキシ設定**:
+
+```env
+OPENSEARCH_PROXY_ENABLED=true
+OPENSEARCH_PROXY_URL=http://proxy.example.com:8080
+```
+
+プロキシが不要な環境では、`*_PROXY_ENABLED`と`*_PROXY_URL`は設定不要です（デフォルトでプロキシは無効）。
 
 #### OpenSearch設定
 
@@ -84,18 +99,12 @@ OPENSEARCH_USERNAME=admin
 OPENSEARCH_PASSWORD=your-password
 ```
 
-**SSL検証とプロキシ設定**（ローカルOpenSearch向け）:
+**SSL検証設定**（ローカルOpenSearch向け）:
 
 ```env
 # 自己署名証明書の場合はSSL検証を無効化（デフォルト: false）
 OPENSEARCH_VERIFY_SSL=false
-
-# OpenSearch専用のプロキシ設定（LLM/Embedding APIとは別に設定可能）
-OPENSEARCH_PROXY_ENABLED=true
-OPENSEARCH_PROXY_URL=http://proxy.example.com:8080
 ```
-
-**注意**: OpenSearchへのアクセスは `OPENSEARCH_PROXY_*` で個別に設定します。`PROXY_ENABLED`/`PROXY_URL` はLLM/Embedding API用です。
 
 #### エンベディングAPI設定
 
