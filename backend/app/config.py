@@ -43,16 +43,10 @@ class Settings(BaseSettings):
     proxy_enabled: bool = False
     proxy_url: str = ""  # e.g., "http://proxy.example.com:8080"
 
-    class Config:
-        env_prefix = ""
-        case_sensitive = False
-
-        # Map environment variable names
-        fields = {
-            "llm_base_url": {"env": "LLM_BASE_URL"},
-            "llm_api_key": {"env": "LLM_API_KEY"},
-            "llm_model": {"env": "LLM_MODEL"},
-        }
+    model_config = {
+        "env_prefix": "",
+        "case_sensitive": False,
+    }
 
 
 @lru_cache()
