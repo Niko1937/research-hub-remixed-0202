@@ -1,0 +1,428 @@
+"""
+OpenSearch Client Module
+
+OpenSearchへのドキュメント投入クライアント
+プロキシ環境にも対応
+"""
+
+import sys
+import json
+from pathlib import Path
+from typing import Optional, Any
+from dataclasses import dataclass
+import asyncio
+
+# Add parent to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import httpx
+
+from common.config import config, OpenSearchConfig, ProxyConfig
+
+
+@dataclass
+class IndexResult:
+    """Index operation result"""
+    success: bool
+    doc_id: str
+    error: Optional[str] = None
+    response: Optional[dict] = None
+
+
+@dataclass
+class BulkResult:
+    """Bulk operation result"""
+    success: bool
+    total: int
+    succeeded: int
+    failed: int
+    errors: list[str]
+
+
+class OpenSearchClient:
+    """
+    OpenSearch Client
+
+    OpenSearchへのドキュメント投入を行うクライアント
+    プロキシ環境にも対応
+    """
+
+    def __init__(
+        self,
+        url: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        verify_ssl: bool = False,
+        timeout: int = 30,
+        proxy_config: Optional[ProxyConfig] = None,
+    ):
+        """
+        Initialize OpenSearch client
+
+        Args:
+            url: OpenSearch URL (default: from env)
+            username: Username (default: from env)
+            password: Password (default: from env)
+            verify_ssl: Whether to verify SSL certificates
+            timeout: Request timeout in seconds
+            proxy_config: Proxy configuration (default: from env)
+        """
+        self.url = (url or config.opensearch.url).rstrip("/")
+        self.username = username or config.opensearch.username
+        self.password = password or config.opensearch.password
+        self.verify_ssl = verify_ssl
+        self.timeout = timeout
+        self.proxy_config = proxy_config or config.proxy
+
+        if not self.url:
+            raise ValueError("OPENSEARCH_URL is not configured")
+
+    @property
+    def auth(self) -> Optional[tuple[str, str]]:
+        """Get auth tuple if credentials are configured"""
+        if self.username and self.password:
+            return (self.username, self.password)
+        return None
+
+    def _get_client_kwargs(self) -> dict:
+        """Get httpx client kwargs including proxy if configured"""
+        kwargs = {
+            "timeout": self.timeout,
+            "verify": self.verify_ssl,
+        }
+        if self.auth:
+            kwargs["auth"] = self.auth
+
+        proxy_kwargs = self.proxy_config.get_httpx_kwargs()
+        kwargs.update(proxy_kwargs)
+        return kwargs
+
+    def _get_headers(self) -> dict:
+        """Get request headers"""
+        return {"Content-Type": "application/json"}
+
+    async def index_exists(self, index_name: str) -> bool:
+        """
+        Check if index exists
+
+        Args:
+            index_name: Index name
+
+        Returns:
+            True if index exists
+        """
+        url = f"{self.url}/{index_name}"
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.head(url)
+                return response.status_code == 200
+        except Exception:
+            return False
+
+    async def index_document(
+        self,
+        index_name: str,
+        doc_id: str,
+        document: dict,
+    ) -> IndexResult:
+        """
+        Index a single document
+
+        Args:
+            index_name: Index name
+            doc_id: Document ID
+            document: Document to index
+
+        Returns:
+            IndexResult with operation status
+        """
+        url = f"{self.url}/{index_name}/_doc/{doc_id}"
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.put(
+                    url,
+                    headers=self._get_headers(),
+                    json=document,
+                )
+
+                if response.status_code in [200, 201]:
+                    return IndexResult(
+                        success=True,
+                        doc_id=doc_id,
+                        response=response.json(),
+                    )
+                else:
+                    return IndexResult(
+                        success=False,
+                        doc_id=doc_id,
+                        error=f"HTTP {response.status_code}: {response.text}",
+                    )
+
+        except httpx.ConnectError as e:
+            return IndexResult(
+                success=False,
+                doc_id=doc_id,
+                error=f"Connection error: {e}. Check OPENSEARCH_URL and network/proxy settings.",
+            )
+        except Exception as e:
+            return IndexResult(
+                success=False,
+                doc_id=doc_id,
+                error=f"Index error: {str(e)}",
+            )
+
+    def index_document_sync(
+        self,
+        index_name: str,
+        doc_id: str,
+        document: dict,
+    ) -> IndexResult:
+        """Synchronous version of index_document"""
+        return asyncio.run(self.index_document(index_name, doc_id, document))
+
+    async def bulk_index(
+        self,
+        index_name: str,
+        documents: list[tuple[str, dict]],
+        on_progress: Optional[callable] = None,
+    ) -> BulkResult:
+        """
+        Bulk index documents
+
+        Args:
+            index_name: Index name
+            documents: List of (doc_id, document) tuples
+            on_progress: Progress callback (current, total)
+
+        Returns:
+            BulkResult with operation status
+        """
+        if not documents:
+            return BulkResult(
+                success=True,
+                total=0,
+                succeeded=0,
+                failed=0,
+                errors=[],
+            )
+
+        # Build bulk request body
+        bulk_body_lines = []
+        for doc_id, document in documents:
+            action = {"index": {"_index": index_name, "_id": doc_id}}
+            bulk_body_lines.append(json.dumps(action))
+            bulk_body_lines.append(json.dumps(document))
+
+        bulk_body = "\n".join(bulk_body_lines) + "\n"
+
+        url = f"{self.url}/_bulk"
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.post(
+                    url,
+                    headers={"Content-Type": "application/x-ndjson"},
+                    content=bulk_body,
+                )
+
+                if response.status_code not in [200, 201]:
+                    return BulkResult(
+                        success=False,
+                        total=len(documents),
+                        succeeded=0,
+                        failed=len(documents),
+                        errors=[f"HTTP {response.status_code}: {response.text}"],
+                    )
+
+                result = response.json()
+
+                # Parse response
+                succeeded = 0
+                failed = 0
+                errors = []
+
+                for item in result.get("items", []):
+                    action_result = item.get("index", {})
+                    status = action_result.get("status", 0)
+
+                    if status in [200, 201]:
+                        succeeded += 1
+                    else:
+                        failed += 1
+                        error_info = action_result.get("error", {})
+                        if error_info:
+                            errors.append(f"{action_result.get('_id')}: {error_info.get('reason', 'Unknown error')}")
+
+                return BulkResult(
+                    success=failed == 0,
+                    total=len(documents),
+                    succeeded=succeeded,
+                    failed=failed,
+                    errors=errors,
+                )
+
+        except httpx.ConnectError as e:
+            return BulkResult(
+                success=False,
+                total=len(documents),
+                succeeded=0,
+                failed=len(documents),
+                errors=[f"Connection error: {e}. Check OPENSEARCH_URL and network/proxy settings."],
+            )
+        except Exception as e:
+            return BulkResult(
+                success=False,
+                total=len(documents),
+                succeeded=0,
+                failed=len(documents),
+                errors=[f"Bulk index error: {str(e)}"],
+            )
+
+    def bulk_index_sync(
+        self,
+        index_name: str,
+        documents: list[tuple[str, dict]],
+        on_progress: Optional[callable] = None,
+    ) -> BulkResult:
+        """Synchronous version of bulk_index"""
+        return asyncio.run(self.bulk_index(index_name, documents, on_progress))
+
+    async def search(
+        self,
+        index_name: str,
+        query: dict,
+        size: int = 10,
+    ) -> dict:
+        """
+        Search documents
+
+        Args:
+            index_name: Index name
+            query: OpenSearch query
+            size: Maximum results
+
+        Returns:
+            Search response
+        """
+        url = f"{self.url}/{index_name}/_search"
+
+        body = {
+            "query": query,
+            "size": size,
+        }
+
+        async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+            response = await client.post(
+                url,
+                headers=self._get_headers(),
+                json=body,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def knn_search(
+        self,
+        index_name: str,
+        vector_field: str,
+        vector: list[float],
+        k: int = 10,
+    ) -> dict:
+        """
+        KNN vector search
+
+        Args:
+            index_name: Index name
+            vector_field: Vector field name
+            vector: Query vector
+            k: Number of results
+
+        Returns:
+            Search response
+        """
+        url = f"{self.url}/{index_name}/_search"
+
+        body = {
+            "size": k,
+            "query": {
+                "knn": {
+                    vector_field: {
+                        "vector": vector,
+                        "k": k,
+                    }
+                }
+            }
+        }
+
+        async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+            response = await client.post(
+                url,
+                headers=self._get_headers(),
+                json=body,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def delete_document(
+        self,
+        index_name: str,
+        doc_id: str,
+    ) -> bool:
+        """
+        Delete a document
+
+        Args:
+            index_name: Index name
+            doc_id: Document ID
+
+        Returns:
+            True if successful
+        """
+        url = f"{self.url}/{index_name}/_doc/{doc_id}"
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.delete(url)
+                return response.status_code in [200, 404]
+        except Exception:
+            return False
+
+    async def get_document(
+        self,
+        index_name: str,
+        doc_id: str,
+    ) -> Optional[dict]:
+        """
+        Get a document by ID
+
+        Args:
+            index_name: Index name
+            doc_id: Document ID
+
+        Returns:
+            Document or None if not found
+        """
+        url = f"{self.url}/{index_name}/_doc/{doc_id}"
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    return response.json().get("_source")
+                return None
+        except Exception:
+            return None
+
+
+def get_opensearch_client() -> OpenSearchClient:
+    """Get configured OpenSearch client instance"""
+    return OpenSearchClient()
+
+
+if __name__ == "__main__":
+    # Test
+    print("OpenSearch Client Configuration:")
+    print(f"  URL: {config.opensearch.url or 'NOT SET'}")
+    print(f"  Username: {config.opensearch.username or 'NOT SET'}")
+    print(f"  Proxy: {'Enabled' if config.proxy.enabled else 'Disabled'}")

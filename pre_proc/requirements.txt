@@ -1,0 +1,41 @@
+# Pre-processing scripts dependencies
+
+# HTTP client
+httpx>=0.26.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# LangChain core
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-text-splitters>=0.0.1
+
+# Document loaders - PDF
+pypdf>=3.17.0
+# pymupdf>=1.23.0  # Alternative PDF loader (optional)
+
+# Document loaders - Office files
+python-docx>=1.1.0
+openpyxl>=3.1.0
+python-pptx>=0.6.23
+
+# Document loaders - Unstructured (for complex documents)
+unstructured>=0.12.0
+
+# Text processing
+chardet>=5.2.0  # Encoding detection
+tiktoken>=0.5.0  # Token counting
+
+# Async support
+aiofiles>=23.2.0
+
+# Progress display
+tqdm>=4.66.0
+
+# Data validation
+pydantic>=2.5.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

@@ -43,6 +43,17 @@ LLM_MODEL=vertex_ai.gemini-2.5-flash
 # プロキシ環境で使用する場合は以下を設定
 # PROXY_ENABLED=true
 # PROXY_URL=http://proxy.example.com:8080
+
+# OpenSearch設定（オプション）
+# OPENSEARCH_URL=https://your-opensearch-endpoint:9200
+# OPENSEARCH_USERNAME=admin
+# OPENSEARCH_PASSWORD=your-password
+
+# エンベディングAPI設定（前処理スクリプト用）
+# EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
+# EMBEDDING_API_KEY=your-api-key
+# EMBEDDING_MODEL=text-embedding-3-large
+# EMBEDDING_DIMENSIONS=1024
 ```
 
 #### プロキシ環境での設定
@@ -55,6 +66,29 @@ PROXY_URL=http://proxy.example.com:8080
 ```
 
 プロキシが不要な環境では、`PROXY_ENABLED`と`PROXY_URL`は設定不要です（デフォルトでプロキシは無効）。
+
+#### OpenSearch設定
+
+OpenSearchを使用する場合は以下を設定:
+
+```env
+OPENSEARCH_URL=https://your-opensearch-endpoint:9200
+OPENSEARCH_USERNAME=admin
+OPENSEARCH_PASSWORD=your-password
+```
+
+#### エンベディングAPI設定
+
+前処理スクリプト（ドキュメントエンベディング）を使用する場合:
+
+```env
+EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
+EMBEDDING_API_KEY=your-api-key
+EMBEDDING_MODEL=text-embedding-3-large
+EMBEDDING_DIMENSIONS=1024
+```
+
+**注意**: エンベディングの次元数は `oipf-details` インデックスのスキーマ（1024次元）に合わせてください。
 
 ### 3. フロントエンドのセットアップ
 
@@ -87,10 +121,10 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 開発サーバーを起動
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 5000
 ```
 
-バックエンドは http://localhost:8000 で起動します。
+バックエンドは http://localhost:5000 で起動します。
 
 ## 開発
 
@@ -102,11 +136,78 @@ npm run dev
 ### バックエンド開発サーバー
 ```bash
 cd backend
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 5000
 ```
 
 ### 両方を同時に起動
 ターミナルを2つ開いて、それぞれでフロントエンドとバックエンドを起動してください。
+
+## 前処理スクリプト（pre_proc）
+
+アプリケーション起動前に実行するデータ準備スクリプトです。
+
+### セットアップ
+
+```bash
+cd pre_proc
+
+# 仮想環境を作成（推奨）
+python -m venv .venv
+source .venv/bin/activate  # macOS/Linux
+# または .venv\Scripts\activate  # Windows
+
+# 依存関係をインストール
+pip install -r requirements.txt
+```
+
+### OpenSearchインデックス作成
+
+```bash
+# oipf-detailsインデックスを作成（デフォルト）
+python opensearch/create_indices.py
+
+# 全インデックス（oipf-summary, oipf-details）を作成
+python opensearch/create_indices.py --all
+
+# インデックスを再作成（削除→作成）
+python opensearch/create_indices.py --action recreate --index oipf-details
+```
+
+### フォルダ構造のMarkdown出力
+
+```bash
+# フォルダ構造をMarkdownファイルに出力
+python folder_structure/generate_structure.py /path/to/folder -o structure.md
+
+# 深度制限（デフォルト: 4階層）
+python folder_structure/generate_structure.py /path/to/folder --depth 2
+```
+
+### ドキュメントエンベディング・OpenSearch投入
+
+指定フォルダ内のドキュメントをLangChainで解析し、LLMで要約・タグ生成、エンベディングを生成してOpenSearchに投入します。
+
+```bash
+# 基本的な使用方法
+python embeddings/process_folder_embeddings.py /path/to/folder
+
+# ドライラン（実際に投入しない）
+python embeddings/process_folder_embeddings.py /path/to/folder --dry-run
+
+# オプション指定
+python embeddings/process_folder_embeddings.py /path/to/folder \
+    --index oipf-details \
+    --depth 4 \
+    --ignore "*.tmp" \
+    --output-json result.json
+
+# 対応ファイル形式を確認
+python embeddings/process_folder_embeddings.py --supported-formats
+```
+
+**対応ファイル形式**: PDF, Word (.docx), Excel (.xlsx, .xls), PowerPoint (.pptx), Markdown, HTML, CSV, JSON, テキストファイル
+
+**プロキシ環境**: `.env`で`PROXY_ENABLED=true`と`PROXY_URL`を設定すると、全ての外部API呼び出し（LLM、エンベディング、OpenSearch）がプロキシ経由になります。
 
 ## API エンドポイント
 
@@ -132,6 +233,12 @@ remix-of-research-hub-30/
 │   │   └── models/         # Pydanticモデル
 │   ├── data/               # JSONデータストレージ
 │   └── requirements.txt    # Python依存関係
+├── pre_proc/               # 前処理スクリプト
+│   ├── common/             # 共通モジュール（設定管理）
+│   ├── opensearch/         # OpenSearchインデックス管理
+│   ├── embeddings/         # エンベディング処理パイプライン
+│   ├── folder_structure/   # フォルダ構造出力
+│   └── entra_hierarchy/    # MS Entra階層構造取得
 ├── public/                 # 静的ファイル
 ├── package.json            # Node.js依存関係
 └── .env                    # 環境変数（gitignore対象）
