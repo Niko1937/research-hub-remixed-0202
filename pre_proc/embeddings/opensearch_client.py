@@ -477,6 +477,79 @@ class OpenSearchClient:
         """Synchronous version of find_document_by_file_path"""
         return asyncio.run(self.find_document_by_file_path(index_name, file_path, file_name))
 
+    async def folder_has_indexed_files(
+        self,
+        index_name: str,
+        folder_path: str,
+    ) -> bool:
+        """
+        Check if any files from a folder path exist in the index
+
+        Uses prefix match on oipf_file_path to find any documents
+        that belong to the specified folder or its subfolders.
+
+        Args:
+            index_name: Index name
+            folder_path: Folder path prefix to check (relative path)
+
+        Returns:
+            True if any documents exist for this folder path
+        """
+        url = f"{self.url}/{index_name}/_search"
+
+        # Use prefix query to match folder path
+        # Ensure folder_path ends without trailing slash for consistent matching
+        folder_prefix = folder_path.rstrip("/")
+
+        query = {
+            "query": {
+                "bool": {
+                    "should": [
+                        # Exact match for files directly in the folder
+                        {"prefix": {"oipf_file_path.keyword": f"{folder_prefix}/"}},
+                        # Also match the folder path itself (for edge cases)
+                        {"term": {"oipf_folder_path.keyword": folder_prefix}},
+                    ],
+                    "minimum_should_match": 1,
+                }
+            },
+            "size": 0,  # We only need the count, not the documents
+            "track_total_hits": True,
+        }
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.post(
+                    url,
+                    headers=self._get_headers(),
+                    json=query,
+                )
+
+                if response.status_code != 200:
+                    return False
+
+                result = response.json()
+                total = result.get("hits", {}).get("total", {})
+
+                # Handle both old and new format for total hits
+                if isinstance(total, dict):
+                    count = total.get("value", 0)
+                else:
+                    count = total
+
+                return count > 0
+
+        except Exception:
+            return False
+
+    def folder_has_indexed_files_sync(
+        self,
+        index_name: str,
+        folder_path: str,
+    ) -> bool:
+        """Synchronous version of folder_has_indexed_files"""
+        return asyncio.run(self.folder_has_indexed_files(index_name, folder_path))
+
 
 def get_opensearch_client() -> OpenSearchClient:
     """Get configured OpenSearch client instance"""

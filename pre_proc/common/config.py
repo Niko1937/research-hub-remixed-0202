@@ -167,12 +167,14 @@ class ProcessingConfig:
     """File processing configuration"""
     max_file_size_mb: float = 100.0  # Default: 100MB
     max_depth: int = 4
+    skip_indexed_folders: bool = False  # Skip subfolders that have already been indexed
 
     @classmethod
     def from_env(cls) -> "ProcessingConfig":
         return cls(
             max_file_size_mb=float(os.getenv("MAX_FILE_SIZE_MB", "100.0")),
             max_depth=int(os.getenv("MAX_FOLDER_DEPTH", "4")),
+            skip_indexed_folders=os.getenv("SKIP_INDEXED_FOLDERS", "false").lower() == "true",
         )
 
 

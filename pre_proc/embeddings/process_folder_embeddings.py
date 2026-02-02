@@ -51,6 +51,8 @@ class ProcessingStats:
     skipped_files: int = 0
     unsupported_files: int = 0  # Files with unsupported extensions (path-only indexed)
     too_large_files: int = 0  # Files exceeding max size limit (skipped)
+    skipped_folders: int = 0  # Folders skipped because already indexed
+    skipped_folder_files: int = 0  # Files in skipped folders
     indexed_documents: int = 0
     updated_documents: int = 0  # Documents updated (already existed in index)
     failed_index: int = 0
@@ -66,6 +68,8 @@ class ProcessingStats:
             "skipped_files": self.skipped_files,
             "unsupported_files": self.unsupported_files,
             "too_large_files": self.too_large_files,
+            "skipped_folders": self.skipped_folders,
+            "skipped_folder_files": self.skipped_folder_files,
             "indexed_documents": self.indexed_documents,
             "updated_documents": self.updated_documents,
             "failed_index": self.failed_index,
@@ -90,6 +94,7 @@ class FolderEmbeddingsPipeline:
         chunk_size: int = 1000,
         max_file_size_mb: Optional[float] = None,
         max_depth: Optional[int] = None,
+        skip_indexed_folders: Optional[bool] = None,
         dry_run: bool = False,
         verbose: bool = True,
         max_concurrency: int = 1,
@@ -105,6 +110,7 @@ class FolderEmbeddingsPipeline:
             chunk_size: Text chunk size for processing
             max_file_size_mb: Maximum file size to process (default: from env MAX_FILE_SIZE_MB or 100MB)
             max_depth: Maximum folder depth to traverse (default: from env MAX_FOLDER_DEPTH or 4)
+            skip_indexed_folders: Skip subfolders that already have indexed files (default: from env SKIP_INDEXED_FOLDERS)
             dry_run: If True, don't actually index documents
             verbose: Enable verbose output
             max_concurrency: Maximum concurrent API calls (default: 1)
@@ -116,6 +122,7 @@ class FolderEmbeddingsPipeline:
         self.chunk_size = chunk_size
         self.max_file_size_mb = max_file_size_mb if max_file_size_mb is not None else config.processing.max_file_size_mb
         self.max_depth = max_depth if max_depth is not None else config.processing.max_depth
+        self.skip_indexed_folders = skip_indexed_folders if skip_indexed_folders is not None else config.processing.skip_indexed_folders
         self.dry_run = dry_run
         self.verbose = verbose
         self.max_concurrency = max_concurrency
@@ -125,6 +132,100 @@ class FolderEmbeddingsPipeline:
         """Log message if verbose"""
         if self.verbose:
             print(message)
+
+    async def _get_skipped_subfolders(
+        self,
+        folder_path: str,
+        all_files: list,
+    ) -> set[str]:
+        """
+        Get set of subfolder paths that should be skipped because they already have indexed files.
+
+        Args:
+            folder_path: Base folder path
+            all_files: List of all files (LoaderResult objects)
+
+        Returns:
+            Set of relative subfolder paths to skip
+        """
+        if not self.skip_indexed_folders:
+            return set()
+
+        if self.dry_run:
+            self._log("  [DRY RUN] Skip indexed folders check disabled")
+            return set()
+
+        # Get unique immediate subfolders (1 level down)
+        base_path = Path(folder_path)
+        subfolders = set()
+
+        for file_result in all_files:
+            file_path = Path(file_result.file_path)
+            try:
+                rel_path = file_path.relative_to(base_path)
+                # Get the first component (immediate subfolder)
+                if len(rel_path.parts) > 1:
+                    subfolders.add(rel_path.parts[0])
+            except ValueError:
+                continue
+
+        if not subfolders:
+            return set()
+
+        self._log(f"\nChecking {len(subfolders)} subfolders for existing indexed files...")
+
+        skipped = set()
+        for subfolder in sorted(subfolders):
+            # Check if any files from this subfolder exist in the index
+            has_indexed = await self.opensearch_client.folder_has_indexed_files(
+                index_name=self.index_name,
+                folder_path=subfolder,
+            )
+
+            if has_indexed:
+                self._log(f"  Skipping (already indexed): {subfolder}/")
+                skipped.add(subfolder)
+
+        return skipped
+
+    def _filter_files_by_skipped_folders(
+        self,
+        files: list,
+        folder_path: str,
+        skipped_folders: set[str],
+    ) -> tuple[list, int]:
+        """
+        Filter out files that belong to skipped folders.
+
+        Args:
+            files: List of LoaderResult objects
+            folder_path: Base folder path
+            skipped_folders: Set of relative subfolder names to skip
+
+        Returns:
+            Tuple of (filtered files list, count of skipped files)
+        """
+        if not skipped_folders:
+            return files, 0
+
+        base_path = Path(folder_path)
+        filtered = []
+        skipped_count = 0
+
+        for file_result in files:
+            file_path = Path(file_result.file_path)
+            try:
+                rel_path = file_path.relative_to(base_path)
+                # Check if file is in a skipped subfolder
+                if len(rel_path.parts) > 1 and rel_path.parts[0] in skipped_folders:
+                    skipped_count += 1
+                    continue
+            except ValueError:
+                pass
+
+            filtered.append(file_result)
+
+        return filtered, skipped_count
 
     async def _initialize_clients(self):
         """Initialize API clients if not provided"""
@@ -293,6 +394,7 @@ class FolderEmbeddingsPipeline:
         self._log(f"Index: {self.index_name}")
         self._log(f"Dry run: {self.dry_run}")
         self._log(f"Max depth: {self.max_depth}")
+        self._log(f"Skip indexed folders: {self.skip_indexed_folders}")
         self._log(f"{'='*60}\n")
 
         # Initialize clients
@@ -337,6 +439,24 @@ class FolderEmbeddingsPipeline:
         self.stats.total_files = len(successful_loads) + len(failed_loads)
         self.stats.failed_files = len(truly_failed)
         self.stats.too_large_files = len(too_large_files)
+
+        # Check for subfolders that should be skipped (already indexed)
+        all_files = successful_loads + unsupported_files
+        skipped_folders = await self._get_skipped_subfolders(folder_path, all_files)
+
+        if skipped_folders:
+            self.stats.skipped_folders = len(skipped_folders)
+
+            # Filter out files from skipped folders
+            successful_loads, skipped_supported = self._filter_files_by_skipped_folders(
+                successful_loads, folder_path, skipped_folders
+            )
+            unsupported_files, skipped_unsupported = self._filter_files_by_skipped_folders(
+                unsupported_files, folder_path, skipped_folders
+            )
+
+            self.stats.skipped_folder_files = skipped_supported + skipped_unsupported
+            self._log(f"\nSkipped {self.stats.skipped_folders} already-indexed subfolders ({self.stats.skipped_folder_files} files)")
 
         self._log(f"Found {len(successful_loads)} supported files to process")
         self._log(f"Found {len(unsupported_files)} unsupported files (path-only indexing)")
@@ -416,6 +536,8 @@ class FolderEmbeddingsPipeline:
         self._log(f"Unsupported (path-only): {self.stats.unsupported_files}")
         self._log(f"Too large (skipped): {self.stats.too_large_files}")
         self._log(f"Skipped (empty): {self.stats.skipped_files}")
+        if self.stats.skipped_folders > 0:
+            self._log(f"Skipped folders (already indexed): {self.stats.skipped_folders} ({self.stats.skipped_folder_files} files)")
         self._log(f"Failed: {self.stats.failed_files}")
         self._log(f"Indexed: {self.stats.indexed_documents} (updated: {self.stats.updated_documents})")
         self._log(f"Index failed: {self.stats.failed_index}")
@@ -526,6 +648,12 @@ def main():
         default=1,
         help="並列処理数（デフォルト: 1）"
     )
+    parser.add_argument(
+        "--skip-indexed-folders",
+        action="store_true",
+        default=None,
+        help=f"既にインデックスされたサブフォルダをスキップ（デフォルト: 環境変数 SKIP_INDEXED_FOLDERS または {config.processing.skip_indexed_folders}）"
+    )
 
     args = parser.parse_args()
 
@@ -552,6 +680,7 @@ def main():
         chunk_size=args.chunk_size,
         max_file_size_mb=args.max_file_size,  # None uses config default
         max_depth=args.depth,  # None uses config default
+        skip_indexed_folders=args.skip_indexed_folders,  # None uses config default
         dry_run=args.dry_run,
         verbose=not args.quiet,
         max_concurrency=args.parallel,
