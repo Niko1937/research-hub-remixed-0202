@@ -135,6 +135,36 @@ class FolderEmbeddingsPipeline:
         if self.verbose:
             print(message)
 
+    def _extract_research_id(self, file_path: str, base_folder: str) -> str:
+        """
+        Extract research ID from immediate subfolder name.
+
+        Takes the first 4 alphanumeric characters from the immediate subfolder
+        (1 level down from base_folder).
+
+        Args:
+            file_path: Full file path
+            base_folder: Base folder path
+
+        Returns:
+            First 4 alphanumeric characters of immediate subfolder name, or empty string
+        """
+        try:
+            rel_path = Path(file_path).relative_to(base_folder)
+            parts = rel_path.parts
+
+            if len(parts) >= 2:
+                # Get immediate subfolder name (first component of relative path)
+                subfolder_name = parts[0]
+                # Extract first 4 alphanumeric characters
+                alphanumeric = "".join(c for c in subfolder_name if c.isalnum())
+                return alphanumeric[:4]
+            else:
+                # File is directly in base_folder (no subfolder)
+                return ""
+        except ValueError:
+            return ""
+
     async def _get_skipped_subfolders(
         self,
         folder_path: str,
@@ -247,6 +277,7 @@ class FolderEmbeddingsPipeline:
         self,
         loader_result: LoaderResult,
         base_folder: str,
+        research_id: str = "",
     ) -> Optional[OIPFDetailsDocument]:
         """
         Process a single file through the pipeline
@@ -254,6 +285,7 @@ class FolderEmbeddingsPipeline:
         Args:
             loader_result: Document loader result
             base_folder: Base folder path
+            research_id: Research ID for grouping files
 
         Returns:
             OIPFDocument or None if failed
@@ -324,6 +356,7 @@ class FolderEmbeddingsPipeline:
                 base_folder=base_folder,
                 authors=authors,
                 editors=editors,
+                research_id=research_id,
             )
 
             return oipf_doc
@@ -336,6 +369,7 @@ class FolderEmbeddingsPipeline:
         self,
         loader_result: LoaderResult,
         base_folder: str,
+        research_id: str = "",
     ) -> Optional[OIPFDetailsDocument]:
         """
         Process an image file through Vision LLM pipeline
@@ -343,6 +377,7 @@ class FolderEmbeddingsPipeline:
         Args:
             loader_result: Document loader result (with is_image=True)
             base_folder: Base folder path
+            research_id: Research ID for grouping files
 
         Returns:
             OIPFDocument or None if failed
@@ -400,6 +435,7 @@ class FolderEmbeddingsPipeline:
                 base_folder=base_folder,
                 authors=authors,
                 editors=editors,
+                research_id=research_id,
             )
 
             return oipf_doc
@@ -577,8 +613,11 @@ class FolderEmbeddingsPipeline:
             for loader_result in tqdm(document_files, desc="Processing documents"):
                 file_name = Path(loader_result.file_path).name
 
+                # Extract research_id from immediate subfolder name (first 4 alphanumeric chars)
+                research_id = self._extract_research_id(loader_result.file_path, folder_path)
+
                 # Process file
-                oipf_doc = await self._process_single_file(loader_result, folder_path)
+                oipf_doc = await self._process_single_file(loader_result, folder_path, research_id)
 
                 if oipf_doc is None:
                     self.stats.failed_files += 1
@@ -602,8 +641,11 @@ class FolderEmbeddingsPipeline:
             for loader_result in tqdm(image_files, desc="Processing images"):
                 file_name = Path(loader_result.file_path).name
 
+                # Extract research_id from immediate subfolder name (first 4 alphanumeric chars)
+                research_id = self._extract_research_id(loader_result.file_path, folder_path)
+
                 # Process image
-                oipf_doc = await self._process_image_file(loader_result, folder_path)
+                oipf_doc = await self._process_image_file(loader_result, folder_path, research_id)
 
                 if oipf_doc is None:
                     self.stats.failed_files += 1
@@ -628,6 +670,9 @@ class FolderEmbeddingsPipeline:
             for loader_result in tqdm(unsupported_files, desc="Indexing path-only"):
                 file_name = Path(loader_result.file_path).name
 
+                # Extract research_id from immediate subfolder name (first 4 alphanumeric chars)
+                research_id = self._extract_research_id(loader_result.file_path, folder_path)
+
                 # Extract author/editor metadata
                 authors = loader_result.metadata.authors if loader_result.metadata else []
                 editors = loader_result.metadata.editors if loader_result.metadata else []
@@ -638,6 +683,7 @@ class FolderEmbeddingsPipeline:
                     base_folder=folder_path,
                     authors=authors,
                     editors=editors,
+                    research_id=research_id,
                 )
 
                 self.stats.unsupported_files += 1
