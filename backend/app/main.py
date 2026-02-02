@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import research_chat, arxiv_proxy, pdf_proxy
+from app.routers import research_chat, research_chat_v1, arxiv_proxy, pdf_proxy
 
 settings = get_settings()
 
@@ -49,6 +49,13 @@ app.include_router(
     research_chat.router,
     prefix="/api/research-chat",
     tags=["research-chat"],
+)
+
+# V1 API (Legacy) - preserved for backward compatibility
+app.include_router(
+    research_chat_v1.router,
+    prefix="/api-v1/research-chat",
+    tags=["research-chat-v1"],
 )
 
 app.include_router(
