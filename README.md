@@ -34,14 +34,19 @@ cd remix-of-research-hub-30
 プロジェクトルートに`.env`ファイルを作成:
 
 ```env
+# ===========================================
 # LLM設定（必須）
+# ===========================================
 LLM_BASE_URL=https://your-llm-api-endpoint.com
 LLM_API_KEY=your-api-key
 LLM_MODEL=vertex_ai.gemini-2.5-flash
+# LLM_TIMEOUT=60
 # LLM_PROXY_ENABLED=false
 # LLM_PROXY_URL=http://proxy.example.com:8080
 
+# ===========================================
 # OpenSearch設定（オプション）
+# ===========================================
 # OPENSEARCH_URL=https://your-opensearch-endpoint:9200
 # OPENSEARCH_USERNAME=admin
 # OPENSEARCH_PASSWORD=your-password
@@ -49,17 +54,24 @@ LLM_MODEL=vertex_ai.gemini-2.5-flash
 # OPENSEARCH_PROXY_ENABLED=false
 # OPENSEARCH_PROXY_URL=http://proxy.example.com:8080
 
+# ===========================================
 # エンベディングAPI設定（前処理スクリプト用）
+# ===========================================
 # EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
 # EMBEDDING_API_KEY=your-api-key
 # EMBEDDING_MODEL=text-embedding-3-large
 # EMBEDDING_DIMENSIONS=1024
+# EMBEDDING_BATCH_SIZE=10
+# EMBEDDING_TIMEOUT=60
 # EMBEDDING_PROXY_ENABLED=false
 # EMBEDDING_PROXY_URL=http://proxy.example.com:8080
 
+# ===========================================
 # ファイル処理設定（前処理スクリプト用）
+# ===========================================
 # MAX_FILE_SIZE_MB=100
-# MAX_FOLDER_DEPTH=4  # 0で無制限
+# MAX_FOLDER_DEPTH=4
+# SKIP_INDEXED_FOLDERS=false
 ```
 
 #### プロキシ環境での設定
@@ -89,6 +101,26 @@ OPENSEARCH_PROXY_URL=http://proxy.example.com:8080
 
 プロキシが不要な環境では、`*_PROXY_ENABLED`と`*_PROXY_URL`は設定不要です（デフォルトでプロキシは無効）。
 
+#### LLM設定
+
+LLM APIの詳細設定:
+
+```env
+LLM_BASE_URL=https://your-llm-api-endpoint.com
+LLM_API_KEY=your-api-key
+LLM_MODEL=vertex_ai.gemini-2.5-flash
+LLM_TIMEOUT=60
+```
+
+| パラメータ | デフォルト | 説明 |
+|-----------|-----------|------|
+| `LLM_BASE_URL` | - | LLM APIのベースURL（必須） |
+| `LLM_API_KEY` | - | LLM APIキー（必須） |
+| `LLM_MODEL` | `vertex_ai.gemini-2.5-flash` | 使用するモデル名 |
+| `LLM_TIMEOUT` | 60 | APIリクエストのタイムアウト（秒） |
+
+**注意**: 画像ファイルの解析にはVision対応モデル（例: `gemini-2.0-flash`, `gpt-4-vision-preview`）が必要です。
+
 #### OpenSearch設定
 
 OpenSearchを使用する場合は以下を設定:
@@ -115,29 +147,36 @@ EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
 EMBEDDING_API_KEY=your-api-key
 EMBEDDING_MODEL=text-embedding-3-large
 EMBEDDING_DIMENSIONS=1024
+EMBEDDING_BATCH_SIZE=10
+EMBEDDING_TIMEOUT=60
 ```
 
-**注意**: エンベディングの次元数は `oipf-details` インデックスのスキーマ（1024次元）に合わせてください。
+| パラメータ | デフォルト | 説明 |
+|-----------|-----------|------|
+| `EMBEDDING_DIMENSIONS` | 1024 | エンベディングの次元数（oipf-detailsスキーマに合わせる） |
+| `EMBEDDING_BATCH_SIZE` | 10 | バッチ処理時の同時リクエスト数 |
+| `EMBEDDING_TIMEOUT` | 60 | APIリクエストのタイムアウト（秒） |
 
 #### ファイル処理設定
 
 前処理スクリプトのファイル処理制限:
 
 ```env
-# 最大ファイルサイズ（MB）- これを超えるファイルはスキップ（デフォルト: 100）
 MAX_FILE_SIZE_MB=100
-
-# 最大フォルダ探索深度（デフォルト: 4、0で無制限）
 MAX_FOLDER_DEPTH=4
-
-# 既にインデックス済みのサブフォルダをスキップ（デフォルト: false）
-SKIP_INDEXED_FOLDERS=true
+SKIP_INDEXED_FOLDERS=false
 ```
 
-**注意**:
-- サイズ制限を超えたファイルは要約・エンベディング処理をスキップします
-- `MAX_FOLDER_DEPTH=0` を設定すると、フォルダ階層を無制限に探索します
-- `SKIP_INDEXED_FOLDERS=true` を設定すると、対象フォルダの1階層下のサブフォルダごとに既存インデックスをチェックし、既にインデックスされているファイルがあるサブフォルダは丸ごとスキップします（増分処理に便利）
+| パラメータ | デフォルト | 説明 |
+|-----------|-----------|------|
+| `MAX_FILE_SIZE_MB` | 100 | 最大ファイルサイズ（MB）。これを超えるファイルは処理をスキップ |
+| `MAX_FOLDER_DEPTH` | 4 | 最大フォルダ探索深度。0で無制限 |
+| `SKIP_INDEXED_FOLDERS` | false | 既にインデックス済みのサブフォルダをスキップするかどうか |
+
+**SKIP_INDEXED_FOLDERS について**:
+- `true` を設定すると、対象フォルダの1階層下のサブフォルダごとに既存インデックスをチェック
+- 既にインデックスされているファイルがあるサブフォルダは丸ごとスキップ（増分処理に便利）
+- サブフォルダ内のファイルパス（`oipf_file_path`）がOpenSearchに存在するかをチェック
 
 ### 3. フロントエンドのセットアップ
 
