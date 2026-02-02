@@ -415,6 +415,68 @@ class OpenSearchClient:
         except Exception:
             return None
 
+    async def find_document_by_file_path(
+        self,
+        index_name: str,
+        file_path: str,
+        file_name: str,
+    ) -> Optional[str]:
+        """
+        Find existing document by oipf_file_path and oipf_file_name
+
+        Args:
+            index_name: Index name
+            file_path: File path to match (oipf_file_path)
+            file_name: File name to match (oipf_file_name)
+
+        Returns:
+            Document ID if found, None otherwise
+        """
+        url = f"{self.url}/{index_name}/_search"
+
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"oipf_file_path.keyword": file_path}},
+                        {"term": {"oipf_file_name.keyword": file_name}},
+                    ]
+                }
+            },
+            "size": 1,
+            "_source": False,
+        }
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.post(
+                    url,
+                    headers=self._get_headers(),
+                    json=query,
+                )
+
+                if response.status_code != 200:
+                    return None
+
+                result = response.json()
+                hits = result.get("hits", {}).get("hits", [])
+
+                if hits:
+                    return hits[0].get("_id")
+                return None
+
+        except Exception:
+            return None
+
+    def find_document_by_file_path_sync(
+        self,
+        index_name: str,
+        file_path: str,
+        file_name: str,
+    ) -> Optional[str]:
+        """Synchronous version of find_document_by_file_path"""
+        return asyncio.run(self.find_document_by_file_path(index_name, file_path, file_name))
+
 
 def get_opensearch_client() -> OpenSearchClient:
     """Get configured OpenSearch client instance"""

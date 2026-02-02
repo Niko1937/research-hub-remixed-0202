@@ -52,6 +52,7 @@ class ProcessingStats:
     unsupported_files: int = 0  # Files with unsupported extensions (path-only indexed)
     too_large_files: int = 0  # Files exceeding max size limit (skipped)
     indexed_documents: int = 0
+    updated_documents: int = 0  # Documents updated (already existed in index)
     failed_index: int = 0
     errors: list[str] = field(default_factory=list)
     start_time: Optional[datetime] = None
@@ -66,6 +67,7 @@ class ProcessingStats:
             "unsupported_files": self.unsupported_files,
             "too_large_files": self.too_large_files,
             "indexed_documents": self.indexed_documents,
+            "updated_documents": self.updated_documents,
             "failed_index": self.failed_index,
             "error_count": len(self.errors),
             "duration_seconds": (self.end_time - self.start_time).total_seconds() if self.end_time and self.start_time else 0,
@@ -221,31 +223,48 @@ class FolderEmbeddingsPipeline:
             self.stats.errors.append(f"{file_name}: Processing error - {str(e)}")
             return None
 
-    async def _index_document(self, doc: OIPFDetailsDocument) -> bool:
+    async def _index_document(self, doc: OIPFDetailsDocument) -> tuple[bool, bool]:
         """
         Index document to OpenSearch
+
+        If a document with the same oipf_file_path and oipf_file_name exists,
+        update it using the existing document ID.
 
         Args:
             doc: OIPF document
 
         Returns:
-            True if successful
+            Tuple of (success, is_update)
         """
         if self.dry_run:
             self._log(f"  [DRY RUN] Would index: {doc.id}")
-            return True
+            return True, False
+
+        # Check if document with same file path and name already exists
+        existing_id = await self.opensearch_client.find_document_by_file_path(
+            index_name=self.index_name,
+            file_path=doc.oipf_file_path,
+            file_name=doc.oipf_file_name,
+        )
+
+        # Use existing ID if found, otherwise use generated ID
+        doc_id = existing_id if existing_id else doc.id
+        is_update = existing_id is not None
+
+        if is_update:
+            self._log(f"  Updating existing document: {doc.oipf_file_name} (ID: {doc_id})")
 
         result = await self.opensearch_client.index_document(
             index_name=self.index_name,
-            doc_id=doc.id,
+            doc_id=doc_id,
             document=doc.to_dict(),
         )
 
         if not result.success:
-            self.stats.errors.append(f"{doc.id}: Index failed - {result.error}")
-            return False
+            self.stats.errors.append(f"{doc_id}: Index failed - {result.error}")
+            return False, is_update
 
-        return True
+        return True, is_update
 
     async def process_folder(
         self,
@@ -354,8 +373,11 @@ class FolderEmbeddingsPipeline:
                 self.stats.processed_files += 1
 
                 # Index document
-                if await self._index_document(oipf_doc):
+                success, is_update = await self._index_document(oipf_doc)
+                if success:
                     self.stats.indexed_documents += 1
+                    if is_update:
+                        self.stats.updated_documents += 1
                 else:
                     self.stats.failed_index += 1
 
@@ -375,8 +397,11 @@ class FolderEmbeddingsPipeline:
                 self.stats.unsupported_files += 1
 
                 # Index document
-                if await self._index_document(oipf_doc):
+                success, is_update = await self._index_document(oipf_doc)
+                if success:
                     self.stats.indexed_documents += 1
+                    if is_update:
+                        self.stats.updated_documents += 1
                 else:
                     self.stats.failed_index += 1
 
@@ -392,7 +417,7 @@ class FolderEmbeddingsPipeline:
         self._log(f"Too large (skipped): {self.stats.too_large_files}")
         self._log(f"Skipped (empty): {self.stats.skipped_files}")
         self._log(f"Failed: {self.stats.failed_files}")
-        self._log(f"Indexed: {self.stats.indexed_documents}")
+        self._log(f"Indexed: {self.stats.indexed_documents} (updated: {self.stats.updated_documents})")
         self._log(f"Index failed: {self.stats.failed_index}")
         self._log(f"Duration: {(self.stats.end_time - self.stats.start_time).total_seconds():.2f}s")
 
