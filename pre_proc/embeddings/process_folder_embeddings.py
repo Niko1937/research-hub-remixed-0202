@@ -139,15 +139,15 @@ class FolderEmbeddingsPipeline:
         """
         Extract research ID from immediate subfolder name.
 
-        Takes the first 4 alphanumeric characters from the immediate subfolder
-        (1 level down from base_folder).
+        Takes the first 4 ASCII alphanumeric characters (a-z, A-Z, 0-9) from
+        the immediate subfolder (1 level down from base_folder).
 
         Args:
             file_path: Full file path
             base_folder: Base folder path
 
         Returns:
-            First 4 alphanumeric characters of immediate subfolder name, or empty string
+            First 4 ASCII alphanumeric characters of immediate subfolder name, or empty string
         """
         try:
             rel_path = Path(file_path).relative_to(base_folder)
@@ -156,8 +156,8 @@ class FolderEmbeddingsPipeline:
             if len(parts) >= 2:
                 # Get immediate subfolder name (first component of relative path)
                 subfolder_name = parts[0]
-                # Extract first 4 alphanumeric characters
-                alphanumeric = "".join(c for c in subfolder_name if c.isalnum())
+                # Extract first 4 ASCII alphanumeric characters only (a-z, A-Z, 0-9)
+                alphanumeric = "".join(c for c in subfolder_name if c.isascii() and c.isalnum())
                 return alphanumeric[:4]
             else:
                 # File is directly in base_folder (no subfolder)
