@@ -47,6 +47,7 @@ class ProcessingStats:
     """Processing statistics"""
     total_files: int = 0
     processed_files: int = 0
+    processed_images: int = 0  # Image files processed via Vision LLM
     failed_files: int = 0
     skipped_files: int = 0
     unsupported_files: int = 0  # Files with unsupported extensions (path-only indexed)
@@ -64,6 +65,7 @@ class ProcessingStats:
         return {
             "total_files": self.total_files,
             "processed_files": self.processed_files,
+            "processed_images": self.processed_images,
             "failed_files": self.failed_files,
             "skipped_files": self.skipped_files,
             "unsupported_files": self.unsupported_files,
@@ -324,6 +326,76 @@ class FolderEmbeddingsPipeline:
             self.stats.errors.append(f"{file_name}: Processing error - {str(e)}")
             return None
 
+    async def _process_image_file(
+        self,
+        loader_result: LoaderResult,
+        base_folder: str,
+    ) -> Optional[OIPFDetailsDocument]:
+        """
+        Process an image file through Vision LLM pipeline
+
+        Args:
+            loader_result: Document loader result (with is_image=True)
+            base_folder: Base folder path
+
+        Returns:
+            OIPFDocument or None if failed
+        """
+        file_path = loader_result.file_path
+        file_name = Path(file_path).name
+
+        try:
+            # Analyze image using Vision LLM
+            self._log(f"  Analyzing image: {file_name}")
+            description_result = await self.llm_client.analyze_image(
+                file_path,
+                max_length=500,
+            )
+
+            if not description_result.success:
+                self.stats.errors.append(f"{file_name}: Image analysis failed - {description_result.error}")
+                return None
+
+            description = description_result.content
+
+            # Extract tags using Vision LLM
+            tags_result = await self.llm_client.extract_tags_from_image(file_path)
+
+            if tags_result.success:
+                tags = self.llm_client.parse_tags(tags_result.content)
+            else:
+                tags = []
+
+            # Generate embedding for the description
+            embedding_result = await self.embedding_client.embed_text(description)
+
+            if not embedding_result.success:
+                self.stats.errors.append(f"{file_name}: Embedding failed - {embedding_result.error}")
+                return None
+
+            embedding = embedding_result.embeddings[0] if embedding_result.embeddings else []
+
+            # Validate embedding dimensions
+            if len(embedding) != 1024:
+                self.stats.errors.append(f"{file_name}: Invalid embedding dimensions ({len(embedding)} != 1024)")
+                return None
+
+            # Create OIPF details document
+            oipf_doc = create_oipf_details_document(
+                file_path=file_path,
+                full_text=f"[Image: {file_name}]\n\n{description}",  # Store description as richtext
+                abstract=description,
+                embedding=embedding,
+                tags=tags,
+                base_folder=base_folder,
+            )
+
+            return oipf_doc
+
+        except Exception as e:
+            self.stats.errors.append(f"{file_name}: Image processing error - {str(e)}")
+            return None
+
     async def _index_document(self, doc: OIPFDetailsDocument) -> tuple[bool, bool]:
         """
         Index document to OpenSearch
@@ -458,7 +530,13 @@ class FolderEmbeddingsPipeline:
             self.stats.skipped_folder_files = skipped_supported + skipped_unsupported
             self._log(f"\nSkipped {self.stats.skipped_folders} already-indexed subfolders ({self.stats.skipped_folder_files} files)")
 
+        # Count image files vs document files
+        image_count = sum(1 for f in successful_loads if f.is_image)
+        document_count = len(successful_loads) - image_count
+
         self._log(f"Found {len(successful_loads)} supported files to process")
+        self._log(f"  - Documents: {document_count}")
+        self._log(f"  - Images: {image_count}")
         self._log(f"Found {len(unsupported_files)} unsupported files (path-only indexing)")
         self._log(f"Skipped {len(too_large_files)} files exceeding size limit ({self.max_file_size_mb}MB)")
         self._log(f"Failed to load: {len(truly_failed)} files")
@@ -476,11 +554,15 @@ class FolderEmbeddingsPipeline:
             self.stats.end_time = datetime.now()
             return self.stats
 
-        # Process supported files
-        if successful_loads:
-            self._log("\nProcessing supported files...")
+        # Separate image files from document files
+        image_files = [f for f in successful_loads if f.is_image]
+        document_files = [f for f in successful_loads if not f.is_image]
 
-            for loader_result in tqdm(successful_loads, desc="Processing"):
+        # Process document files
+        if document_files:
+            self._log(f"\nProcessing {len(document_files)} document files...")
+
+            for loader_result in tqdm(document_files, desc="Processing documents"):
                 file_name = Path(loader_result.file_path).name
 
                 # Process file
@@ -491,6 +573,32 @@ class FolderEmbeddingsPipeline:
                     continue
 
                 self.stats.processed_files += 1
+
+                # Index document
+                success, is_update = await self._index_document(oipf_doc)
+                if success:
+                    self.stats.indexed_documents += 1
+                    if is_update:
+                        self.stats.updated_documents += 1
+                else:
+                    self.stats.failed_index += 1
+
+        # Process image files using Vision LLM
+        if image_files:
+            self._log(f"\nProcessing {len(image_files)} image files (Vision LLM)...")
+
+            for loader_result in tqdm(image_files, desc="Processing images"):
+                file_name = Path(loader_result.file_path).name
+
+                # Process image
+                oipf_doc = await self._process_image_file(loader_result, folder_path)
+
+                if oipf_doc is None:
+                    self.stats.failed_files += 1
+                    continue
+
+                self.stats.processed_files += 1
+                self.stats.processed_images += 1
 
                 # Index document
                 success, is_update = await self._index_document(oipf_doc)
@@ -533,6 +641,8 @@ class FolderEmbeddingsPipeline:
         self._log(f"{'='*60}")
         self._log(f"Total files: {self.stats.total_files}")
         self._log(f"Processed (content extracted): {self.stats.processed_files}")
+        if self.stats.processed_images > 0:
+            self._log(f"  - Images (Vision LLM): {self.stats.processed_images}")
         self._log(f"Unsupported (path-only): {self.stats.unsupported_files}")
         self._log(f"Too large (skipped): {self.stats.too_large_files}")
         self._log(f"Skipped (empty): {self.stats.skipped_files}")

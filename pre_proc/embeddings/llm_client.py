@@ -3,11 +3,14 @@ LLM Client Module
 
 LLM APIクライアント（要約生成、タグ抽出用）
 プロキシ環境にも対応
+画像解析（Vision LLM）にも対応
 """
 
 import sys
+import base64
+import mimetypes
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 from dataclasses import dataclass
 import asyncio
 import json
@@ -18,6 +21,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import httpx
 
 from common.config import config, LLMConfig
+
+
+# MIME type mapping for images
+IMAGE_MIME_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+}
 
 
 @dataclass
@@ -247,6 +261,250 @@ class LLMClient:
         tags = [tag for tag in tags if tag]
 
         return tags
+
+    def _encode_image_to_base64(self, image_path: Path) -> tuple[str, str]:
+        """
+        Encode image file to base64 data URL
+
+        Args:
+            image_path: Path to image file
+
+        Returns:
+            Tuple of (base64_data_url, mime_type)
+        """
+        image_path = Path(image_path)
+        ext = image_path.suffix.lower()
+        mime_type = IMAGE_MIME_TYPES.get(ext, "image/jpeg")
+
+        with open(image_path, "rb") as f:
+            image_data = f.read()
+
+        base64_data = base64.b64encode(image_data).decode("utf-8")
+        data_url = f"data:{mime_type};base64,{base64_data}"
+
+        return data_url, mime_type
+
+    async def analyze_image(
+        self,
+        image_path: Union[str, Path],
+        max_length: int = 500,
+    ) -> LLMResult:
+        """
+        Analyze image using Vision LLM and generate description
+
+        Args:
+            image_path: Path to image file
+            max_length: Maximum description length
+
+        Returns:
+            LLMResult with image description
+        """
+        image_path = Path(image_path)
+
+        if not image_path.exists():
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Image file not found: {image_path}",
+                model=self.model,
+            )
+
+        try:
+            data_url, mime_type = self._encode_image_to_base64(image_path)
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Failed to read image: {str(e)}",
+                model=self.model,
+            )
+
+        # Create message with image content (OpenAI Vision API format)
+        messages = [
+            {
+                "role": "system",
+                "content": f"""あなたは画像分析の専門家です。与えられた画像の内容を詳しく説明してください。
+説明は日本語で、{max_length}文字以内にしてください。
+画像に含まれる主要な要素、テキスト、図表、グラフなどがあれば、それらも説明に含めてください。"""
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "この画像の内容を詳しく説明してください。"
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data_url
+                        }
+                    }
+                ]
+            }
+        ]
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": max_length * 2,
+            "temperature": 0.3,
+        }
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.post(
+                    self._get_endpoint(),
+                    headers=self._get_headers(),
+                    json=payload,
+                )
+
+                if response.status_code != 200:
+                    return LLMResult(
+                        success=False,
+                        content="",
+                        error=f"Vision API error: {response.status_code} - {response.text}",
+                        model=self.model,
+                    )
+
+                data = response.json()
+                content = data["choices"][0]["message"]["content"]
+
+                return LLMResult(
+                    success=True,
+                    content=content,
+                    model=data.get("model", self.model),
+                    usage=data.get("usage"),
+                )
+
+        except httpx.ConnectError as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Connection error: {e}. Check LLM_BASE_URL and network/proxy settings.",
+                model=self.model,
+            )
+        except httpx.TimeoutException as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Timeout error: {e}",
+                model=self.model,
+            )
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Vision LLM error: {str(e)}",
+                model=self.model,
+            )
+
+    def analyze_image_sync(
+        self,
+        image_path: Union[str, Path],
+        max_length: int = 500,
+    ) -> LLMResult:
+        """Synchronous version of analyze_image"""
+        return asyncio.run(self.analyze_image(image_path, max_length))
+
+    async def extract_tags_from_image(
+        self,
+        image_path: Union[str, Path],
+        max_tags: int = 5,
+    ) -> LLMResult:
+        """
+        Extract theme tags from image using Vision LLM
+
+        Args:
+            image_path: Path to image file
+            max_tags: Maximum number of tags
+
+        Returns:
+            LLMResult with tags (comma-separated)
+        """
+        image_path = Path(image_path)
+
+        if not image_path.exists():
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Image file not found: {image_path}",
+                model=self.model,
+            )
+
+        try:
+            data_url, mime_type = self._encode_image_to_base64(image_path)
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Failed to read image: {str(e)}",
+                model=self.model,
+            )
+
+        messages = [
+            {
+                "role": "system",
+                "content": """あなたは画像分類の専門家です。与えられた画像から主要なテーマやキーワードを抽出してください。
+タグはカンマ区切りで出力してください。各タグは簡潔に（1-3語程度）。"""
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"この画像から最大{max_tags}個の主要なテーマタグを抽出してください。タグのみをカンマ区切りで出力してください。"
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data_url
+                        }
+                    }
+                ]
+            }
+        ]
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": 200,
+            "temperature": 0.3,
+        }
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.post(
+                    self._get_endpoint(),
+                    headers=self._get_headers(),
+                    json=payload,
+                )
+
+                if response.status_code != 200:
+                    return LLMResult(
+                        success=False,
+                        content="",
+                        error=f"Vision API error: {response.status_code} - {response.text}",
+                        model=self.model,
+                    )
+
+                data = response.json()
+                content = data["choices"][0]["message"]["content"]
+
+                return LLMResult(
+                    success=True,
+                    content=content,
+                    model=data.get("model", self.model),
+                    usage=data.get("usage"),
+                )
+
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Vision LLM error: {str(e)}",
+                model=self.model,
+            )
 
 
 def get_llm_client() -> LLMClient:

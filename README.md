@@ -254,7 +254,11 @@ python embeddings/process_folder_embeddings.py /path/to/folder \
 python embeddings/process_folder_embeddings.py --supported-formats
 ```
 
-**対応ファイル形式**: PDF, Word (.docx), Excel (.xlsx, .xls), PowerPoint (.pptx), Markdown, HTML, CSV, JSON, テキストファイル
+**対応ファイル形式**:
+- **ドキュメント**: PDF, Word (.docx), Excel (.xlsx, .xls), PowerPoint (.pptx), Markdown, HTML, CSV, JSON, テキストファイル
+- **画像**: JPEG (.jpg, .jpeg), PNG, GIF, WebP, BMP（Vision LLMで内容を解析・要約）
+
+**注意**: 画像ファイルはVision対応のLLMモデル（例: `gemini-2.0-flash`, `gpt-4-vision-preview`）が必要です。
 
 **プロキシ環境**: `.env`で`PROXY_ENABLED=true`と`PROXY_URL`を設定すると、全ての外部API呼び出し（LLM、エンベディング、OpenSearch）がプロキシ経由になります。
 

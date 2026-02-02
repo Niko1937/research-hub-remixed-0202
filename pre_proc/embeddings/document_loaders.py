@@ -41,6 +41,7 @@ class LoaderResult:
     file_type: str = ""
     unsupported: bool = False  # True if file type is not supported by LangChain
     too_large: bool = False  # True if file exceeds max size limit
+    is_image: bool = False  # True if file is an image (needs Vision LLM processing)
 
 
 # File extension to loader mapping
@@ -68,8 +69,11 @@ LOADER_MAPPING: dict[str, tuple[type, dict]] = {
     ".json": (JSONLoader, {"jq_schema": ".", "text_content": False}),
 }
 
-# Supported extensions set
-SUPPORTED_EXTENSIONS = set(LOADER_MAPPING.keys())
+# Image file extensions (processed via Vision LLM, not LangChain loaders)
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+
+# Supported extensions set (includes both LangChain loaders and image files)
+SUPPORTED_EXTENSIONS = set(LOADER_MAPPING.keys()) | IMAGE_EXTENSIONS
 
 
 def detect_encoding(file_path: Path) -> str:
@@ -102,6 +106,19 @@ def is_supported_file(file_path: Path) -> bool:
         True if supported
     """
     return file_path.suffix.lower() in SUPPORTED_EXTENSIONS
+
+
+def is_image_file(file_path: Path) -> bool:
+    """
+    Check if file is an image
+
+    Args:
+        file_path: Path to file
+
+    Returns:
+        True if image file
+    """
+    return file_path.suffix.lower() in IMAGE_EXTENSIONS
 
 
 def get_loader_for_file(file_path: Path) -> Optional[tuple[type, dict]]:
@@ -153,6 +170,16 @@ def load_document(
             file_path=str(file_path),
             file_type=file_path.suffix.lower(),
             too_large=True,
+        )
+
+    # Check if it's an image file (handled by Vision LLM, not LangChain)
+    if is_image_file(file_path):
+        return LoaderResult(
+            success=True,
+            documents=[],  # No documents - will be processed by Vision LLM
+            file_path=str(file_path),
+            file_type=file_path.suffix.lower(),
+            is_image=True,
         )
 
     # Get loader
@@ -324,6 +351,9 @@ def get_supported_extensions_info() -> dict[str, str]:
     info = {}
     for ext, (loader_class, _) in LOADER_MAPPING.items():
         info[ext] = loader_class.__name__
+    # Add image extensions
+    for ext in IMAGE_EXTENSIONS:
+        info[ext] = "VisionLLM"
     return info
 
 
