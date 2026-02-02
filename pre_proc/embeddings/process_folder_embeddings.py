@@ -310,6 +310,10 @@ class FolderEmbeddingsPipeline:
                 self.stats.errors.append(f"{file_name}: Invalid embedding dimensions ({len(embedding)} != 1024)")
                 return None
 
+            # Extract author/editor metadata
+            authors = loader_result.metadata.authors if loader_result.metadata else []
+            editors = loader_result.metadata.editors if loader_result.metadata else []
+
             # Create OIPF details document
             oipf_doc = create_oipf_details_document(
                 file_path=file_path,
@@ -318,6 +322,8 @@ class FolderEmbeddingsPipeline:
                 embedding=embedding,
                 tags=tags,
                 base_folder=base_folder,
+                authors=authors,
+                editors=editors,
             )
 
             return oipf_doc
@@ -380,6 +386,10 @@ class FolderEmbeddingsPipeline:
                 self.stats.errors.append(f"{file_name}: Invalid embedding dimensions ({len(embedding)} != 1024)")
                 return None
 
+            # Extract author/editor metadata
+            authors = loader_result.metadata.authors if loader_result.metadata else []
+            editors = loader_result.metadata.editors if loader_result.metadata else []
+
             # Create OIPF details document
             oipf_doc = create_oipf_details_document(
                 file_path=file_path,
@@ -388,6 +398,8 @@ class FolderEmbeddingsPipeline:
                 embedding=embedding,
                 tags=tags,
                 base_folder=base_folder,
+                authors=authors,
+                editors=editors,
             )
 
             return oipf_doc
@@ -616,10 +628,16 @@ class FolderEmbeddingsPipeline:
             for loader_result in tqdm(unsupported_files, desc="Indexing path-only"):
                 file_name = Path(loader_result.file_path).name
 
+                # Extract author/editor metadata
+                authors = loader_result.metadata.authors if loader_result.metadata else []
+                editors = loader_result.metadata.editors if loader_result.metadata else []
+
                 # Create path-only document
                 oipf_doc = create_oipf_details_document_path_only(
                     file_path=loader_result.file_path,
                     base_folder=folder_path,
+                    authors=authors,
+                    editors=editors,
                 )
 
                 self.stats.unsupported_files += 1

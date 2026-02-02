@@ -74,6 +74,8 @@ class OIPFDetailsDocument:
     oipf_file_richtext: str = ""
     oipf_file_tags: list[str] = field(default_factory=list)
     oipf_folder_path: str = ""
+    oipf_file_author: list[str] = field(default_factory=list)  # File creators/authors
+    oipf_file_editor: list[str] = field(default_factory=list)  # Last editors/modifiers
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     is_content_extracted: bool = True  # False if file type is unsupported
@@ -89,6 +91,8 @@ class OIPFDetailsDocument:
             "oipf_file_richtext": self.oipf_file_richtext,
             "oipf_file_tags": self.oipf_file_tags,
             "oipf_folder_path": self.oipf_folder_path,
+            "oipf_file_author": self.oipf_file_author,
+            "oipf_file_editor": self.oipf_file_editor,
             "is_content_extracted": self.is_content_extracted,
         }
 
@@ -226,6 +230,8 @@ def create_oipf_details_document(
     embedding: list[float],
     tags: list[str],
     base_folder: str = "",
+    authors: Optional[list[str]] = None,
+    editors: Optional[list[str]] = None,
 ) -> OIPFDetailsDocument:
     """
     Create OIPF details document for file-level RAG indexing
@@ -237,6 +243,8 @@ def create_oipf_details_document(
         embedding: Abstract embedding vector (1024 dimensions)
         tags: File tags
         base_folder: Base folder for relative path calculation
+        authors: List of file authors/creators
+        editors: List of last editors/modifiers
 
     Returns:
         OIPFDetailsDocument ready for indexing to oipf-details
@@ -275,6 +283,8 @@ def create_oipf_details_document(
         oipf_file_richtext=full_text,
         oipf_file_tags=tags,
         oipf_folder_path=folder_path,
+        oipf_file_author=authors or [],
+        oipf_file_editor=editors or [],
         created_at=now,
         updated_at=now,
         is_content_extracted=True,
@@ -284,6 +294,8 @@ def create_oipf_details_document(
 def create_oipf_details_document_path_only(
     file_path: str,
     base_folder: str = "",
+    authors: Optional[list[str]] = None,
+    editors: Optional[list[str]] = None,
 ) -> OIPFDetailsDocument:
     """
     Create OIPF details document for unsupported files (path info only)
@@ -294,6 +306,8 @@ def create_oipf_details_document_path_only(
     Args:
         file_path: Original file path
         base_folder: Base folder for relative path calculation
+        authors: List of file authors/creators
+        editors: List of last editors/modifiers
 
     Returns:
         OIPFDetailsDocument with path info only (no content/embedding)
@@ -332,6 +346,8 @@ def create_oipf_details_document_path_only(
         oipf_file_richtext="",  # No content
         oipf_file_tags=[],  # No tags
         oipf_folder_path=folder_path,
+        oipf_file_author=authors or [],
+        oipf_file_editor=editors or [],
         created_at=now,
         updated_at=now,
         is_content_extracted=False,  # Mark as not extracted

@@ -32,6 +32,19 @@ from langchain_core.documents import Document
 
 
 @dataclass
+class FileMetadata:
+    """File metadata including author and editor information"""
+    authors: list[str] = None  # File creators/authors
+    editors: list[str] = None  # Last editors/modifiers
+
+    def __post_init__(self):
+        if self.authors is None:
+            self.authors = []
+        if self.editors is None:
+            self.editors = []
+
+
+@dataclass
 class LoaderResult:
     """Document loader result"""
     success: bool
@@ -42,6 +55,7 @@ class LoaderResult:
     unsupported: bool = False  # True if file type is not supported by LangChain
     too_large: bool = False  # True if file exceeds max size limit
     is_image: bool = False  # True if file is an image (needs Vision LLM processing)
+    metadata: Optional[FileMetadata] = None  # Author/editor metadata
 
 
 # File extension to loader mapping
@@ -121,6 +135,144 @@ def is_image_file(file_path: Path) -> bool:
     return file_path.suffix.lower() in IMAGE_EXTENSIONS
 
 
+def extract_pdf_metadata(file_path: Path) -> FileMetadata:
+    """
+    Extract author/editor metadata from PDF file
+
+    Args:
+        file_path: Path to PDF file
+
+    Returns:
+        FileMetadata with extracted information
+    """
+    metadata = FileMetadata()
+    try:
+        import pypdf
+        with open(file_path, "rb") as f:
+            reader = pypdf.PdfReader(f)
+            info = reader.metadata
+            if info:
+                # Author field
+                author = info.get("/Author", "")
+                if author:
+                    metadata.authors = [author.strip()]
+                # Creator field as fallback
+                if not metadata.authors:
+                    creator = info.get("/Creator", "")
+                    if creator and not creator.startswith(("Microsoft", "Adobe", "LibreOffice")):
+                        metadata.authors = [creator.strip()]
+                # Producer might have editor info
+                producer = info.get("/Producer", "")
+                if producer and not producer.startswith(("Microsoft", "Adobe", "LibreOffice", "pypdf")):
+                    metadata.editors = [producer.strip()]
+    except Exception:
+        pass
+    return metadata
+
+
+def extract_office_metadata(file_path: Path) -> FileMetadata:
+    """
+    Extract author/editor metadata from Office files (docx, xlsx, pptx)
+
+    Args:
+        file_path: Path to Office file
+
+    Returns:
+        FileMetadata with extracted information
+    """
+    metadata = FileMetadata()
+    try:
+        import zipfile
+        import xml.etree.ElementTree as ET
+
+        # Office files are ZIP archives with XML metadata
+        with zipfile.ZipFile(file_path, "r") as zf:
+            # Try to read core.xml (contains creator and lastModifiedBy)
+            try:
+                core_xml = zf.read("docProps/core.xml")
+                root = ET.fromstring(core_xml)
+
+                # Define namespaces
+                namespaces = {
+                    "dc": "http://purl.org/dc/elements/1.1/",
+                    "cp": "http://schemas.openxmlformats.org/package/2006/metadata/core-properties",
+                }
+
+                # Extract creator (author)
+                creator = root.find("dc:creator", namespaces)
+                if creator is not None and creator.text:
+                    metadata.authors = [creator.text.strip()]
+
+                # Extract lastModifiedBy (editor)
+                last_modified_by = root.find("cp:lastModifiedBy", namespaces)
+                if last_modified_by is not None and last_modified_by.text:
+                    metadata.editors = [last_modified_by.text.strip()]
+
+            except KeyError:
+                pass
+    except Exception:
+        pass
+    return metadata
+
+
+def extract_image_metadata(file_path: Path) -> FileMetadata:
+    """
+    Extract author/editor metadata from image files (EXIF data)
+
+    Args:
+        file_path: Path to image file
+
+    Returns:
+        FileMetadata with extracted information
+    """
+    metadata = FileMetadata()
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS
+
+        with Image.open(file_path) as img:
+            exif_data = img._getexif()
+            if exif_data:
+                for tag_id, value in exif_data.items():
+                    tag = TAGS.get(tag_id, tag_id)
+                    if tag == "Artist" and value:
+                        metadata.authors = [str(value).strip()]
+                    elif tag == "Copyright" and value and not metadata.authors:
+                        # Use copyright as fallback for author
+                        metadata.authors = [str(value).strip()]
+    except Exception:
+        pass
+    return metadata
+
+
+def extract_file_metadata(file_path: Path) -> FileMetadata:
+    """
+    Extract author/editor metadata from any supported file type
+
+    Args:
+        file_path: Path to file
+
+    Returns:
+        FileMetadata with extracted information
+    """
+    ext = file_path.suffix.lower()
+
+    # PDF files
+    if ext == ".pdf":
+        return extract_pdf_metadata(file_path)
+
+    # Office files
+    if ext in [".docx", ".xlsx", ".pptx"]:
+        return extract_office_metadata(file_path)
+
+    # Image files
+    if ext in IMAGE_EXTENSIONS:
+        return extract_image_metadata(file_path)
+
+    # Default: empty metadata
+    return FileMetadata()
+
+
 def get_loader_for_file(file_path: Path) -> Optional[tuple[type, dict]]:
     """
     Get appropriate loader for file type
@@ -172,6 +324,9 @@ def load_document(
             too_large=True,
         )
 
+    # Extract file metadata (author/editor)
+    file_metadata = extract_file_metadata(file_path)
+
     # Check if it's an image file (handled by Vision LLM, not LangChain)
     if is_image_file(file_path):
         return LoaderResult(
@@ -180,6 +335,7 @@ def load_document(
             file_path=str(file_path),
             file_type=file_path.suffix.lower(),
             is_image=True,
+            metadata=file_metadata,
         )
 
     # Get loader
@@ -192,6 +348,7 @@ def load_document(
             file_path=str(file_path),
             file_type=file_path.suffix.lower(),
             unsupported=True,
+            metadata=file_metadata,
         )
 
     loader_class, loader_kwargs = loader_info
@@ -221,6 +378,7 @@ def load_document(
             documents=documents,
             file_path=str(file_path),
             file_type=file_path.suffix.lower(),
+            metadata=file_metadata,
         )
 
     except Exception as e:
@@ -230,6 +388,7 @@ def load_document(
             error=f"Failed to load document: {str(e)}",
             file_path=str(file_path),
             file_type=file_path.suffix.lower(),
+            metadata=file_metadata,
         )
 
 

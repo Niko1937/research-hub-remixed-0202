@@ -242,6 +242,12 @@ def create_oipf_details_index() -> bool:
                         }
                     }
                 },
+                "oipf_file_author": {
+                    "type": "keyword"
+                },
+                "oipf_file_editor": {
+                    "type": "keyword"
+                },
                 "created_at": {
                     "type": "date"
                 },
