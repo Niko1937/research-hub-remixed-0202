@@ -28,6 +28,10 @@ from app.services.mock_data import (
     CURRENT_USER_ID,
     get_employee_by_id,
 )
+from app.services.internal_research_search import (
+    internal_research_service,
+    InternalResearchResult,
+)
 
 router = APIRouter()
 
@@ -470,26 +474,63 @@ async def handle_search_mode(
 
     user_message = request.messages[-1].content
 
+    # Build chat history for context-aware search
+    chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
+
     # Search all sources in parallel
-    papers, internal, challenges = await asyncio.gather(
-        search_all_sources(user_message),
-        asyncio.to_thread(search_internal_research, user_message),
-        asyncio.to_thread(search_business_challenges, user_message),
-    )
+    # Use OpenSearch for internal research if configured, otherwise fallback to mock data
+    if internal_research_service.is_configured:
+        papers, internal, challenges = await asyncio.gather(
+            search_all_sources(user_message),
+            internal_research_service.search(user_message, chat_history),
+            asyncio.to_thread(search_business_challenges, user_message),
+        )
+    else:
+        papers, internal, challenges = await asyncio.gather(
+            search_all_sources(user_message),
+            asyncio.to_thread(search_internal_research, user_message),
+            asyncio.to_thread(search_business_challenges, user_message),
+        )
 
     # Send research data
+    # Include research_id for OpenSearch results
+    internal_data = []
+    for r in internal:
+        item = {
+            "title": r.title,
+            "tags": r.tags,
+            "similarity": r.similarity,
+            "year": r.year,
+        }
+        # Add research_id if available (OpenSearch results)
+        if hasattr(r, "research_id") and r.research_id:
+            item["research_id"] = r.research_id
+        if hasattr(r, "abstract") and r.abstract:
+            item["abstract"] = r.abstract
+        internal_data.append(item)
+
     yield create_sse_message({
         "type": "research_data",
-        "internal": [{"title": r.title, "tags": r.tags, "similarity": r.similarity, "year": r.year} for r in internal],
+        "internal": internal_data,
         "business": [{"challenge": c.challenge, "business_unit": c.business_unit, "priority": c.priority, "keywords": c.keywords} for c in challenges],
         "external": [p.to_dict() for p in papers],
     })
 
     # Build context and stream AI response
+    # Format internal research with more details for OpenSearch results
+    internal_context_lines = []
+    for r in internal:
+        line = f"- {r.title}"
+        if hasattr(r, "research_id") and r.research_id:
+            line += f" (研究ID: {r.research_id})"
+        if hasattr(r, "abstract") and r.abstract:
+            line += f"\n  要約: {r.abstract[:200]}..."
+        internal_context_lines.append(line)
+
     context_prompt = f"""あなたはR&D研究者向けのアシスタントです。
 
 【社内研究】
-{chr(10).join(f'- {r.title}' for r in internal) or '- なし'}
+{chr(10).join(internal_context_lines) or '- なし'}
 
 【外部論文】
 {chr(10).join(f'{i+1}. {p.title}' for i, p in enumerate(papers)) or '- なし'}

@@ -43,10 +43,35 @@ class Settings(BaseSettings):
     proxy_enabled: bool = False
     proxy_url: str = ""  # e.g., "http://proxy.example.com:8080"
 
+    # OpenSearch Configuration
+    opensearch_url: str = ""
+    opensearch_username: str = ""
+    opensearch_password: str = ""
+    opensearch_verify_ssl: bool = False
+    opensearch_proxy_enabled: bool = False
+    opensearch_proxy_url: str = ""
+
+    # Embedding Configuration
+    embedding_api_url: str = ""
+    embedding_api_key: str = ""
+    embedding_model: str = "text-embedding-3-large"
+    embedding_dimensions: int = 1024
+    embedding_timeout: int = 60
+    embedding_proxy_enabled: bool = False
+    embedding_proxy_url: str = ""
+
     model_config = {
         "env_prefix": "",
         "case_sensitive": False,
     }
+
+    def is_opensearch_configured(self) -> bool:
+        """Check if OpenSearch is properly configured"""
+        return bool(self.opensearch_url)
+
+    def is_embedding_configured(self) -> bool:
+        """Check if Embedding API is properly configured"""
+        return bool(self.embedding_api_url and self.embedding_api_key)
 
 
 @lru_cache()
