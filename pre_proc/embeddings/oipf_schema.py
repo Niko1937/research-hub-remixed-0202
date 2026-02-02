@@ -23,6 +23,7 @@ class OIPFDocument:
     OpenSearchの oipf-summary インデックスに投入するドキュメント形式
     """
     id: str
+    oipf_research_id: str = ""  # Research ID for exact match search
     related_researchers: list[str] = field(default_factory=list)
     oipf_research_abstract: str = ""
     oipf_research_abstract_embedding: list[float] = field(default_factory=list)
@@ -34,6 +35,7 @@ class OIPFDocument:
         """Convert to dictionary for OpenSearch"""
         return {
             "id": self.id,
+            "oipf_research_id": self.oipf_research_id,
             "related_researchers": self.related_researchers,
             "oipf_research_abstract": self.oipf_research_abstract,
             "oipf_research_abstract_embedding": self.oipf_research_abstract_embedding,
@@ -66,6 +68,7 @@ class OIPFDetailsDocument:
     ファイル単位の詳細情報（RAG向け）
     """
     id: str
+    oipf_research_id: str = ""  # Research ID for exact match search
     oipf_file_path: str = ""
     oipf_file_name: str = ""
     oipf_file_type: str = ""
@@ -84,6 +87,7 @@ class OIPFDetailsDocument:
         """Convert to dictionary for OpenSearch"""
         result = {
             "id": self.id,
+            "oipf_research_id": self.oipf_research_id,
             "oipf_file_path": self.oipf_file_path,
             "oipf_file_name": self.oipf_file_name,
             "oipf_file_type": self.oipf_file_type,
@@ -193,6 +197,7 @@ def create_oipf_document(
     tags: list[str],
     base_folder: str = "",
     researchers: Optional[list[str]] = None,
+    research_id: str = "",
 ) -> OIPFDocument:
     """
     Create OIPF document from processed file
@@ -205,6 +210,7 @@ def create_oipf_document(
         tags: Theme tags
         base_folder: Base folder for structure summary
         researchers: Related researcher IDs
+        research_id: Research ID for exact match search
 
     Returns:
         OIPFDocument ready for indexing
@@ -214,6 +220,7 @@ def create_oipf_document(
 
     return OIPFDocument(
         id=doc_id,
+        oipf_research_id=research_id,
         related_researchers=researchers or [],
         oipf_research_abstract=abstract,
         oipf_research_abstract_embedding=embedding,
@@ -232,6 +239,7 @@ def create_oipf_details_document(
     base_folder: str = "",
     authors: Optional[list[str]] = None,
     editors: Optional[list[str]] = None,
+    research_id: str = "",
 ) -> OIPFDetailsDocument:
     """
     Create OIPF details document for file-level RAG indexing
@@ -245,6 +253,7 @@ def create_oipf_details_document(
         base_folder: Base folder for relative path calculation
         authors: List of file authors/creators
         editors: List of last editors/modifiers
+        research_id: Research ID for exact match search
 
     Returns:
         OIPFDetailsDocument ready for indexing to oipf-details
@@ -275,6 +284,7 @@ def create_oipf_details_document(
 
     return OIPFDetailsDocument(
         id=doc_id,
+        oipf_research_id=research_id,
         oipf_file_path=rel_path,
         oipf_file_name=path.name,
         oipf_file_type=path.suffix.lower(),
@@ -296,6 +306,7 @@ def create_oipf_details_document_path_only(
     base_folder: str = "",
     authors: Optional[list[str]] = None,
     editors: Optional[list[str]] = None,
+    research_id: str = "",
 ) -> OIPFDetailsDocument:
     """
     Create OIPF details document for unsupported files (path info only)
@@ -308,6 +319,7 @@ def create_oipf_details_document_path_only(
         base_folder: Base folder for relative path calculation
         authors: List of file authors/creators
         editors: List of last editors/modifiers
+        research_id: Research ID for exact match search
 
     Returns:
         OIPFDetailsDocument with path info only (no content/embedding)
@@ -338,6 +350,7 @@ def create_oipf_details_document_path_only(
 
     return OIPFDetailsDocument(
         id=doc_id,
+        oipf_research_id=research_id,
         oipf_file_path=rel_path,
         oipf_file_name=path.name,
         oipf_file_type=path.suffix.lower(),

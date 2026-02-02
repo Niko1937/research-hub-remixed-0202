@@ -136,6 +136,9 @@ def create_oipf_summary_index() -> bool:
                 "id": {
                     "type": "keyword"
                 },
+                "oipf_research_id": {
+                    "type": "keyword"
+                },
                 "related_researchers": {
                     "type": "keyword"
                 },
@@ -192,6 +195,9 @@ def create_oipf_details_index() -> bool:
         "mappings": {
             "properties": {
                 "id": {
+                    "type": "keyword"
+                },
+                "oipf_research_id": {
                     "type": "keyword"
                 },
                 "oipf_file_path": {
