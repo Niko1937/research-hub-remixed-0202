@@ -262,6 +262,130 @@ class LLMClient:
 
         return tags
 
+    async def extract_researchers(
+        self,
+        text: str,
+    ) -> LLMResult:
+        """
+        Extract researcher/member names from text
+
+        ドキュメントの先頭ページから著者・メンバー名を抽出する。
+
+        Args:
+            text: Text from first pages of document
+
+        Returns:
+            LLMResult with member names (one per line)
+        """
+        system_prompt = """あなたは文書分析の専門家です。与えられたテキストから、著者、メンバー、担当者、研究者の名前を抽出してください。
+
+以下のルールに従ってください：
+- 人名のみを抽出（組織名や部署名は除外）
+- 日本人名は「姓 名」または「姓名」の形式で出力
+- 外国人名はそのまま出力
+- 名前が見つからない場合は「該当なし」と出力
+- 各名前を改行で区切って出力"""
+
+        prompt = f"""以下のテキストから著者・メンバー・担当者の名前を抽出してください。
+名前のみを1行ずつ出力してください。
+
+テキスト：
+{text[:6000]}"""
+
+        return await self.generate(prompt, system_prompt, max_tokens=500)
+
+    def parse_researchers(self, researchers_str: str) -> list[str]:
+        """
+        Parse researchers string into list
+
+        Args:
+            researchers_str: Newline-separated researcher names
+
+        Returns:
+            List of researcher names
+        """
+        if not researchers_str or "該当なし" in researchers_str:
+            return []
+
+        # Split by newlines and clean up
+        researchers = []
+        for line in researchers_str.split("\n"):
+            name = line.strip()
+            # Remove common prefixes like "- ", "・", numbers
+            name = name.lstrip("-・•●○◎123456789０１２３４５６７８９. 　")
+            if name and len(name) >= 2 and "該当" not in name:
+                researchers.append(name)
+
+        return researchers
+
+    async def generate_research_summary(
+        self,
+        text: str,
+        max_length: int = 800,
+    ) -> LLMResult:
+        """
+        Generate research summary for oipf_research_abstract
+
+        研究資料から研究の概要を生成する。
+
+        Args:
+            text: Full document text
+            max_length: Maximum summary length
+
+        Returns:
+            LLMResult with research summary
+        """
+        system_prompt = f"""あなたは研究文書の要約専門家です。与えられた研究資料の内容を、以下の観点で要約してください：
+
+1. 研究の目的・背景
+2. 主要な手法・アプローチ
+3. 主な成果・結論
+4. 意義・応用可能性
+
+要約は日本語で、{max_length}文字以内にしてください。
+段落分けせず、一つの文章としてまとめてください。"""
+
+        prompt = f"""以下の研究資料を要約してください：
+
+{text[:12000]}"""
+
+        return await self.generate(prompt, system_prompt, max_tokens=max_length * 2)
+
+    async def extract_research_tags(
+        self,
+        text: str,
+        num_tags: int = 10,
+    ) -> LLMResult:
+        """
+        Extract research classification tags for oipf_research_themetags
+
+        研究を他の研究と分類するためのタグを生成する。
+
+        Args:
+            text: Document text
+            num_tags: Number of tags to generate (default: 10)
+
+        Returns:
+            LLMResult with tags (comma-separated)
+        """
+        system_prompt = f"""あなたは研究分類の専門家です。与えられた研究資料から、この研究を他の研究と分類・検索するのに適したタグを{num_tags}個程度抽出してください。
+
+タグの種類：
+- 研究分野（例：機械学習、材料科学、バイオテクノロジー）
+- 技術・手法（例：深層学習、シミュレーション、実験解析）
+- 応用領域（例：製造業、医療、エネルギー）
+- キーワード（例：最適化、予測、自動化）
+
+タグはカンマ区切りで出力してください。各タグは簡潔に（1-4語程度）。"""
+
+        prompt = f"""以下の研究資料から、分類用のタグを{num_tags}個程度抽出してください。
+タグのみをカンマ区切りで出力してください。
+
+研究資料：
+{text[:8000]}"""
+
+        return await self.generate(prompt, system_prompt, max_tokens=300)
+
     def _encode_image_to_base64(self, image_path: Path) -> tuple[str, str]:
         """
         Encode image file to base64 data URL

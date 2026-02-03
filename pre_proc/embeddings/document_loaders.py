@@ -516,6 +516,156 @@ def get_supported_extensions_info() -> dict[str, str]:
     return info
 
 
+def load_document_pages(
+    file_path: Path,
+    max_pages: int = 5,
+    max_file_size_mb: float = 100.0,
+) -> LoaderResult:
+    """
+    Load first N pages/sections of a document
+
+    PDFの場合は最初のN枚のみを抽出。
+    その他のドキュメントは全体を読み込んでからテキストを制限。
+
+    Args:
+        file_path: Path to file
+        max_pages: Maximum number of pages to extract (default: 5)
+        max_file_size_mb: Maximum file size in MB
+
+    Returns:
+        LoaderResult with limited documents
+    """
+    file_path = Path(file_path)
+
+    # Check if file exists
+    if not file_path.exists():
+        return LoaderResult(
+            success=False,
+            documents=[],
+            error=f"File not found: {file_path}",
+            file_path=str(file_path),
+        )
+
+    # Check file size
+    file_size_mb = file_path.stat().st_size / (1024 * 1024)
+    if file_size_mb > max_file_size_mb:
+        return LoaderResult(
+            success=False,
+            documents=[],
+            error=f"File too large: {file_size_mb:.2f}MB (max: {max_file_size_mb}MB)",
+            file_path=str(file_path),
+            file_type=file_path.suffix.lower(),
+            too_large=True,
+        )
+
+    # Extract file metadata
+    file_metadata = extract_file_metadata(file_path)
+
+    # Check if it's an image file
+    if is_image_file(file_path):
+        return LoaderResult(
+            success=True,
+            documents=[],
+            file_path=str(file_path),
+            file_type=file_path.suffix.lower(),
+            is_image=True,
+            metadata=file_metadata,
+        )
+
+    ext = file_path.suffix.lower()
+
+    try:
+        # PDF: Load specific pages using PyPDFLoader
+        if ext == ".pdf":
+            loader = PyPDFLoader(str(file_path))
+            all_docs = loader.load()
+
+            # Limit to first max_pages
+            limited_docs = all_docs[:max_pages]
+
+            # Add metadata
+            for i, doc in enumerate(limited_docs):
+                doc.metadata["source_path"] = str(file_path)
+                doc.metadata["file_name"] = file_path.name
+                doc.metadata["file_type"] = ext
+                doc.metadata["page_number"] = i + 1
+                doc.metadata["total_pages_loaded"] = len(limited_docs)
+                doc.metadata["total_pages_in_file"] = len(all_docs)
+
+            return LoaderResult(
+                success=True,
+                documents=limited_docs,
+                file_path=str(file_path),
+                file_type=ext,
+                metadata=file_metadata,
+            )
+
+        # Other document types: Load all and limit by character count
+        else:
+            result = load_document(file_path, max_file_size_mb)
+
+            if not result.success:
+                return result
+
+            # For non-PDF, we can't easily split by pages
+            # So we return all documents but mark them
+            for doc in result.documents:
+                doc.metadata["page_limited"] = False  # Indicates full content
+
+            return result
+
+    except Exception as e:
+        return LoaderResult(
+            success=False,
+            documents=[],
+            error=f"Failed to load document pages: {str(e)}",
+            file_path=str(file_path),
+            file_type=ext,
+            metadata=file_metadata,
+        )
+
+
+def get_document_text(
+    file_path: Path,
+    max_pages: Optional[int] = None,
+    max_file_size_mb: float = 100.0,
+) -> tuple[str, Optional[str]]:
+    """
+    Get document text as a single string
+
+    便利関数: ドキュメントからテキストを抽出して単一の文字列として返す。
+
+    Args:
+        file_path: Path to file
+        max_pages: Maximum pages to load (None for all)
+        max_file_size_mb: Maximum file size in MB
+
+    Returns:
+        Tuple of (text_content, error_message)
+        If successful, error_message is None
+    """
+    file_path = Path(file_path)
+
+    if max_pages:
+        result = load_document_pages(file_path, max_pages, max_file_size_mb)
+    else:
+        result = load_document(file_path, max_file_size_mb)
+
+    if not result.success:
+        return "", result.error
+
+    if result.is_image:
+        return "", "Image files require Vision LLM processing"
+
+    # Combine all document content
+    text_parts = []
+    for doc in result.documents:
+        if doc.page_content:
+            text_parts.append(doc.page_content)
+
+    return "\n\n".join(text_parts), None
+
+
 if __name__ == "__main__":
     # Test
     print("Supported extensions:")

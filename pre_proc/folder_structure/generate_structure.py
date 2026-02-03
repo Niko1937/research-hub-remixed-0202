@@ -123,6 +123,73 @@ def generate_tree(
     return lines
 
 
+def generate_tree_md(
+    target_path: str,
+    base_path: Optional[str] = None,
+    max_depth: Optional[int] = None,
+    show_files: bool = True,
+    show_hidden: bool = False,
+    ignore_patterns: list[str] = None,
+) -> str:
+    """
+    フォルダ構造をシンプルなMarkdown形式で生成（ヘッダーなし）
+
+    他のモジュールから呼び出して使用するためのシンプル版。
+    base_pathを指定すると、そこからの相対パスでツリーを生成。
+
+    Args:
+        target_path: 対象フォルダのパス
+        base_path: 省略するベースパス（指定するとそこからの相対パスで表示）
+        max_depth: 最大深度
+        show_files: ファイルも表示するか
+        show_hidden: 隠しファイルを表示するか
+        ignore_patterns: 無視するパターン
+
+    Returns:
+        str: Markdown形式のツリー構造（コードブロック付き）
+    """
+    path = Path(target_path).resolve()
+
+    if not path.exists():
+        raise FileNotFoundError(f"Path not found: {target_path}")
+
+    if not path.is_dir():
+        raise NotADirectoryError(f"Not a directory: {target_path}")
+
+    if ignore_patterns is None:
+        ignore_patterns = DEFAULT_IGNORE.copy()
+
+    # ツリー生成
+    tree_lines = generate_tree(
+        path,
+        ignore_patterns=ignore_patterns,
+        max_depth=max_depth,
+        show_files=show_files,
+        show_hidden=show_hidden,
+    )
+
+    # ルートフォルダ名の決定
+    if base_path:
+        base = Path(base_path).resolve()
+        try:
+            rel_path = path.relative_to(base)
+            root_name = str(rel_path)
+        except ValueError:
+            root_name = path.name
+    else:
+        root_name = path.name
+
+    # Markdown生成（シンプル版）
+    md_lines = [
+        "```",
+        f"{root_name}/",
+    ]
+    md_lines.extend(tree_lines)
+    md_lines.append("```")
+
+    return "\n".join(md_lines)
+
+
 def generate_markdown(
     target_path: str,
     output_path: Optional[str] = None,

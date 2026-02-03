@@ -5,6 +5,12 @@ Pre-proc Common Module
 """
 
 from .config import Config, config, ProxyConfig, OpenSearchConfig, EmbeddingConfig, LLMConfig, ProcessingConfig
+from .utils import (
+    extract_research_id,
+    extract_research_id_from_folder,
+    truncate_text,
+    safe_filename,
+)
 
 __all__ = [
     "Config",
@@ -14,4 +20,8 @@ __all__ = [
     "EmbeddingConfig",
     "LLMConfig",
     "ProcessingConfig",
+    "extract_research_id",
+    "extract_research_id_from_folder",
+    "truncate_text",
+    "safe_filename",
 ]

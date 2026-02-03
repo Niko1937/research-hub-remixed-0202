@@ -301,6 +301,66 @@ python embeddings/process_folder_embeddings.py --supported-formats
 
 **プロキシ環境**: `.env`で`PROXY_ENABLED=true`と`PROXY_URL`を設定すると、全ての外部API呼び出し（LLM、エンベディング、OpenSearch）がプロキシ経由になります。
 
+### 研究サマリーインデックス投入（oipf-summary）
+
+単一の研究ドキュメントからサマリー情報を抽出し、oipf-summaryインデックスに投入します。
+
+```bash
+# 基本的な使用方法
+python embeddings/process_summary_index.py /path/to/research/document.pdf
+
+# ベースパスを指定（フォルダ構造の省略・研究ID抽出用）
+python embeddings/process_summary_index.py \
+    /data/研究/ABC123_量子研究/報告書.pdf \
+    --base-path /data/研究
+
+# ドライラン（OpenSearchに投入しない）
+python embeddings/process_summary_index.py /path/to/document.pdf --dry-run
+
+# オプション指定
+python embeddings/process_summary_index.py /path/to/document.pdf \
+    --base-path /data/研究 \
+    --index oipf-summary \
+    --num-tags 12 \
+    --max-pages 10
+```
+
+**処理内容**:
+| フィールド | 処理内容 |
+|-----------|---------|
+| `oipf_research_id` | ベースパス直下のフォルダ名から先頭4桁ASCII英数字を抽出 |
+| `oipf_research_abstract` | LLMで研究要約を生成 |
+| `oipf_research_abstract_embedding` | 要約をエンベディング（1024次元） |
+| `related_researchers` | 先頭5ページからLLMでメンバー名を抽出 |
+| `oipf_research_themetags` | LLMで研究分類タグを10個前後生成 |
+| `oipf_spo_folderstructure_summary` | フォルダ構造をMarkdown形式で出力 |
+
+**オプション**:
+| オプション | デフォルト | 説明 |
+|-----------|-----------|------|
+| `--base-path`, `-b` | ファイルの親フォルダ | フォルダ構造で省略するベースパス |
+| `--index`, `-i` | `oipf-summary` | 投入先インデックス名 |
+| `--num-tags`, `-t` | 10 | 生成するタグ数 |
+| `--max-pages`, `-p` | 5 | メンバー抽出に使用する最大ページ数 |
+| `--dry-run`, `-n` | - | OpenSearchに投入しない |
+| `--quiet`, `-q` | - | 進捗表示を抑制 |
+
+**フォルダ構造と研究ID**:
+
+フォルダ構造が以下のようになっている場合:
+```
+/data/研究/
+├── ABC123_量子コンピューティング研究/
+│   ├── 報告書.pdf          ← 処理対象
+│   └── データ/
+└── XYZ789_AI画像認識/
+    └── 最終報告.pdf
+```
+
+`--base-path /data/研究` を指定して `/data/研究/ABC123_量子コンピューティング研究/報告書.pdf` を処理すると:
+- **研究ID**: `ABC1`（フォルダ名の先頭4桁ASCII英数字）
+- **フォルダ構造**: `ABC123_量子コンピューティング研究/` 以下のツリー構造
+
 ## API エンドポイント
 
 - `GET /` - ヘルスチェック
