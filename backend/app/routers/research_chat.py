@@ -156,29 +156,72 @@ Keep it concise, 2-4 steps. Always end with "chat"."""
             })
 
         elif tool_name == "internal-docs":
-            # Search internal SharePoint documents (Coarse-to-Fine)
-            yield create_sse_message({
-                "type": "internal_docs_thinking",
-                "step": "coarse",
-                "message": "社内資料を検索中（カテゴリ特定）...",
-            })
+            # Search internal documents
+            # Use OpenSearch if configured, otherwise fall back to mock data
+            if internal_research_service.is_configured:
+                # Use OpenSearch-based search
+                yield create_sse_message({
+                    "type": "internal_docs_thinking",
+                    "step": "coarse",
+                    "message": "社内研究をOpenSearchで検索中...",
+                })
 
-            # Perform Coarse-to-Fine search
-            search_result = search_sharepoint_coarse2fine(query)
+                # Build chat history for context-aware search
+                chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
 
-            yield create_sse_message({
-                "type": "internal_docs_thinking",
-                "step": "fine",
-                "message": f"詳細検索中... (カテゴリ: {search_result['total_coarse']}件, 資料: {search_result['total_fine']}件)",
-            })
+                # Perform OpenSearch search
+                internal_results = await internal_research_service.search(query, chat_history)
 
-            # Format results for display
-            docs_results = {
-                "coarse_matches": search_result["coarse_matches"],
-                "fine_matches": search_result["fine_matches"],
-                "total_coarse": search_result["total_coarse"],
-                "total_fine": search_result["total_fine"],
-            }
+                yield create_sse_message({
+                    "type": "internal_docs_thinking",
+                    "step": "fine",
+                    "message": f"検索完了: {len(internal_results)}件の研究が見つかりました",
+                })
+
+                # Format results for display (convert to compatible format)
+                fine_matches = []
+                for r in internal_results:
+                    fine_matches.append({
+                        "title": r.title,
+                        "path": r.file_path or f"/research/{r.research_id}",
+                        "snippet": r.abstract[:200] + "..." if r.abstract else "",
+                        "relevance": r.similarity,
+                        "research_id": r.research_id,
+                        "tags": r.tags,
+                    })
+
+                docs_results = {
+                    "coarse_matches": [],  # OpenSearch doesn't use coarse/fine distinction
+                    "fine_matches": fine_matches,
+                    "total_coarse": 0,
+                    "total_fine": len(fine_matches),
+                    "source": "opensearch",
+                }
+            else:
+                # Fall back to mock data (SharePoint Coarse-to-Fine)
+                yield create_sse_message({
+                    "type": "internal_docs_thinking",
+                    "step": "coarse",
+                    "message": "社内資料を検索中（カテゴリ特定）...",
+                })
+
+                # Perform Coarse-to-Fine search
+                search_result = search_sharepoint_coarse2fine(query)
+
+                yield create_sse_message({
+                    "type": "internal_docs_thinking",
+                    "step": "fine",
+                    "message": f"詳細検索中... (カテゴリ: {search_result['total_coarse']}件, 資料: {search_result['total_fine']}件)",
+                })
+
+                # Format results for display
+                docs_results = {
+                    "coarse_matches": search_result["coarse_matches"],
+                    "fine_matches": search_result["fine_matches"],
+                    "total_coarse": search_result["total_coarse"],
+                    "total_fine": search_result["total_fine"],
+                    "source": "mock",
+                }
 
             tool_results.append({
                 "tool": "internal-docs",
@@ -563,6 +606,13 @@ async def research_chat(request: ResearchChatRequest):
     - search: Quick search across sources
     """
 
+    # Log incoming request for debugging
+    user_message = request.messages[-1].content if request.messages else "(empty)"
+    print(f"\n[research_chat] Request received:")
+    print(f"  - Mode: {request.mode}")
+    print(f"  - Tool: {request.tool or '(none)'}")
+    print(f"  - Message: {user_message[:50]}...")
+
     try:
         llm_client = get_llm_client()
     except Exception as e:
@@ -570,9 +620,11 @@ async def research_chat(request: ResearchChatRequest):
 
     async def event_generator():
         if request.mode == "assistant":
+            print(f"[research_chat] Using assistant mode")
             async for event in handle_assistant_mode(request, llm_client):
                 yield event
         else:
+            print(f"[research_chat] Using search mode (OpenSearch enabled)")
             async for event in handle_search_mode(request, llm_client):
                 yield event
 
