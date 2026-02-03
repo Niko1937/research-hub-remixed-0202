@@ -305,8 +305,19 @@ python embeddings/process_folder_embeddings.py --supported-formats
 
 単一の研究ドキュメントからサマリー情報を抽出し、oipf-summaryインデックスに投入します。
 
+**コマンド構文**:
+```
+python embeddings/process_summary_index.py <file> [オプション]
+```
+
+| パラメータ | 必須/任意 | 説明 |
+|-----------|----------|------|
+| `<file>` | **必須** | 処理対象のファイルパス（PDF、Word、PowerPoint等） |
+| `[オプション]` | 任意 | 下記オプション一覧を参照 |
+
+**使用例**:
 ```bash
-# 基本的な使用方法
+# 基本的な使用方法（ファイルパスのみ指定）
 python embeddings/process_summary_index.py /path/to/research/document.pdf
 
 # ベースパスを指定（フォルダ構造の省略・研究ID抽出用）
@@ -353,16 +364,16 @@ python embeddings/process_summary_index.py /path/to/document.pdf \
 | `oipf_research_themetags` | LLMで研究分類タグを10個前後生成 |
 | `oipf_spo_folderstructure_summary` | フォルダ構造をMarkdown形式で出力 |
 
-**オプション**:
-| オプション | デフォルト | 説明 |
-|-----------|-----------|------|
-| `--base-path`, `-b` | ファイルの親フォルダ | フォルダ構造で省略するベースパス |
-| `--research-id`, `-r` | (自動抽出) | 研究ID（4桁英数字）を手動指定 |
-| `--index`, `-i` | `oipf-summary` | 投入先インデックス名 |
-| `--num-tags`, `-t` | 10 | 生成するタグ数 |
-| `--max-pages`, `-p` | 5 | メンバー抽出に使用する最大ページ数 |
-| `--dry-run`, `-n` | - | OpenSearchに投入しない |
-| `--quiet`, `-q` | - | 進捗表示を抑制 |
+**オプション一覧**（すべて任意）:
+| オプション | 短縮形 | デフォルト | 説明 |
+|-----------|--------|-----------|------|
+| `--base-path` | `-b` | ファイルの親フォルダ | フォルダ構造で省略するベースパス |
+| `--research-id` | `-r` | (自動抽出) | 研究ID（4桁英数字）を手動指定 |
+| `--index` | `-i` | `oipf-summary` | 投入先インデックス名 |
+| `--num-tags` | `-t` | 10 | 生成するタグ数 |
+| `--max-pages` | `-p` | 5 | メンバー抽出に使用する最大ページ数 |
+| `--dry-run` | `-n` | - | OpenSearchに投入しない |
+| `--quiet` | `-q` | - | 進捗表示を抑制 |
 
 **フォルダ構造と研究ID**:
 
