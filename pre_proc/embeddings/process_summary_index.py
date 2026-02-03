@@ -93,6 +93,7 @@ class SummaryIndexPipeline:
         base_path: Optional[str] = None,
         max_pages_for_members: int = 5,
         num_tags: int = 10,
+        research_id: Optional[str] = None,
     ) -> ProcessingResult:
         """
         Process a single file and create oipf-summary document
@@ -102,6 +103,7 @@ class SummaryIndexPipeline:
             base_path: Base path to omit in folder structure (optional)
             max_pages_for_members: Max pages to scan for member extraction
             num_tags: Number of tags to generate
+            research_id: Optional research ID (4-digit alphanumeric). If not provided, extracted from folder name.
 
         Returns:
             ProcessingResult with document or error
@@ -114,9 +116,12 @@ class SummaryIndexPipeline:
         self._log(f"Base path: {base_path}")
         self._log(f"{'='*60}")
 
-        # 1. Extract research ID
-        research_id = extract_research_id_from_folder(str(file_path.parent), str(base_path))
-        self._log(f"[1/7] Research ID: {research_id or '(empty)'}")
+        # 1. Extract or use provided research ID
+        if research_id:
+            self._log(f"[1/7] Research ID (specified): {research_id}")
+        else:
+            research_id = extract_research_id_from_folder(str(file_path.parent), str(base_path))
+            self._log(f"[1/7] Research ID (extracted): {research_id or '(empty)'}")
 
         # 2. Load document
         self._log(f"[2/7] Loading document...")
@@ -352,6 +357,7 @@ async def main_async(args):
         base_path=args.base_path,
         max_pages_for_members=args.max_pages,
         num_tags=args.num_tags,
+        research_id=args.research_id,
     )
 
     # Output result
@@ -395,6 +401,9 @@ def main():
   # ドライラン（OpenSearchに投入しない）
   python process_summary_index.py /path/to/document.pdf --dry-run
 
+  # 研究IDを手動指定
+  python process_summary_index.py /path/to/document.pdf --research-id XYZ1
+
   # タグ数とメンバー抽出ページ数を指定
   python process_summary_index.py /path/to/document.pdf --num-tags 15 --max-pages 10
         """
@@ -407,6 +416,10 @@ def main():
     parser.add_argument(
         "--base-path", "-b",
         help="フォルダ構造で省略するベースパス"
+    )
+    parser.add_argument(
+        "--research-id", "-r",
+        help="研究ID（4桁英数字）を手動指定。省略時はフォルダ名から自動抽出"
     )
     parser.add_argument(
         "--index", "-i",

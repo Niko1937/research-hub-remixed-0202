@@ -317,9 +317,13 @@ python embeddings/process_summary_index.py \
 # ドライラン（OpenSearchに投入しない）
 python embeddings/process_summary_index.py /path/to/document.pdf --dry-run
 
+# 研究IDを手動指定
+python embeddings/process_summary_index.py /path/to/document.pdf --research-id XYZ1
+
 # オプション指定
 python embeddings/process_summary_index.py /path/to/document.pdf \
     --base-path /data/研究 \
+    --research-id ABC1 \
     --index oipf-summary \
     --num-tags 12 \
     --max-pages 10
@@ -328,7 +332,7 @@ python embeddings/process_summary_index.py /path/to/document.pdf \
 **処理内容**:
 | フィールド | 処理内容 |
 |-----------|---------|
-| `oipf_research_id` | ベースパス直下のフォルダ名から先頭4桁ASCII英数字を抽出 |
+| `oipf_research_id` | `--research-id`で指定、または ベースパス直下のフォルダ名から先頭4桁ASCII英数字を抽出 |
 | `oipf_research_abstract` | LLMで研究要約を生成 |
 | `oipf_research_abstract_embedding` | 要約をエンベディング（1024次元） |
 | `related_researchers` | 先頭5ページからLLMでメンバー名を抽出 |
@@ -339,6 +343,7 @@ python embeddings/process_summary_index.py /path/to/document.pdf \
 | オプション | デフォルト | 説明 |
 |-----------|-----------|------|
 | `--base-path`, `-b` | ファイルの親フォルダ | フォルダ構造で省略するベースパス |
+| `--research-id`, `-r` | (自動抽出) | 研究ID（4桁英数字）を手動指定 |
 | `--index`, `-i` | `oipf-summary` | 投入先インデックス名 |
 | `--num-tags`, `-t` | 10 | 生成するタグ数 |
 | `--max-pages`, `-p` | 5 | メンバー抽出に使用する最大ページ数 |
