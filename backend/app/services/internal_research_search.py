@@ -63,8 +63,12 @@ class InternalResearchSearchService:
             List of InternalResearchResult
         """
         if not self.is_configured:
-            print("[InternalResearchSearch] OpenSearch or Embedding not configured, returning empty results")
+            print("[InternalResearchSearch] search_initial: Not configured, returning empty results")
+            print(f"  - OpenSearch configured: {opensearch_client.is_configured}")
+            print(f"  - Embedding configured: {embedding_client.is_configured}")
             return []
+
+        print(f"[InternalResearchSearch] search_initial: Searching for '{query[:50]}...'")
 
         try:
             # 1. Embed the query
@@ -130,8 +134,12 @@ class InternalResearchSearchService:
             List of InternalResearchResult
         """
         if not self.is_configured:
-            print("[InternalResearchSearch] OpenSearch or Embedding not configured, returning empty results")
+            print("[InternalResearchSearch] search_followup: Not configured, returning empty results")
+            print(f"  - OpenSearch configured: {opensearch_client.is_configured}")
+            print(f"  - Embedding configured: {embedding_client.is_configured}")
             return []
+
+        print(f"[InternalResearchSearch] search_followup: Searching for '{query[:50]}...'")
 
         try:
             # 1. Use LLM to generate OpenSearch query
@@ -223,11 +231,18 @@ class InternalResearchSearchService:
         Returns:
             List of InternalResearchResult
         """
+        print(f"[InternalResearchSearch] search() called")
+        print(f"  - Query: {query[:50]}...")
+        print(f"  - is_configured: {self.is_configured}")
+
         # Determine if this is initial or follow-up query
         is_initial = (
             chat_history is None
             or len(chat_history) <= 2  # Only system + first user message
         )
+
+        print(f"  - is_initial: {is_initial}")
+        print(f"  - research_id_filter: {research_id_filter}")
 
         if is_initial and not research_id_filter:
             return await self.search_initial(query, limit)

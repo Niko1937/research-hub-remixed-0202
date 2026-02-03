@@ -87,6 +87,22 @@ if __name__ == "__main__":
     print(f"  LLM_BASE_URL: {settings.llm_base_url or 'NOT SET'}")
     print(f"  LLM_MODEL:    {settings.llm_model or 'NOT SET'}")
     print(f"  LLM_API_KEY:  {'SET' if settings.llm_api_key else 'NOT SET'}")
+    print("")
+    print("OpenSearch Configuration:")
+    print(f"  OPENSEARCH_URL:      {settings.opensearch_url or 'NOT SET'}")
+    print(f"  OPENSEARCH_USERNAME: {'SET' if settings.opensearch_username else 'NOT SET'}")
+    print(f"  OPENSEARCH_PASSWORD: {'SET' if settings.opensearch_password else 'NOT SET'}")
+    print(f"  Status: {'CONFIGURED' if settings.is_opensearch_configured() else 'NOT CONFIGURED'}")
+    print("")
+    print("Embedding Configuration:")
+    print(f"  EMBEDDING_API_URL: {settings.embedding_api_url or 'NOT SET'}")
+    print(f"  EMBEDDING_API_KEY: {'SET' if settings.embedding_api_key else 'NOT SET'}")
+    print(f"  EMBEDDING_MODEL:   {settings.embedding_model}")
+    print(f"  Status: {'CONFIGURED' if settings.is_embedding_configured() else 'NOT CONFIGURED'}")
+    print("")
+    print("Internal Research Search:")
+    opensearch_ready = settings.is_opensearch_configured() and settings.is_embedding_configured()
+    print(f"  Status: {'ENABLED (OpenSearch)' if opensearch_ready else 'DISABLED (Mock Data)'}")
 
     uvicorn.run(
         "app.main:app",

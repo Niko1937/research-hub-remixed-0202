@@ -45,20 +45,22 @@ LLM_MODEL=vertex_ai.gemini-2.5-flash
 # LLM_PROXY_URL=http://proxy.example.com:8080
 
 # ===========================================
-# OpenSearch設定（オプション）
+# OpenSearch設定（社内研究検索に必須）
+# 注意: 社内研究検索を有効にするには、OpenSearchとEmbedding両方の設定が必要
 # ===========================================
-# OPENSEARCH_URL=https://your-opensearch-endpoint:9200
-# OPENSEARCH_USERNAME=admin
-# OPENSEARCH_PASSWORD=your-password
+OPENSEARCH_URL=https://your-opensearch-endpoint:9200
+OPENSEARCH_USERNAME=admin
+OPENSEARCH_PASSWORD=your-password
 # OPENSEARCH_VERIFY_SSL=false
 # OPENSEARCH_PROXY_ENABLED=false
 # OPENSEARCH_PROXY_URL=http://proxy.example.com:8080
 
 # ===========================================
-# エンベディングAPI設定（前処理スクリプト用）
+# エンベディングAPI設定（社内研究検索に必須）
+# 注意: 社内研究検索を有効にするには、OpenSearchとEmbedding両方の設定が必要
 # ===========================================
-# EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
-# EMBEDDING_API_KEY=your-api-key
+EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
+EMBEDDING_API_KEY=your-api-key
 # EMBEDDING_MODEL=text-embedding-3-large
 # EMBEDDING_DIMENSIONS=1024
 # EMBEDDING_BATCH_SIZE=10
@@ -120,6 +122,21 @@ LLM_TIMEOUT=60
 | `LLM_TIMEOUT` | 60 | APIリクエストのタイムアウト（秒） |
 
 **注意**: 画像ファイルの解析にはVision対応モデル（例: `gemini-2.0-flash`, `gpt-4-vision-preview`）が必要です。
+
+#### 社内研究検索の有効化
+
+社内研究検索をOpenSearchで有効にするには、**OpenSearch**と**EmbeddingAPI**の**両方**を設定する必要があります。
+
+| 設定状態 | 動作 |
+|---------|------|
+| OpenSearch + Embedding 両方設定済み | OpenSearchによる社内研究検索が有効 |
+| どちらかが未設定 | モックデータによるデモ動作 |
+
+バックエンド起動時に以下のログで設定状態を確認できます:
+```
+Internal Research Search:
+  Status: ENABLED (OpenSearch)  ← または DISABLED (Mock Data)
+```
 
 #### OpenSearch設定
 
