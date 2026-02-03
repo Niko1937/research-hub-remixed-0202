@@ -241,8 +241,8 @@ cd pre_proc
 
 # 仮想環境を作成（推奨）
 python -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# または .venv\Scripts\activate  # Windows
+.venv\Scripts\activate  # Windows
+# または source .venv/bin/activate  # macOS/Linux
 
 # 依存関係をインストール
 pip install -r requirements.txt
@@ -317,10 +317,24 @@ python embeddings/process_summary_index.py \
 # ドライラン（OpenSearchに投入しない）
 python embeddings/process_summary_index.py /path/to/document.pdf --dry-run
 
-# 研究IDを手動指定
+# 研究IDを手動指定（フォルダ名から抽出せずに直接指定）
 python embeddings/process_summary_index.py /path/to/document.pdf --research-id XYZ1
 
-# オプション指定
+# 研究IDを手動指定（短縮形 -r）
+python embeddings/process_summary_index.py /path/to/document.pdf -r ABC1
+
+# 研究IDを手動指定 + ドライラン（投入前の確認用）
+python embeddings/process_summary_index.py /path/to/document.pdf \
+    --research-id TEST \
+    --dry-run
+
+# 研究IDを手動指定 + ベースパス指定
+python embeddings/process_summary_index.py \
+    /data/研究/任意のフォルダ/報告書.pdf \
+    --research-id PROJ \
+    --base-path /data/研究
+
+# 全オプション指定
 python embeddings/process_summary_index.py /path/to/document.pdf \
     --base-path /data/研究 \
     --research-id ABC1 \
