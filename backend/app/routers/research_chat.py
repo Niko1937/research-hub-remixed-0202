@@ -49,6 +49,47 @@ async def handle_assistant_mode(
 
     user_message = request.messages[-1].content
     tool_results = []
+    internal_research_context = []  # OpenSearch results for LLM context
+
+    # Always fetch internal research from OpenSearch if configured
+    if internal_research_service.is_configured:
+        print(f"[assistant_mode] Fetching internal research from OpenSearch...")
+        try:
+            chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
+            internal_results = await internal_research_service.search(user_message, chat_history)
+
+            if internal_results:
+                print(f"[assistant_mode] Found {len(internal_results)} internal research results")
+
+                # Store for LLM context
+                internal_research_context = internal_results
+
+                # Send results to frontend
+                internal_data = []
+                for r in internal_results:
+                    item = {
+                        "title": r.title,
+                        "tags": r.tags,
+                        "similarity": r.similarity,
+                        "year": r.year,
+                    }
+                    if r.research_id:
+                        item["research_id"] = r.research_id
+                    if r.abstract:
+                        item["abstract"] = r.abstract
+                    internal_data.append(item)
+
+                yield create_sse_message({
+                    "type": "research_data",
+                    "internal": internal_data,
+                    "business": [],
+                    "external": [],
+                    "source": "opensearch_auto",
+                })
+            else:
+                print(f"[assistant_mode] No internal research results found")
+        except Exception as e:
+            print(f"[assistant_mode] OpenSearch search failed: {e}")
 
     # Generate or use provided steps
     steps = []
@@ -444,6 +485,21 @@ HTMLのみを出力。最初の文字は<!DOCTYPE html>で始める。"""
 
 ## ユーザーの質問:
 {user_message}"""
+
+    # Add internal research context from OpenSearch (if available)
+    if internal_research_context:
+        internal_context_lines = []
+        for r in internal_research_context:
+            line = f"- {r.title}"
+            if r.research_id:
+                line += f" (研究ID: {r.research_id})"
+            if r.abstract:
+                line += f"\n  要約: {r.abstract[:300]}..."
+            if r.tags:
+                line += f"\n  タグ: {', '.join(r.tags[:5])}"
+            internal_context_lines.append(line)
+
+        context_prompt += f"\n\n## 関連する社内研究 (OpenSearch):\n" + "\n".join(internal_context_lines)
 
     if tool_results:
         context_prompt += f"\n\n## ツール実行結果:\n{json.dumps(tool_results, ensure_ascii=False, indent=2)}"
