@@ -288,6 +288,37 @@ python opensearch/create_indices.py --action recreate --index oipf-details
 | `oipf-details` | ファイル詳細（RAG向け、ファイル単位） |
 | `employees` | 従業員・有識者（組織経路図、KnowWho検索） |
 
+### 従業員データ登録（employees）
+
+CSVファイルから従業員データをemployeesインデックスに登録します。
+
+```bash
+# 基本的な使用方法
+python embeddings/process_employees.py /path/to/employees.csv
+
+# ドライラン（登録せずに確認）
+python embeddings/process_employees.py /path/to/employees.csv --dry-run
+```
+
+**必要なCSV列**:
+| 列名 | 必須 | 説明 |
+|-----|------|------|
+| `employee_id` | **必須** | 従業員ID |
+| `display_name` | **必須** | 氏名 |
+| `mail` | **必須** | メールアドレス |
+| `job_title` | **必須** | 役職 |
+| `department` | **必須** | 部署 |
+| `manager_mail` | 任意 | 上司のメールアドレス |
+| `UserPrincipalName` | 任意 | （使用しない） |
+| `UsageLocation` | 任意 | （使用しない） |
+| `manager_display_name` | 任意 | （使用しない） |
+
+**処理内容**:
+| 処理 | 説明 |
+|-----|------|
+| manager_employee_id取得 | manager_mailから同CSV内のmailをマッチングしてemployee_idを取得 |
+| profile生成 | oipf-summaryのrelated_researchersと名前マッチングしてresearch_summary, expertise, keywordsを生成 |
+
 ### フォルダ構造のMarkdown出力
 
 ```bash
