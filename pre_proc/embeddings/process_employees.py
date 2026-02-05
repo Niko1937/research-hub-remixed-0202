@@ -98,7 +98,8 @@ class EmployeesPipeline:
         self._log(f"\n[1/5] Reading CSV file: {csv_path}")
 
         records = []
-        encodings = ['utf-8', 'utf-8-sig', 'cp932', 'shift_jis']
+        # Note: utf-8-sig must come BEFORE utf-8 to properly handle BOM on Windows
+        encodings = ['utf-8-sig', 'utf-8', 'cp932', 'shift_jis']
 
         for encoding in encodings:
             try:
@@ -119,12 +120,19 @@ class EmployeesPipeline:
         # Validate required columns
         required_columns = ['display_name', 'mail', 'employee_id', 'job_title', 'department']
         first_record = records[0]
+        actual_columns = list(first_record.keys())
         missing_columns = [col for col in required_columns if col not in first_record]
 
         if missing_columns:
-            raise ValueError(f"Missing required columns: {missing_columns}")
+            # Show actual columns for debugging
+            raise ValueError(
+                f"Missing required columns: {missing_columns}\n"
+                f"  Actual columns found: {actual_columns}\n"
+                f"  Hint: If first column looks like '\\ufeffdisplay_name', "
+                f"the file has a BOM issue. Try re-saving as UTF-8 without BOM."
+            )
 
-        self._log(f"  Columns: {list(first_record.keys())}")
+        self._log(f"  Columns: {actual_columns}")
 
         return records
 
