@@ -310,6 +310,7 @@ def create_employees_index() -> bool:
     Create employees index for organizational data with KNN vector support
 
     従業員・有識者データ用インデックス（組織経路図、KnowWho検索用）
+    knowwho_db.jsonの構造に準拠
 
     Returns:
         bool: True if successful, False otherwise
@@ -364,27 +365,32 @@ def create_employees_index() -> bool:
                 "manager_employee_id": {
                     "type": "keyword"
                 },
-                # プロフィール情報
-                "research_summary": {
-                    "type": "text"
-                },
-                "expertise": {
-                    "type": "keyword"
-                },
-                "keywords": {
-                    "type": "keyword"
-                },
-                "bio": {
-                    "type": "text"
-                },
-                # プロフィールのエンベディング（ベクトル検索用）
-                "profile_embedding": {
-                    "type": "knn_vector",
-                    "dimension": 1024,
-                    "method": {
-                        "name": "hnsw",
-                        "space_type": "cosinesimil",
-                        "engine": "faiss"
+                # プロフィール情報（入れ子構造 - knowwho_db.json準拠）
+                "profile": {
+                    "type": "object",
+                    "properties": {
+                        "research_summary": {
+                            "type": "text"
+                        },
+                        "expertise": {
+                            "type": "keyword"
+                        },
+                        "keywords": {
+                            "type": "keyword"
+                        },
+                        "bio": {
+                            "type": "text"
+                        },
+                        # プロフィールのエンベディング（ベクトル検索用）
+                        "embedding": {
+                            "type": "knn_vector",
+                            "dimension": 1024,
+                            "method": {
+                                "name": "hnsw",
+                                "space_type": "cosinesimil",
+                                "engine": "faiss"
+                            }
+                        }
                     }
                 },
                 # 可視化用（t-SNE座標、クラスタ情報）
