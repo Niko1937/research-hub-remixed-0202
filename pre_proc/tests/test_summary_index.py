@@ -237,6 +237,22 @@ def test_parse_researchers():
     researchers = client.parse_researchers("該当なし")
     assert len(researchers) == 0
 
+    # Test filtering description phrases
+    researchers = client.parse_researchers("以下の方々が担当しています\n田中太郎\n山田花子")
+    assert len(researchers) == 2
+    assert "田中太郎" in researchers
+    assert "以下の方々が担当しています" not in researchers
+
+    # Test filtering sentences
+    researchers = client.parse_researchers("メンバー一覧：\n田中太郎\n研究を担当しました。")
+    assert len(researchers) == 1
+    assert "田中太郎" in researchers
+
+    # Test filtering long text
+    researchers = client.parse_researchers("これは非常に長い説明文であり人名ではありません\n佐藤次郎")
+    assert len(researchers) == 1
+    assert "佐藤次郎" in researchers
+
     print("  [PASS] Researcher parsing")
 
 

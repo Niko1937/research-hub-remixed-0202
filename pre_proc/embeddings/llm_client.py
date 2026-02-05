@@ -277,17 +277,27 @@ class LLMClient:
         Returns:
             LLMResult with member names (one per line)
         """
-        system_prompt = """あなたは文書分析の専門家です。与えられたテキストから、著者、メンバー、担当者、研究者の名前を抽出してください。
+        system_prompt = """あなたは文書から人名を抽出する専門家です。
 
-以下のルールに従ってください：
-- 人名のみを抽出（組織名や部署名は除外）
-- 日本人名は「姓 名」または「姓名」の形式で出力
-- 外国人名はそのまま出力
-- 名前が見つからない場合は「該当なし」と出力
-- 各名前を改行で区切って出力"""
+【重要な出力ルール】
+- 人名のみを出力（説明文や前置きは絶対に書かない）
+- 1行に1人の名前のみ
+- 日本人名：「山田太郎」のように姓名のみ
+- 外国人名：「John Smith」のようにそのまま
+- 名前が見つからない場合のみ「該当なし」と出力
 
-        prompt = f"""以下のテキストから著者・メンバー・担当者の名前を抽出してください。
-名前のみを1行ずつ出力してください。
+【出力例】
+山田太郎
+佐藤花子
+John Smith
+
+【禁止事項】
+- 「以下の方々が〜」などの説明文
+- 「メンバー：」などの見出し
+- 組織名、部署名、役職名のみの出力"""
+
+        prompt = f"""以下のテキストから人名を抽出し、名前のみを1行ずつ出力してください。
+説明文は不要です。名前だけを出力してください。
 
 テキスト：
 {text[:6000]}"""
@@ -307,14 +317,44 @@ class LLMClient:
         if not researchers_str or "該当なし" in researchers_str:
             return []
 
+        # Phrases that indicate description text (not person names)
+        description_phrases = [
+            "以下", "次の", "上記", "下記", "方々", "メンバー", "担当者", "著者",
+            "研究者", "チーム", "グループ", "一覧", "リスト", "名前",
+            "です", "ます", "した", "する", "ある", "いる", "なる",
+            "抽出", "記載", "含む", "確認", "特定", "見つ",
+            "：", ":", "。", "、が", "について", "として", "による",
+            "人物", "氏名", "名簿", "所属", "部署",
+        ]
+
         # Split by newlines and clean up
         researchers = []
         for line in researchers_str.split("\n"):
             name = line.strip()
             # Remove common prefixes like "- ", "・", numbers
             name = name.lstrip("-・•●○◎123456789０１２３４５６７８９. 　")
-            if name and len(name) >= 2 and "該当" not in name:
-                researchers.append(name)
+
+            # Skip empty or too short
+            if not name or len(name) < 2:
+                continue
+
+            # Skip if contains "該当"
+            if "該当" in name:
+                continue
+
+            # Skip if too long (person names are typically short)
+            if len(name) > 20:
+                continue
+
+            # Skip if contains description phrases
+            if any(phrase in name for phrase in description_phrases):
+                continue
+
+            # Skip if looks like a sentence (contains common particles/endings)
+            if name.endswith(("。", "、", "です", "ます", "した", "ください")):
+                continue
+
+            researchers.append(name)
 
         return researchers
 
