@@ -307,7 +307,7 @@ def delete_index(index_name: str) -> bool:
 
 def create_employees_index() -> bool:
     """
-    Create employees index for organizational data with KNN vector support
+    Create employees index for organizational data
 
     従業員・有識者データ用インデックス（組織経路図、KnowWho検索用）
     knowwho_db.jsonの構造に準拠
@@ -320,7 +320,6 @@ def create_employees_index() -> bool:
     index_body = {
         "settings": {
             "index": {
-                "knn": True,
                 "number_of_shards": 1,
                 "number_of_replicas": 0
             }
@@ -373,45 +372,15 @@ def create_employees_index() -> bool:
                             "type": "text"
                         },
                         "expertise": {
-                            "type": "keyword"
+                            "type": "keyword"  # 配列対応（例: ["経営戦略", "技術経営"]）
                         },
                         "keywords": {
-                            "type": "keyword"
+                            "type": "keyword"  # 配列対応（例: ["MOT", "R&D投資"]）
                         },
                         "bio": {
                             "type": "text"
-                        },
-                        # プロフィールのエンベディング（ベクトル検索用）
-                        "embedding": {
-                            "type": "knn_vector",
-                            "dimension": 1024,
-                            "method": {
-                                "name": "hnsw",
-                                "space_type": "cosinesimil",
-                                "engine": "faiss"
-                            }
                         }
                     }
-                },
-                # 可視化用（t-SNE座標、クラスタ情報）
-                "tsne_x": {
-                    "type": "float"
-                },
-                "tsne_y": {
-                    "type": "float"
-                },
-                "cluster_id": {
-                    "type": "integer"
-                },
-                "cluster_label": {
-                    "type": "keyword"
-                },
-                # メタデータ
-                "created_at": {
-                    "type": "date"
-                },
-                "updated_at": {
-                    "type": "date"
                 }
             }
         }
