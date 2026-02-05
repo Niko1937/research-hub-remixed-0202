@@ -305,6 +305,115 @@ def delete_index(index_name: str) -> bool:
         return False
 
 
+def create_employees_index() -> bool:
+    """
+    Create employees index for organizational data with KNN vector support
+
+    従業員・有識者データ用インデックス（組織経路図、KnowWho検索用）
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    index_name = "employees"
+
+    index_body = {
+        "settings": {
+            "index": {
+                "knn": True,
+                "number_of_shards": 1,
+                "number_of_replicas": 0
+            }
+        },
+        "mappings": {
+            "properties": {
+                # 基本情報
+                "employee_id": {
+                    "type": "keyword"
+                },
+                "display_name": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                        }
+                    }
+                },
+                "mail": {
+                    "type": "keyword"
+                },
+                "job_title": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                        }
+                    }
+                },
+                "department": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                        }
+                    }
+                },
+                # 組織階層（上司のemployee_id）
+                "manager_employee_id": {
+                    "type": "keyword"
+                },
+                # プロフィール情報
+                "research_summary": {
+                    "type": "text"
+                },
+                "expertise": {
+                    "type": "keyword"
+                },
+                "keywords": {
+                    "type": "keyword"
+                },
+                "bio": {
+                    "type": "text"
+                },
+                # プロフィールのエンベディング（ベクトル検索用）
+                "profile_embedding": {
+                    "type": "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "faiss"
+                    }
+                },
+                # 可視化用（t-SNE座標、クラスタ情報）
+                "tsne_x": {
+                    "type": "float"
+                },
+                "tsne_y": {
+                    "type": "float"
+                },
+                "cluster_id": {
+                    "type": "integer"
+                },
+                "cluster_label": {
+                    "type": "keyword"
+                },
+                # メタデータ
+                "created_at": {
+                    "type": "date"
+                },
+                "updated_at": {
+                    "type": "date"
+                }
+            }
+        }
+    }
+
+    return _create_index(index_name, index_body)
+
+
 def create_all_indices() -> bool:
     """
     Create all OIPF indices
@@ -317,6 +426,7 @@ def create_all_indices() -> bool:
     results = []
     results.append(("oipf-summary", create_oipf_summary_index()))
     results.append(("oipf-details", create_oipf_details_index()))
+    results.append(("employees", create_employees_index()))
 
     print("\n" + "=" * 50)
     print("Index Creation Summary")
@@ -347,6 +457,9 @@ def main():
   # oipf-summary インデックスのみ作成
   python create_indices.py --index oipf-summary
 
+  # employees インデックスのみ作成
+  python create_indices.py --index employees
+
   # インデックスを削除
   python create_indices.py --action delete --index oipf-details
 
@@ -362,14 +475,14 @@ def main():
     )
     parser.add_argument(
         "--index",
-        choices=["oipf-summary", "oipf-details"],
+        choices=["oipf-summary", "oipf-details", "employees"],
         default="oipf-details",
         help="Index name (default: oipf-details)"
     )
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Create all indices (oipf-summary and oipf-details)"
+        help="Create all indices (oipf-summary, oipf-details, employees)"
     )
 
     args = parser.parse_args()
@@ -378,6 +491,13 @@ def main():
     print("OpenSearch Index Management")
     print("=" * 50)
 
+    # Index creation function mapping
+    index_creators = {
+        "oipf-summary": create_oipf_summary_index,
+        "oipf-details": create_oipf_details_index,
+        "employees": create_employees_index,
+    }
+
     try:
         if args.all and args.action == "create":
             success = create_all_indices()
@@ -385,15 +505,9 @@ def main():
             success = delete_index(args.index)
         elif args.action == "recreate":
             delete_index(args.index)
-            if args.index == "oipf-summary":
-                success = create_oipf_summary_index()
-            else:
-                success = create_oipf_details_index()
+            success = index_creators[args.index]()
         else:  # create
-            if args.index == "oipf-summary":
-                success = create_oipf_summary_index()
-            else:
-                success = create_oipf_details_index()
+            success = index_creators[args.index]()
 
         if success:
             print("\nOperation completed successfully.")

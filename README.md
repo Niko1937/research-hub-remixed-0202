@@ -271,12 +271,22 @@ pip install -r requirements.txt
 # oipf-detailsインデックスを作成（デフォルト）
 python opensearch/create_indices.py
 
-# 全インデックス（oipf-summary, oipf-details）を作成
+# 全インデックス（oipf-summary, oipf-details, employees）を作成
 python opensearch/create_indices.py --all
+
+# employeesインデックスのみ作成
+python opensearch/create_indices.py --index employees
 
 # インデックスを再作成（削除→作成）
 python opensearch/create_indices.py --action recreate --index oipf-details
 ```
+
+**利用可能なインデックス**:
+| インデックス名 | 用途 |
+|--------------|------|
+| `oipf-summary` | 研究概要（フォルダ単位の要約、ベクトル検索） |
+| `oipf-details` | ファイル詳細（RAG向け、ファイル単位） |
+| `employees` | 従業員・有識者（組織経路図、KnowWho検索） |
 
 ### フォルダ構造のMarkdown出力
 
