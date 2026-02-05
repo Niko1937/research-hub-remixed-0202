@@ -288,6 +288,66 @@ python opensearch/create_indices.py --action recreate --index oipf-details
 | `oipf-details` | ファイル詳細（RAG向け、ファイル単位） |
 | `employees` | 従業員・有識者（組織経路図、KnowWho検索） |
 
+### OpenSearchデータエクスポート
+
+別のOpenSearchにデータを移行する際に使用します。
+
+```bash
+# 全インデックスをエクスポート
+python opensearch/export_indices.py --all
+
+# 特定のインデックスをエクスポート
+python opensearch/export_indices.py --index oipf-summary
+
+# 出力ディレクトリを指定
+python opensearch/export_indices.py --all --output ./my_exports
+
+# エンベディングを除外（ファイルサイズ削減）
+python opensearch/export_indices.py --all --exclude-embeddings
+```
+
+**出力ファイル**:
+```
+exports/export_YYYYMMDD_HHMMSS/
+├── manifest.json                  # エクスポート情報
+├── oipf-summary_mapping.json      # マッピング・設定
+├── oipf-summary_data.ndjson       # ドキュメントデータ
+├── oipf-details_mapping.json
+├── oipf-details_data.ndjson
+├── employees_mapping.json
+└── employees_data.ndjson
+```
+
+### OpenSearchデータインポート
+
+エクスポートしたデータを別のOpenSearchにインポートします。
+
+```bash
+# マニフェストから全インデックスをインポート
+python opensearch/import_indices.py --dir ./exports/export_20240101_120000
+
+# 特定のインデックスをインポート
+python opensearch/import_indices.py --dir ./exports/export_20240101_120000 --index oipf-summary
+
+# インデックスをマッピングファイルから作成してインポート
+python opensearch/import_indices.py --dir ./exports/export_20240101_120000 --create-index
+
+# バッチサイズを指定（大量データ時）
+python opensearch/import_indices.py --dir ./exports/export_20240101_120000 --batch-size 1000
+```
+
+**オプション一覧**:
+| オプション | 短縮形 | 説明 |
+|-----------|--------|------|
+| `--dir` | `-d` | エクスポートディレクトリ（必須） |
+| `--index` | `-i` | インポートするインデックス名（省略時は全インデックス） |
+| `--create-index` | `-c` | マッピングファイルからインデックスを作成 |
+| `--batch-size` | `-b` | バルクリクエストのバッチサイズ（デフォルト: 500） |
+
+**注意**:
+- インポート先のOpenSearchにインデックスが存在する必要があります（`--create-index`で自動作成可能）
+- 同じIDのドキュメントは上書きされます
+
 ### 従業員データ登録（employees）
 
 CSVファイルから従業員データをemployeesインデックスに登録します。
