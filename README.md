@@ -56,6 +56,12 @@ OPENSEARCH_PASSWORD=your-password
 # OPENSEARCH_PROXY_URL=http://proxy.example.com:8080
 
 # ===========================================
+# KnowWho設定（有識者検索・組織経路図）
+# ===========================================
+# KNOWWHO_USE_OPENSEARCH=false  # trueでOpenSearchのemployeesインデックスを使用、falseでモックデータ
+# KNOWWHO_CURRENT_USER_ID=E100  # 現在のユーザーID（OpenSearch使用時）
+
+# ===========================================
 # エンベディングAPI設定（社内研究検索に必須）
 # 注意: 社内研究検索を有効にするには、OpenSearchとEmbedding両方の設定が必要
 # ===========================================
@@ -131,6 +137,26 @@ LLM_TIMEOUT=60
 |---------|------|
 | OpenSearch + Embedding 両方設定済み | OpenSearchによる社内研究検索が有効 |
 | どちらかが未設定 | モックデータによるデモ動作 |
+
+#### KnowWho（有識者検索・組織経路図）の設定
+
+有識者検索と組織経路図のデータソースを切り替えられます。
+
+```env
+# OpenSearchのemployeesインデックスを使用する場合
+KNOWWHO_USE_OPENSEARCH=true
+KNOWWHO_CURRENT_USER_ID=E100  # 現在のユーザーID
+
+# モックデータ（JSONファイル）を使用する場合（デフォルト）
+KNOWWHO_USE_OPENSEARCH=false
+```
+
+| 設定 | データソース | 説明 |
+|------|-------------|------|
+| `KNOWWHO_USE_OPENSEARCH=true` | OpenSearch (employees) | 本番用。事前にprocess_employees.pyでデータ登録が必要 |
+| `KNOWWHO_USE_OPENSEARCH=false` | JSONファイル | 開発/デモ用。knowwho_db.json等を使用 |
+
+**注意**: OpenSearchモードでは、t-SNE座標やクラスタ情報は利用できません（可視化は簡易版になります）。
 
 バックエンド起動時に以下のログで設定状態を確認できます:
 ```

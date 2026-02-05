@@ -144,6 +144,38 @@ class OpenSearchClient:
         response.raise_for_status()
         return response.json()
 
+    async def get_document(
+        self,
+        index: str,
+        doc_id: str,
+    ) -> Optional[dict]:
+        """
+        Get a single document by ID
+
+        Args:
+            index: Index name (e.g., "employees")
+            doc_id: Document ID
+
+        Returns:
+            Document as dict with _id and _source, or None if not found
+        """
+        if not self.is_configured:
+            raise RuntimeError("OpenSearch is not configured")
+
+        client = await self._get_client()
+        url = f"{self.settings.opensearch_url.rstrip('/')}/{index}/_doc/{doc_id}"
+
+        try:
+            response = await client.get(url)
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            raise
+
     async def search_with_query_string(
         self,
         index: str,

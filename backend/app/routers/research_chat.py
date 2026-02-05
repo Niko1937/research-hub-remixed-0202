@@ -19,19 +19,14 @@ from app.services.external_search import search_all_sources, search_openalex, se
 from app.services.mock_data import (
     search_internal_research,
     search_business_challenges,
-    search_experts,
     search_sharepoint_coarse2fine,
     deep_file_search,
-    get_all_employees_for_tsne,
-    get_cluster_metadata,
-    MOCK_EMPLOYEES,
-    CURRENT_USER_ID,
-    get_employee_by_id,
 )
 from app.services.internal_research_search import (
     internal_research_service,
     InternalResearchResult,
 )
+from app.services.knowwho_service import knowwho_service
 
 router = APIRouter()
 
@@ -277,10 +272,13 @@ Keep it concise, 2-4 steps. Always end with "chat"."""
 
         elif tool_name == "knowwho":
             # Find experts
+            knowwho_status = knowwho_service.get_status()
+            source_label = "OpenSearch" if knowwho_status["mode"] == "opensearch" else "モックデータ"
+
             yield create_sse_message({
                 "type": "knowwho_thinking",
                 "step": "departments",
-                "message": "関連部署を特定中...",
+                "message": f"関連部署を特定中... (データソース: {source_label})",
             })
 
             # Identify relevant departments
@@ -306,8 +304,8 @@ JSON形式で回答: {{"departments": ["部署1", "部署2"]}}"""
                 "departments": departments,
             })
 
-            # Search experts
-            experts = search_experts(departments)
+            # Search experts using knowwho_service
+            experts = await knowwho_service.search_experts(departments)
 
             tool_results.append({
                 "tool": "knowwho",
@@ -315,12 +313,20 @@ JSON形式で回答: {{"departments": ["部署1", "部署2"]}}"""
                 "results": experts,
             })
 
+            # Get all employees and cluster metadata for visualization
+            all_employees = await knowwho_service.get_all_employees_for_tsne()
+            cluster_metadata = knowwho_service.get_cluster_metadata()
+
             yield create_sse_message({
                 "type": "knowwho_results",
                 "experts": experts,
-                "searchContext": {"departments": departments, "candidateCount": len(experts)},
-                "allEmployees": get_all_employees_for_tsne(),
-                "clusters": get_cluster_metadata(),
+                "searchContext": {
+                    "departments": departments,
+                    "candidateCount": len(experts),
+                    "dataSource": knowwho_status["mode"],
+                },
+                "allEmployees": all_employees,
+                "clusters": cluster_metadata,
             })
 
         elif tool_name == "positioning-analysis":
