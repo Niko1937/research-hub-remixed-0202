@@ -91,13 +91,18 @@ class KnowWhoService:
         self._mock_data_loaded = True
 
     def get_current_user_id(self) -> str:
-        """Get current user ID"""
-        if self.use_opensearch:
-            # For OpenSearch, use environment variable or default
-            return os.getenv("KNOWWHO_CURRENT_USER_ID", "E100")
-        else:
+        """Get current user ID from environment variable or fallback to default"""
+        # Environment variable takes priority (works in both OpenSearch and mock mode)
+        env_user_id = os.getenv("KNOWWHO_CURRENT_USER_ID", "")
+        if env_user_id:
+            return env_user_id
+
+        # Fallback: use mock data's current_user_id or default
+        if not self.use_opensearch:
             self._load_mock_data()
             return self._mock_current_user_id
+
+        return "E100"  # Default for OpenSearch mode without env var
 
     async def get_employee_by_id(self, employee_id: str) -> Optional[Employee]:
         """Get employee by ID"""

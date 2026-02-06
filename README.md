@@ -59,7 +59,7 @@ OPENSEARCH_PASSWORD=your-password
 # KnowWho設定（有識者検索・組織経路図）
 # ===========================================
 # KNOWWHO_USE_OPENSEARCH=false  # trueでOpenSearchのemployeesインデックスを使用、falseでモックデータ
-# KNOWWHO_CURRENT_USER_ID=E100  # 現在のユーザーID（OpenSearch使用時）
+# KNOWWHO_CURRENT_USER_ID=E100  # 組織経路図の起点となる「自分」のemployee_id（両モード共通）
 
 # ===========================================
 # エンベディングAPI設定（社内研究検索に必須）
@@ -145,16 +145,19 @@ LLM_TIMEOUT=60
 ```env
 # OpenSearchのemployeesインデックスを使用する場合
 KNOWWHO_USE_OPENSEARCH=true
-KNOWWHO_CURRENT_USER_ID=E100  # 現在のユーザーID
 
 # モックデータ（JSONファイル）を使用する場合（デフォルト）
 KNOWWHO_USE_OPENSEARCH=false
+
+# 組織経路図の起点「自分」を指定（両モード共通、employee_idで指定）
+KNOWWHO_CURRENT_USER_ID=E100
 ```
 
-| 設定 | データソース | 説明 |
-|------|-------------|------|
-| `KNOWWHO_USE_OPENSEARCH=true` | OpenSearch (employees) | 本番用。事前にprocess_employees.pyでデータ登録が必要 |
-| `KNOWWHO_USE_OPENSEARCH=false` | JSONファイル | 開発/デモ用。knowwho_db.json等を使用 |
+| 設定 | 説明 |
+|------|------|
+| `KNOWWHO_USE_OPENSEARCH=true` | OpenSearch (employees) を使用。事前にprocess_employees.pyでデータ登録が必要 |
+| `KNOWWHO_USE_OPENSEARCH=false` | JSONファイル（knowwho_db.json等）を使用（デフォルト） |
+| `KNOWWHO_CURRENT_USER_ID` | 組織経路図の起点となる「自分」のemployee_id。省略時はモックデータのデフォルト値またはE100 |
 
 **注意**: OpenSearchモードでは、t-SNE座標やクラスタ情報は利用できません（可視化は簡易版になります）。
 
