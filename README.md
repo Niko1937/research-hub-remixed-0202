@@ -80,6 +80,13 @@ EMBEDDING_API_KEY=your-api-key
 # MAX_FILE_SIZE_MB=100
 # MAX_FOLDER_DEPTH=4
 # SKIP_INDEXED_FOLDERS=false
+
+# ===========================================
+# 汎用プロキシ設定（前処理スクリプト用、オプション）
+# 注意: サービス別プロキシ設定（LLM_PROXY_*等）が優先されます
+# ===========================================
+# PROXY_ENABLED=false
+# PROXY_URL=http://proxy.example.com:8080
 ```
 
 #### プロキシ環境での設定
