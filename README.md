@@ -60,6 +60,7 @@ OPENSEARCH_PASSWORD=your-password
 # ===========================================
 # KNOWWHO_USE_OPENSEARCH=false  # trueでOpenSearchのemployeesインデックスを使用、falseでモックデータ
 # KNOWWHO_CURRENT_USER_ID=E100  # 組織経路図の起点となる「自分」のemployee_id（両モード共通）
+# KNOWWHO_TARGET_EMPLOYEES=E001,E002,E003  # 経路探索対象の従業員ID（カンマ区切り、省略時は部署ベース検索）
 
 # ===========================================
 # エンベディングAPI設定（社内研究検索に必須）
@@ -158,6 +159,9 @@ KNOWWHO_USE_OPENSEARCH=false
 
 # 組織経路図の起点「自分」を指定（両モード共通、employee_idで指定）
 KNOWWHO_CURRENT_USER_ID=E100
+
+# 経路探索対象の従業員IDを指定（カンマ区切り、省略時は部署ベースの検索）
+KNOWWHO_TARGET_EMPLOYEES=E001,E002,E003
 ```
 
 | 設定 | 説明 |
@@ -165,6 +169,7 @@ KNOWWHO_CURRENT_USER_ID=E100
 | `KNOWWHO_USE_OPENSEARCH=true` | OpenSearch (employees) を使用。事前にprocess_employees.pyでデータ登録が必要 |
 | `KNOWWHO_USE_OPENSEARCH=false` | JSONファイル（knowwho_db.json等）を使用（デフォルト） |
 | `KNOWWHO_CURRENT_USER_ID` | 組織経路図の起点となる「自分」のemployee_id。省略時はモックデータのデフォルト値またはE100 |
+| `KNOWWHO_TARGET_EMPLOYEES` | 経路探索対象の従業員ID（カンマ区切り）。指定時は部署検索をスキップし、自分から指定従業員への経路のみを探索 |
 
 **注意**: OpenSearchモードでは、t-SNE座標やクラスタ情報は利用できません（可視化は簡易版になります）。
 

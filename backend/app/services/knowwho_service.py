@@ -377,6 +377,113 @@ class KnowWhoService:
         from app.services.mock_data import search_experts
         return search_experts(departments)
 
+    def get_target_employee_ids(self) -> list[str]:
+        """
+        Get target employee IDs from environment variable.
+        Returns list of employee IDs specified in KNOWWHO_TARGET_EMPLOYEES.
+        """
+        target_str = self.settings.knowwho_target_employees
+        if not target_str:
+            # Fallback to os.getenv for hot-reload (though settings are cached)
+            target_str = os.getenv("KNOWWHO_TARGET_EMPLOYEES", "")
+
+        if not target_str:
+            return []
+
+        # Parse comma-separated IDs
+        return [eid.strip() for eid in target_str.split(",") if eid.strip()]
+
+    async def search_by_target_employees(self) -> list[dict]:
+        """
+        Search for experts specified in KNOWWHO_TARGET_EMPLOYEES environment variable.
+        Returns path information from current user to each target employee.
+        """
+        target_ids = self.get_target_employee_ids()
+        if not target_ids:
+            print("[KnowWhoService] No target employees specified in KNOWWHO_TARGET_EMPLOYEES")
+            return []
+
+        current_user_id = self.get_current_user_id()
+        current_user = await self.get_employee_by_id(current_user_id)
+
+        if not current_user:
+            print(f"[KnowWhoService] Current user {current_user_id} not found")
+            return []
+
+        results = []
+
+        for target_id in target_ids:
+            # Skip if target is the current user
+            if target_id == current_user_id:
+                continue
+
+            emp = await self.get_employee_by_id(target_id)
+            if not emp:
+                print(f"[KnowWhoService] Target employee {target_id} not found")
+                continue
+
+            # Calculate path from current user to target
+            _, full_path, distance = await self.find_path_between(
+                current_user_id, emp.employee_id
+            )
+
+            same_dept = emp.department == current_user.department
+
+            # Determine approachability
+            if same_dept:
+                approachability = "direct"
+            elif distance < 0 or not full_path:
+                approachability = "via_manager"
+            elif distance <= 3:
+                approachability = "introduction"
+            else:
+                approachability = "via_manager"
+
+            # Determine contact methods
+            if approachability == "direct":
+                contact_methods = ["slack", "email"]
+            elif approachability == "introduction":
+                contact_methods = ["request_intro", "email"]
+            else:
+                contact_methods = ["ask_manager"]
+
+            results.append({
+                "employee_id": emp.employee_id,
+                "name": emp.display_name,
+                "affiliation": emp.department,
+                "role": emp.job_title,
+                "mail": emp.mail,
+                "approachability": approachability,
+                "connectionPath": " → ".join(e.display_name for e in full_path) if full_path else "",
+                "distance": distance,
+                "contactMethods": contact_methods,
+                "suggestedQuestions": [
+                    f"{emp.display_name}さんの専門分野について教えてください",
+                    "現在進行中のプロジェクトについて伺いたいです",
+                ],
+                "pathDetails": [
+                    {
+                        "employee_id": e.employee_id,
+                        "name": e.display_name,
+                        "role": e.job_title,
+                        "department": e.department,
+                    }
+                    for e in full_path
+                ] if full_path else [],
+                "expertise": emp.expertise,
+                "keywords": emp.keywords,
+                "research_summary": emp.research_summary,
+                "tsne_x": emp.tsne_x,
+                "tsne_y": emp.tsne_y,
+                "cluster_id": emp.cluster_id,
+                "cluster_label": emp.cluster_label,
+            })
+
+        # Sort by distance
+        results.sort(key=lambda c: (0 if c["approachability"] == "direct" else 1, c["distance"]))
+
+        return results
+
     async def get_all_employees_for_tsne(self) -> list[dict]:
         """Get all employees with t-SNE coordinates for visualization"""
         if self.use_opensearch:
@@ -440,10 +547,14 @@ class KnowWhoService:
 
     def get_status(self) -> dict:
         """Get service status"""
+        target_employees = self.get_target_employee_ids()
         return {
             "mode": "opensearch" if self.use_opensearch else "mock",
             "opensearch_available": self.is_opensearch_available,
             "opensearch_enabled": os.getenv("KNOWWHO_USE_OPENSEARCH", "false").lower() == "true",
+            "current_user_id": self.get_current_user_id(),
+            "target_employees": target_employees,
+            "target_mode": len(target_employees) > 0,
         }
 
 

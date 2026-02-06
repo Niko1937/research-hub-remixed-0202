@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     embedding_proxy_enabled: bool = False
     embedding_proxy_url: str = ""
 
+    # KnowWho Configuration
+    knowwho_current_user_id: str = ""  # Current user's employee_id
+    knowwho_target_employees: str = ""  # Comma-separated target employee IDs (e.g., "E001,E002,E003")
+
     model_config = {
         "env_prefix": "",
         "case_sensitive": False,

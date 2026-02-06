@@ -275,14 +275,52 @@ Keep it concise, 2-4 steps. Always end with "chat"."""
             knowwho_status = knowwho_service.get_status()
             source_label = "OpenSearch" if knowwho_status["mode"] == "opensearch" else "モックデータ"
 
-            yield create_sse_message({
-                "type": "knowwho_thinking",
-                "step": "departments",
-                "message": f"関連部署を特定中... (データソース: {source_label})",
-            })
+            # Check if target employees are specified in config
+            target_employee_ids = knowwho_service.get_target_employee_ids()
 
-            # Identify relevant departments
-            dept_prompt = f"""ユーザーの質問に関連する部署を特定してください。
+            if target_employee_ids:
+                # Use specified target employees
+                yield create_sse_message({
+                    "type": "knowwho_thinking",
+                    "step": "target_employees",
+                    "message": f"指定された従業員への経路を探索中... (データソース: {source_label})",
+                    "targetEmployees": target_employee_ids,
+                })
+
+                # Search by target employee IDs
+                experts = await knowwho_service.search_by_target_employees()
+
+                tool_results.append({
+                    "tool": "knowwho",
+                    "query": query,
+                    "results": experts,
+                })
+
+                # Get all employees and cluster metadata for visualization
+                all_employees = await knowwho_service.get_all_employees_for_tsne()
+                cluster_metadata = knowwho_service.get_cluster_metadata()
+
+                yield create_sse_message({
+                    "type": "knowwho_results",
+                    "experts": experts,
+                    "searchContext": {
+                        "targetEmployees": target_employee_ids,
+                        "candidateCount": len(experts),
+                        "dataSource": knowwho_status["mode"],
+                    },
+                    "allEmployees": all_employees,
+                    "clusters": cluster_metadata,
+                })
+            else:
+                # Use department-based search (original behavior)
+                yield create_sse_message({
+                    "type": "knowwho_thinking",
+                    "step": "departments",
+                    "message": f"関連部署を特定中... (データソース: {source_label})",
+                })
+
+                # Identify relevant departments
+                dept_prompt = f"""ユーザーの質問に関連する部署を特定してください。
 
 質問: {query}
 
@@ -290,44 +328,44 @@ Keep it concise, 2-4 steps. Always end with "chat"."""
 
 JSON形式で回答: {{"departments": ["部署1", "部署2"]}}"""
 
-            departments = ["研究開発部", "AI推進部"]
-            try:
-                parsed = await llm_client.generate_json(dept_prompt)
-                departments = parsed.get("departments", departments)
-            except Exception as e:
-                print(f"Department identification failed: {e}")
+                departments = ["研究開発部", "AI推進部"]
+                try:
+                    parsed = await llm_client.generate_json(dept_prompt)
+                    departments = parsed.get("departments", departments)
+                except Exception as e:
+                    print(f"Department identification failed: {e}")
 
-            yield create_sse_message({
-                "type": "knowwho_thinking",
-                "step": "searching",
-                "message": f"候補者を検索中... ({', '.join(departments)})",
-                "departments": departments,
-            })
-
-            # Search experts using knowwho_service
-            experts = await knowwho_service.search_experts(departments)
-
-            tool_results.append({
-                "tool": "knowwho",
-                "query": query,
-                "results": experts,
-            })
-
-            # Get all employees and cluster metadata for visualization
-            all_employees = await knowwho_service.get_all_employees_for_tsne()
-            cluster_metadata = knowwho_service.get_cluster_metadata()
-
-            yield create_sse_message({
-                "type": "knowwho_results",
-                "experts": experts,
-                "searchContext": {
+                yield create_sse_message({
+                    "type": "knowwho_thinking",
+                    "step": "searching",
+                    "message": f"候補者を検索中... ({', '.join(departments)})",
                     "departments": departments,
-                    "candidateCount": len(experts),
-                    "dataSource": knowwho_status["mode"],
-                },
-                "allEmployees": all_employees,
-                "clusters": cluster_metadata,
-            })
+                })
+
+                # Search experts using knowwho_service
+                experts = await knowwho_service.search_experts(departments)
+
+                tool_results.append({
+                    "tool": "knowwho",
+                    "query": query,
+                    "results": experts,
+                })
+
+                # Get all employees and cluster metadata for visualization
+                all_employees = await knowwho_service.get_all_employees_for_tsne()
+                cluster_metadata = knowwho_service.get_cluster_metadata()
+
+                yield create_sse_message({
+                    "type": "knowwho_results",
+                    "experts": experts,
+                    "searchContext": {
+                        "departments": departments,
+                        "candidateCount": len(experts),
+                        "dataSource": knowwho_status["mode"],
+                    },
+                    "allEmployees": all_employees,
+                    "clusters": cluster_metadata,
+                })
 
         elif tool_name == "positioning-analysis":
             # Generate positioning analysis
