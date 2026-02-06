@@ -190,15 +190,33 @@ class KnowWhoService:
                 break
 
         if not lca:
-            # Fallback: assume managers 2 levels up are connected
+            # Fallback: assume managers 2 levels up are connected through a virtual CEO
             # Take up to 3 ancestors from each side (self + 2 levels up)
             my_path = my_ancestors[:3] if len(my_ancestors) >= 3 else my_ancestors
             target_path = target_ancestors[:3] if len(target_ancestors) >= 3 else target_ancestors
 
             if my_path and target_path:
-                # Connect paths: my_path -> (virtual connection) -> reversed target_path
-                full_path = my_path + list(reversed(target_path))
-                # Remove duplicate if the top managers happen to be the same
+                # Check if top managers are the same (no virtual CEO needed)
+                my_top = my_path[-1] if my_path else None
+                target_top = target_path[-1] if target_path else None
+
+                if my_top and target_top and my_top.employee_id == target_top.employee_id:
+                    # Same top manager - connect directly without virtual CEO
+                    full_path = my_path + list(reversed(target_path[:-1]))
+                else:
+                    # Different top managers - insert virtual CEO between them
+                    virtual_ceo = Employee(
+                        employee_id="VIRTUAL_CEO",
+                        display_name="（経営層）",
+                        mail="",
+                        job_title="経営層",
+                        department="経営",
+                        manager_employee_id=None,
+                    )
+                    # Connect: my_path -> virtual CEO -> reversed target_path
+                    full_path = my_path + [virtual_ceo] + list(reversed(target_path))
+
+                # Remove duplicates while preserving order
                 seen = set()
                 unique_path = []
                 for emp in full_path:
@@ -207,8 +225,11 @@ class KnowWhoService:
                         unique_path.append(emp)
 
                 distance = len(unique_path) - 1 if unique_path else 0
-                # Use the top of my_path as virtual LCA
-                virtual_lca = my_path[-1] if my_path else None
+                # Use virtual CEO as LCA (or top manager if same)
+                virtual_lca = next(
+                    (e for e in unique_path if e.employee_id == "VIRTUAL_CEO"),
+                    my_path[-1] if my_path else None
+                )
                 return virtual_lca, unique_path, distance
 
             return None, [], -1
