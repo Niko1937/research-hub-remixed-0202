@@ -43,14 +43,34 @@ interface ExpertNetworkGraphProps {
   experts: Expert[];
 }
 
-// 職階レベルを取得
-const getRoleLevel = (role: string): number => {
+// 職階レベルを取得（役職名ベース）
+const getRoleLevelFromTitle = (role: string): number => {
   const roleLower = role.toLowerCase();
-  if (roleLower.includes('ceo') || roleLower.includes('社長') || roleLower.includes('代表')) return 4;
+  // 経営層（仮想CEOを含む）
+  if (roleLower.includes('経営層') || roleLower.includes('ceo') || roleLower.includes('社長') || roleLower.includes('代表')) return 4;
+  // 役員級
   if (roleLower.includes('執行役') || roleLower.includes('vp') || roleLower.includes('vice president') || roleLower.includes('役員') || roleLower.includes('cto') || roleLower.includes('cso') || roleLower.includes('cfo')) return 3;
+  // 部長級
   if (roleLower.includes('部長') || roleLower.includes('director') || roleLower.includes('manager') || roleLower.includes('教授')) return 2;
+  // 課長級
   if (roleLower.includes('課長') || roleLower.includes('lead') || roleLower.includes('主任') || roleLower.includes('准教授') || roleLower.includes('講師')) return 1;
   return 0;
+};
+
+// 経路の位置からレベルを計算（上に行くほど高いレベル）
+const getRoleLevelFromPath = (pathIndex: number, pathLength: number, isUser: boolean, isTarget: boolean): number => {
+  if (pathLength <= 1) return 0;
+
+  // 自分とターゲットは末端（レベル0）
+  if (isUser || isTarget) return 0;
+
+  // 中間ノードは経路の位置に基づいてレベルを設定
+  // 経路の中央付近が最も高いレベル（LCA付近）
+  const midPoint = Math.floor(pathLength / 2);
+  const distanceFromMid = Math.abs(pathIndex - midPoint);
+  const maxLevel = Math.min(4, Math.floor(pathLength / 2));
+
+  return Math.max(1, maxLevel - distanceFromMid);
 };
 
 const getRoleLevelLabel = (level: number): string => {
@@ -99,23 +119,30 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
     experts.forEach(expert => {
       if (expert.pathDetails && expert.pathDetails.length > 0) {
         const pathNodeIds = new Set<string>();
-        const expertNodeId = expert.pathDetails[expert.pathDetails.length - 1].employee_id || 
+        const expertNodeId = expert.pathDetails[expert.pathDetails.length - 1].employee_id ||
                             `node-${expert.pathDetails[expert.pathDetails.length - 1].name}`;
-        
+        const pathLength = expert.pathDetails.length;
+
         for (let i = 0; i < expert.pathDetails.length; i++) {
           const pathNode = expert.pathDetails[i];
           const isFirst = i === 0;
           const isLast = i === expert.pathDetails.length - 1;
-          
+
           const nodeId = pathNode.employee_id || `node-${pathNode.name}`;
           pathNodeIds.add(nodeId);
-          
+
           if (!nodeMap.has(nodeId)) {
-            const roleLevel = getRoleLevel(pathNode.role);
-            roleLevelSet.add(roleLevel);
-            
             const isUser = pathNode.name === '自分' || isFirst;
-            
+
+            // 役職名からのレベルと経路位置からのレベルを組み合わせ
+            const titleLevel = getRoleLevelFromTitle(pathNode.role);
+            const pathLevel = getRoleLevelFromPath(i, pathLength, isUser, isLast);
+
+            // 役職名レベルが明示的に設定されている場合（>0）はそれを優先
+            // そうでなければ経路位置からのレベルを使用
+            const roleLevel = titleLevel > 0 ? titleLevel : pathLevel;
+            roleLevelSet.add(roleLevel);
+
             nodeMap.set(nodeId, {
               id: nodeId,
               label: pathNode.name,
