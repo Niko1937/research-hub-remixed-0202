@@ -464,6 +464,11 @@ class KnowWhoService:
             else:
                 contact_methods = ["ask_manager"]
 
+            # Debug: log job_level and role for path nodes
+            print(f"[KnowWho Debug] Path to {emp.display_name}:")
+            for e in full_path:
+                print(f"  - {e.display_name}: job_level={e.job_level}, job_title={e.job_title}, role={e.get_role_with_level()}")
+
             results.append({
                 "employee_id": emp.employee_id,
                 "name": emp.display_name,
