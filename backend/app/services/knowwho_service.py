@@ -226,9 +226,10 @@ class KnowWhoService:
                         employee_id="VIRTUAL_CEO",
                         display_name="（経営層）",
                         mail="",
-                        job_title="経営層",
+                        job_title="社長",  # フロントエンドで「社長」を検出 → level 4（経営層）
                         department="経営",
                         manager_employee_id=None,
+                        job_level=0,  # suffixを追加しない
                     )
                     # Connect: my_path -> virtual CEO -> reversed target_path
                     full_path = my_path + [virtual_ceo] + list(reversed(target_path))
