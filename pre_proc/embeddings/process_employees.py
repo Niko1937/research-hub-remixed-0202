@@ -321,8 +321,16 @@ class EmployeesPipeline:
 
         employees = []
         profile_count = 0
+        skipped_count = 0
 
         for record in csv_records:
+            employee_id = record.get('employee_id', '').strip()
+
+            # Skip records with empty employee_id
+            if not employee_id:
+                skipped_count += 1
+                continue
+
             display_name = record.get('display_name', '').strip()
             manager_mail = record.get('manager_mail', '').strip()
 
@@ -335,7 +343,7 @@ class EmployeesPipeline:
                 profile_count += 1
 
             employee = EmployeeRecord(
-                employee_id=record.get('employee_id', '').strip(),
+                employee_id=employee_id,
                 display_name=display_name,
                 mail=record.get('mail', '').strip(),
                 job_title=record.get('job_title', '').strip(),
@@ -348,6 +356,8 @@ class EmployeesPipeline:
 
         self._log(f"  Converted: {len(employees)} employees")
         self._log(f"  With profile data: {profile_count} employees")
+        if skipped_count > 0:
+            self._log(f"  Skipped (empty employee_id): {skipped_count} records")
 
         return employees
 
@@ -375,6 +385,12 @@ class EmployeesPipeline:
         error_count = 0
 
         for employee in employees:
+            # Skip if employee_id is empty (safety check)
+            if not employee.employee_id:
+                error_count += 1
+                self._log(f"  Skipping employee with empty ID: {employee.display_name}")
+                continue
+
             try:
                 result = await self.opensearch_client.index_document(
                     index_name="employees",
