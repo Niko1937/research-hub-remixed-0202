@@ -409,6 +409,7 @@ python embeddings/process_employees.py /path/to/employees.csv --dry-run
 | `mail` | **必須** | メールアドレス |
 | `job_title` | **必須** | 役職 |
 | `department` | **必須** | 部署 |
+| `job_level` | 任意 | 職階レベル（0: 一般, 1: 課長級, 2: 部長級）。組織経路図の階層表示に使用 |
 | `manager_mail` | 任意 | 上司のメールアドレス |
 | `UserPrincipalName` | 任意 | （使用しない） |
 | `UsageLocation` | 任意 | （使用しない） |

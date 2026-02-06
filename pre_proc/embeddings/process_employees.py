@@ -43,6 +43,7 @@ class EmployeeRecord:
     job_title: str
     department: str
     manager_employee_id: Optional[str] = None
+    job_level: int = 0  # 0: 一般, 1: 課長級, 2: 部長級
     profile: EmployeeProfile = field(default_factory=EmployeeProfile)
 
     def to_dict(self) -> dict:
@@ -54,6 +55,7 @@ class EmployeeRecord:
             "job_title": self.job_title,
             "department": self.department,
             "manager_employee_id": self.manager_employee_id,
+            "job_level": self.job_level,
             "profile": {
                 "research_summary": self.profile.research_summary,
                 "expertise": self.profile.expertise,
@@ -337,6 +339,14 @@ class EmployeesPipeline:
             # Get manager_employee_id from lookup
             manager_employee_id = self.get_manager_employee_id(manager_mail)
 
+            # Get job_level (0: 一般, 1: 課長級, 2: 部長級)
+            job_level_str = record.get('job_level', '0').strip()
+            try:
+                job_level = int(job_level_str) if job_level_str else 0
+                job_level = max(0, min(2, job_level))  # Clamp to 0-2
+            except ValueError:
+                job_level = 0
+
             # Generate profile from oipf-summary
             profile = self.generate_profile(display_name)
             if profile.research_summary or profile.expertise:
@@ -349,6 +359,7 @@ class EmployeesPipeline:
                 job_title=record.get('job_title', '').strip(),
                 department=record.get('department', '').strip(),
                 manager_employee_id=manager_employee_id,
+                job_level=job_level,
                 profile=profile,
             )
 

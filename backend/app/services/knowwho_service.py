@@ -28,6 +28,7 @@ class Employee:
     job_title: str
     department: str
     manager_employee_id: Optional[str] = None
+    job_level: int = 0  # 0: 一般, 1: 課長級, 2: 部長級
     research_summary: str = ""
     expertise: list[str] = None
     keywords: list[str] = None
@@ -42,6 +43,21 @@ class Employee:
             self.expertise = []
         if self.keywords is None:
             self.keywords = []
+
+    def get_role_with_level(self) -> str:
+        """
+        Get job_title with level keyword appended for frontend hierarchy detection.
+        Frontend's getRoleLevelFromTitle will recognize these keywords.
+        """
+        if self.job_level >= 2:
+            # 部長級 - append if not already containing the keyword
+            if '部長' not in self.job_title and 'director' not in self.job_title.lower():
+                return f"{self.job_title}（部長級）"
+        elif self.job_level == 1:
+            # 課長級 - append if not already containing the keyword
+            if '課長' not in self.job_title and '主任' not in self.job_title:
+                return f"{self.job_title}（課長級）"
+        return self.job_title
 
 
 class KnowWhoService:
@@ -139,6 +155,7 @@ class KnowWhoService:
             job_title=source.get("job_title", ""),
             department=source.get("department", ""),
             manager_employee_id=source.get("manager_employee_id"),
+            job_level=source.get("job_level", 0),
             research_summary=profile.get("research_summary", ""),
             expertise=profile.get("expertise", []),
             keywords=profile.get("keywords", []),
@@ -332,7 +349,7 @@ class KnowWhoService:
                     "employee_id": emp.employee_id,
                     "name": emp.display_name,
                     "affiliation": emp.department,
-                    "role": emp.job_title,
+                    "role": emp.get_role_with_level(),
                     "mail": emp.mail,
                     "approachability": approachability,
                     "connectionPath": " → ".join(e.display_name for e in full_path) if full_path else "",
@@ -346,7 +363,7 @@ class KnowWhoService:
                         {
                             "employee_id": e.employee_id,
                             "name": e.display_name,
-                            "role": e.job_title,
+                            "role": e.get_role_with_level(),
                             "department": e.department,
                         }
                         for e in full_path
@@ -451,7 +468,7 @@ class KnowWhoService:
                 "employee_id": emp.employee_id,
                 "name": emp.display_name,
                 "affiliation": emp.department,
-                "role": emp.job_title,
+                "role": emp.get_role_with_level(),
                 "mail": emp.mail,
                 "approachability": approachability,
                 "connectionPath": " → ".join(e.display_name for e in full_path) if full_path else "",
@@ -465,7 +482,7 @@ class KnowWhoService:
                     {
                         "employee_id": e.employee_id,
                         "name": e.display_name,
-                        "role": e.job_title,
+                        "role": e.get_role_with_level(),
                         "department": e.department,
                     }
                     for e in full_path
@@ -510,11 +527,21 @@ class KnowWhoService:
                 source = hit["_source"]
                 profile = source.get("profile", {})
 
+                # Get role with level suffix based on job_level
+                job_title = source.get("job_title", "")
+                job_level = source.get("job_level", 0)
+                if job_level >= 2 and '部長' not in job_title and 'director' not in job_title.lower():
+                    role = f"{job_title}（部長級）"
+                elif job_level == 1 and '課長' not in job_title and '主任' not in job_title:
+                    role = f"{job_title}（課長級）"
+                else:
+                    role = job_title
+
                 employees.append({
                     "employee_id": source.get("employee_id", ""),
                     "name": source.get("display_name", ""),
                     "department": source.get("department", ""),
-                    "role": source.get("job_title", ""),
+                    "role": role,
                     "expertise": profile.get("expertise", []),
                     "keywords": profile.get("keywords", []),
                     # t-SNE coordinates - not in OpenSearch, would need separate computation
