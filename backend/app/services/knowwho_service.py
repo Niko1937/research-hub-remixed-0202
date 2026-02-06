@@ -190,6 +190,27 @@ class KnowWhoService:
                 break
 
         if not lca:
+            # Fallback: assume managers 2 levels up are connected
+            # Take up to 3 ancestors from each side (self + 2 levels up)
+            my_path = my_ancestors[:3] if len(my_ancestors) >= 3 else my_ancestors
+            target_path = target_ancestors[:3] if len(target_ancestors) >= 3 else target_ancestors
+
+            if my_path and target_path:
+                # Connect paths: my_path -> (virtual connection) -> reversed target_path
+                full_path = my_path + list(reversed(target_path))
+                # Remove duplicate if the top managers happen to be the same
+                seen = set()
+                unique_path = []
+                for emp in full_path:
+                    if emp.employee_id not in seen:
+                        seen.add(emp.employee_id)
+                        unique_path.append(emp)
+
+                distance = len(unique_path) - 1 if unique_path else 0
+                # Use the top of my_path as virtual LCA
+                virtual_lca = my_path[-1] if my_path else None
+                return virtual_lca, unique_path, distance
+
             return None, [], -1
 
         lca_index_in_me = next(
@@ -270,6 +291,9 @@ class KnowWhoService:
                 # Determine approachability
                 if same_dept:
                     approachability = "direct"
+                elif distance < 0 or not full_path:
+                    # No path found even with fallback
+                    approachability = "via_manager"
                 elif distance <= 3:
                     approachability = "introduction"
                 else:
