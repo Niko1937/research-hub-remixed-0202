@@ -580,11 +580,84 @@ remix-of-research-hub-30/
 │   ├── opensearch/         # OpenSearchインデックス管理
 │   ├── embeddings/         # エンベディング処理パイプライン
 │   ├── folder_structure/   # フォルダ構造出力
-│   └── entra_hierarchy/    # MS Entra階層構造取得
+│   ├── entra_hierarchy/    # MS Entra階層構造取得
+│   └── test_data/          # テストデータ生成・投入ツール
 ├── public/                 # 静的ファイル
 ├── package.json            # Node.js依存関係
 └── .env                    # 環境変数（gitignore対象）
 ```
+
+## テストデータの生成と投入
+
+開発・検証用のテストデータを生成し、OpenSearchに投入できます。
+
+### テストデータ概要
+
+| インデックス | 件数 | 内容 |
+|-------------|------|------|
+| `employees` | 100件 | 従業員データ（6部署、3階層：部長6名、課長15名、一般79名） |
+| `oipf-summary` | 5件 | 研究プロジェクト概要（従業員名と連携） |
+| `oipf-details` | 100件 | 研究詳細タスク（各プロジェクト20件） |
+
+### テストデータの生成
+
+```bash
+cd pre_proc/test_data
+
+# 従業員データを生成
+python generate_employees.py
+
+# 研究概要データを生成（employees生成後に実行）
+python generate_oipf_summary.py
+
+# 研究詳細データを生成（oipf-summary生成後に実行）
+python generate_oipf_details.py
+```
+
+生成されるファイル:
+```
+pre_proc/test_data/data/
+├── employees_test.csv           # 従業員CSV
+├── oipf_summary_test.ndjson     # 研究概要NDJSON
+└── oipf_details_test.ndjson     # 研究詳細NDJSON
+```
+
+### OpenSearchへの投入
+
+```bash
+cd pre_proc/test_data
+
+# ドライラン（確認用、実際には投入しない）
+python load_test_data.py --dry-run --all
+
+# 全インデックスに投入
+python load_test_data.py --all
+
+# 既存データをクリアしてから投入
+python load_test_data.py --clear --all
+
+# 個別投入
+python load_test_data.py --employees    # employeesのみ
+python load_test_data.py --summary      # oipf-summaryのみ
+python load_test_data.py --details      # oipf-detailsのみ
+```
+
+### テスト用の環境変数設定例
+
+テストデータ投入後、以下の設定でフロントエンドからのテストが可能です:
+
+```env
+# OpenSearchを使用
+KNOWWHO_USE_OPENSEARCH=true
+
+# 一般社員を「自分」に設定
+KNOWWHO_CURRENT_USER_ID=E005
+
+# 各部署の部長を検索対象に設定
+KNOWWHO_TARGET_EMPLOYEES=E001,E021,E039
+```
+
+詳細は `pre_proc/test_data/README.md` を参照してください。
 
 ## 注意事項
 
