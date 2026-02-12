@@ -9,6 +9,7 @@ OpenSearchのインデックスを作成する前処理スクリプト
 import os
 import sys
 from pathlib import Path
+from typing import Optional, Tuple
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent.parent
@@ -49,7 +50,7 @@ def get_opensearch_url() -> str:
     return url.rstrip("/")
 
 
-def get_opensearch_auth() -> tuple[str, str] | None:
+def get_opensearch_auth() -> Optional[Tuple[str, str]]:
     """Get OpenSearch authentication credentials"""
     username = os.getenv("OPENSEARCH_USERNAME", "")
     password = os.getenv("OPENSEARCH_PASSWORD", "")
