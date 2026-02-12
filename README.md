@@ -320,24 +320,77 @@ uvicorn app.main:app --reload --port 5000
 
 EC2等のリモートサーバーにデプロイする場合の手順です。
 
-### 1. 環境変数の設定
+### 前提条件
 
-`.env`ファイルに以下を追加:
-
-```env
-# フロントエンドからバックエンドへのアクセスURL
-VITE_API_URL=http://<EC2のパブリックIP>:5000
-```
-
-### 2. バックエンドの起動
+- Node.js 18+ & npm
+- Python 3.9+（Amazon Linux 2023の場合）またはPython 3.11+
+- Git
 
 ```bash
+# Amazon Linux 2023の場合
+sudo dnf install -y nodejs python3 python3-pip git
+```
+
+### 1. リポジトリのクローン
+
+```bash
+git clone https://github.com/Niko1937/research-hub-remixed-0202.git
+cd research-hub-remixed-0202
+```
+
+### 2. 環境変数の設定
+
+`.env`ファイルを作成し、必要な環境変数を設定:
+
+```bash
+cp .env.example .env  # テンプレートがある場合
+# または新規作成
+nano .env
+```
+
+**必須の設定:**
+
+```env
+# フロントエンドからバックエンドへのアクセスURL（EC2デプロイ時に必須）
+VITE_API_URL=http://<EC2のパブリックIP>:5000
+
+# LLM設定（必須）
+LLM_BASE_URL=https://your-llm-api-endpoint.com
+LLM_API_KEY=your-api-key
+LLM_MODEL=vertex_ai.gemini-2.5-flash
+```
+
+その他の環境変数については「2. 環境変数の設定」セクションを参照してください。
+
+### 3. バックエンドのセットアップと起動
+
+```bash
+# backendディレクトリに移動
 cd backend
-source .venv/bin/activate  # Windowsの場合: .venv\Scripts\activate
+
+# 仮想環境を作成
+python3 -m venv .venv
+
+# 仮想環境を有効化
+source .venv/bin/activate
+
+# 依存関係をインストール
+pip install -r requirements.txt
+
+# バックエンドを起動（全インターフェースでリッスン）
 uvicorn app.main:app --host 0.0.0.0 --port 5000
 ```
 
-### 3. フロントエンドの起動
+### 4. フロントエンドのセットアップと起動
+
+別のターミナルを開いて実行:
+
+```bash
+cd research-hub-remixed-0202
+
+# 依存関係をインストール
+npm install
+```
 
 #### 方法A: 開発/検証用（npm run dev）
 
@@ -353,13 +406,13 @@ npm run dev -- --host 0.0.0.0 --port 8080
 最適化されたファイルを配信します。
 
 ```bash
-# 1. ビルド（VITE_API_URLが埋め込まれる）
+# ビルド（VITE_API_URLが埋め込まれる）
 npm run build
 
-# 2. dist/フォルダを配信（以下のいずれか）
+# dist/フォルダを配信（以下のいずれか）
 
 # Pythonの簡易サーバー
-cd dist && python -m http.server 8080
+cd dist && python3 -m http.server 8080
 
 # または npmのserveパッケージ
 npx serve dist -l 8080
@@ -367,7 +420,7 @@ npx serve dist -l 8080
 # または nginx等のWebサーバー
 ```
 
-### 4. アクセス確認
+### 5. アクセス確認
 
 - フロントエンド: `http://<EC2のパブリックIP>:8080`
 - バックエンドAPI: `http://<EC2のパブリックIP>:5000`
@@ -380,6 +433,22 @@ EC2のセキュリティグループで以下のポートを開放してくだ�
 |-------|------|
 | 5000 | バックエンドAPI |
 | 8080 | フロントエンド（または80/443） |
+| 22 | SSH（管理用） |
+
+### バックグラウンド実行（オプション）
+
+サーバーをバックグラウンドで実行する場合:
+
+```bash
+# バックエンド
+cd backend
+source .venv/bin/activate
+nohup uvicorn app.main:app --host 0.0.0.0 --port 5000 > ../backend.log 2>&1 &
+
+# フロントエンド（本番ビルド後）
+cd dist
+nohup python3 -m http.server 8080 > ../frontend.log 2>&1 &
+```
 
 ## 前処理スクリプト（pre_proc）
 
