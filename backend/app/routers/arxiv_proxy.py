@@ -37,6 +37,10 @@ async def arxiv_proxy(request: ArxivSearchRequest) -> ArxivSearchResponse:
     arXiv APIへのプロキシ
     CORSの問題を回避するために使用
     """
+    # Check if arXiv search is enabled
+    if not settings.arxiv_enabled:
+        print("[arXiv Proxy] Search disabled via ARXIV_ENABLED=false")
+        return ArxivSearchResponse(xmlData="<?xml version='1.0' encoding='UTF-8'?><feed xmlns='http://www.w3.org/2005/Atom'></feed>")
 
     params = {
         "search_query": f"all:{request.searchQuery}",

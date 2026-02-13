@@ -179,6 +179,11 @@ async def search_arxiv(query: str, timeout: int = 15) -> list[ExternalPaper]:
     Returns:
         List of ExternalPaper
     """
+    # Check if arXiv search is enabled
+    if not settings.arxiv_enabled:
+        print("[arXiv] Search disabled via ARXIV_ENABLED=false")
+        return []
+
     try:
         async with httpx.AsyncClient(**_get_httpx_kwargs(timeout=timeout)) as client:
             response = await client.get(

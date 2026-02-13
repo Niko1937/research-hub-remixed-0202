@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     knowwho_current_user_id: str = ""  # Current user's employee_id
     knowwho_target_employees: str = ""  # Comma-separated target employee IDs (e.g., "E001,E002,E003")
 
+    # External Search Configuration
+    arxiv_enabled: bool = True  # Enable/disable arXiv search
+
     model_config = {
         "env_prefix": "",
         "case_sensitive": False,
