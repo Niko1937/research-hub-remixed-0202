@@ -42,12 +42,23 @@ cd remix-of-research-hub-30
 # ===========================================
 # LLM設定（必須）
 # ===========================================
+# LLM_PROVIDER: "openai" または "bedrock" を選択
+LLM_PROVIDER=openai
+
+# --- OpenAI互換API使用時（LLM_PROVIDER=openai）---
+# OpenAI, Azure OpenAI, LiteLLM等のOpenAI互換APIを使用
 LLM_BASE_URL=https://your-llm-api-endpoint.com
 LLM_API_KEY=your-api-key
 LLM_MODEL=vertex_ai.gemini-2.5-flash
 # LLM_TIMEOUT=60
 # LLM_PROXY_ENABLED=false
 # LLM_PROXY_URL=http://proxy.example.com:8080
+
+# --- AWS Bedrock使用時（LLM_PROVIDER=bedrock）---
+# EC2にBedrockアクセス権限のIAMロールが必要（BASE_URL, API_KEYは不要）
+# LLM_PROVIDER=bedrock
+# LLM_MODEL=anthropic.claude-3-sonnet-20240229-v1:0
+# LLM_AWS_REGION=ap-northeast-1
 
 # ===========================================
 # OpenSearch設定（社内研究検索に必須）
@@ -162,20 +173,47 @@ VITE_API_URL=http://<EC2のIPアドレスまたはドメイン>:5000
 
 #### LLM設定
 
-LLM APIの詳細設定:
+LLM APIは2つのプロバイダーをサポートしています:
+
+| プロバイダー | 説明 |
+|-------------|------|
+| `openai` | OpenAI互換API（OpenAI, Azure OpenAI, LiteLLM等） |
+| `bedrock` | AWS Bedrock（IAMロール認証、API_KEY不要） |
+
+**OpenAI互換API使用時** (`LLM_PROVIDER=openai`):
 
 ```env
+LLM_PROVIDER=openai
 LLM_BASE_URL=https://your-llm-api-endpoint.com
 LLM_API_KEY=your-api-key
 LLM_MODEL=vertex_ai.gemini-2.5-flash
 LLM_TIMEOUT=60
 ```
 
+**AWS Bedrock使用時** (`LLM_PROVIDER=bedrock`):
+
+```env
+LLM_PROVIDER=bedrock
+LLM_MODEL=anthropic.claude-3-sonnet-20240229-v1:0
+LLM_AWS_REGION=ap-northeast-1
+# LLM_BASE_URL, LLM_API_KEY は不要（IAMロールで認証）
+```
+
+**Bedrockで利用可能なモデル例**:
+- `anthropic.claude-3-sonnet-20240229-v1:0` - Claude 3 Sonnet
+- `anthropic.claude-3-haiku-20240307-v1:0` - Claude 3 Haiku
+- `amazon.titan-text-premier-v1:0` - Amazon Titan Text
+- `meta.llama3-70b-instruct-v1:0` - Meta Llama 3
+
+**注意**: Bedrock使用時は、EC2にBedrockアクセス権限のIAMロールをアタッチしてください。
+
 | パラメータ | デフォルト | 説明 |
 |-----------|-----------|------|
-| `LLM_BASE_URL` | - | LLM APIのベースURL（必須） |
-| `LLM_API_KEY` | - | LLM APIキー（必須） |
+| `LLM_PROVIDER` | `openai` | プロバイダー（`openai` または `bedrock`） |
+| `LLM_BASE_URL` | - | OpenAI互換APIのURL（openai時に必須） |
+| `LLM_API_KEY` | - | APIキー（openai時に必須） |
 | `LLM_MODEL` | `vertex_ai.gemini-2.5-flash` | 使用するモデル名 |
+| `LLM_AWS_REGION` | `ap-northeast-1` | AWSリージョン（bedrock時に必須） |
 | `LLM_TIMEOUT` | 60 | APIリクエストのタイムアウト（秒） |
 
 **注意**: 画像ファイルの解析にはVision対応モデル（例: `gemini-2.0-flash`, `gpt-4-vision-preview`）が必要です。
@@ -391,10 +429,16 @@ nano .env
 # フロントエンドからバックエンドへのアクセスURL（EC2デプロイ時に必須）
 VITE_API_URL=http://<EC2のパブリックIP>:5000
 
-# LLM設定（必須）
+# LLM設定（必須）- OpenAI互換APIの場合
+LLM_PROVIDER=openai
 LLM_BASE_URL=https://your-llm-api-endpoint.com
 LLM_API_KEY=your-api-key
 LLM_MODEL=vertex_ai.gemini-2.5-flash
+
+# LLM設定（必須）- AWS Bedrockの場合（上記の代わりに設定）
+# LLM_PROVIDER=bedrock
+# LLM_MODEL=anthropic.claude-3-sonnet-20240229-v1:0
+# LLM_AWS_REGION=ap-northeast-1
 ```
 
 その他の環境変数については「2. 環境変数の設定」セクションを参照してください。

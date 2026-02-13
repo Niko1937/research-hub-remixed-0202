@@ -34,10 +34,12 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:8000", "http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:8000"]
 
     # LLM Configuration
-    llm_base_url: str = ""
-    llm_api_key: str = ""
+    llm_provider: str = "openai"  # "openai" or "bedrock"
+    llm_base_url: str = ""  # Required for openai provider
+    llm_api_key: str = ""  # Required for openai provider
     llm_model: str = "vertex_ai.gemini-2.5-flash"
     llm_timeout: int = 60
+    llm_aws_region: str = "ap-northeast-1"  # Required for bedrock provider
 
     # Proxy Configuration
     proxy_enabled: bool = False
