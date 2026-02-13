@@ -76,14 +76,24 @@ OPENSEARCH_PASSWORD=your-password
 # エンベディングAPI設定（社内研究検索に必須）
 # 注意: 社内研究検索を有効にするには、OpenSearchとEmbedding両方の設定が必要
 # ===========================================
+# EMBEDDING_PROVIDER: "openai" または "bedrock" を選択
+EMBEDDING_PROVIDER=openai
+
+# --- OpenAI互換API使用時（EMBEDDING_PROVIDER=openai）---
+# OpenAI, Azure OpenAI, LiteLLM等のOpenAI互換APIを使用
 EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
 EMBEDDING_API_KEY=your-api-key
-# EMBEDDING_MODEL=text-embedding-3-large
+EMBEDDING_MODEL=text-embedding-3-large
 # EMBEDDING_DIMENSIONS=1024
-# EMBEDDING_BATCH_SIZE=10
-# EMBEDDING_TIMEOUT=60
 # EMBEDDING_PROXY_ENABLED=false
 # EMBEDDING_PROXY_URL=http://proxy.example.com:8080
+
+# --- AWS Bedrock使用時（EMBEDDING_PROVIDER=bedrock）---
+# EC2にBedrockアクセス権限のIAMロールが必要（API_URL, API_KEYは不要）
+# EMBEDDING_PROVIDER=bedrock
+# EMBEDDING_MODEL=amazon.titan-embed-text-v2:0
+# EMBEDDING_AWS_REGION=ap-northeast-1
+# EMBEDDING_DIMENSIONS=1024
 
 # ===========================================
 # ファイル処理設定（前処理スクリプト用）
@@ -231,21 +241,43 @@ OPENSEARCH_VERIFY_SSL=false
 
 #### エンベディングAPI設定
 
-前処理スクリプト（ドキュメントエンベディング）を使用する場合:
+エンベディングAPIは2つのプロバイダーをサポートしています:
+
+| プロバイダー | 説明 |
+|-------------|------|
+| `openai` | OpenAI互換API（OpenAI, Azure OpenAI, LiteLLM等） |
+| `bedrock` | AWS Bedrock（IAMロール認証、API_KEY不要） |
+
+**OpenAI互換API使用時** (`EMBEDDING_PROVIDER=openai`):
 
 ```env
+EMBEDDING_PROVIDER=openai
 EMBEDDING_API_URL=https://your-embedding-api-endpoint.com
 EMBEDDING_API_KEY=your-api-key
 EMBEDDING_MODEL=text-embedding-3-large
 EMBEDDING_DIMENSIONS=1024
-EMBEDDING_BATCH_SIZE=10
-EMBEDDING_TIMEOUT=60
 ```
+
+**AWS Bedrock使用時** (`EMBEDDING_PROVIDER=bedrock`):
+
+```env
+EMBEDDING_PROVIDER=bedrock
+EMBEDDING_MODEL=amazon.titan-embed-text-v2:0
+EMBEDDING_AWS_REGION=ap-northeast-1
+EMBEDDING_DIMENSIONS=1024
+# EMBEDDING_API_URL, EMBEDDING_API_KEY は不要（IAMロールで認証）
+```
+
+**注意**: Bedrock使用時は、EC2にBedrockアクセス権限のIAMロールをアタッチしてください。
 
 | パラメータ | デフォルト | 説明 |
 |-----------|-----------|------|
-| `EMBEDDING_DIMENSIONS` | 1024 | エンベディングの次元数（oipf-detailsスキーマに合わせる） |
-| `EMBEDDING_BATCH_SIZE` | 10 | バッチ処理時の同時リクエスト数 |
+| `EMBEDDING_PROVIDER` | `openai` | プロバイダー（`openai` または `bedrock`） |
+| `EMBEDDING_API_URL` | - | OpenAI互換APIのURL（openai時に必須） |
+| `EMBEDDING_API_KEY` | - | APIキー（openai時に必須） |
+| `EMBEDDING_MODEL` | `text-embedding-3-large` | モデル名 |
+| `EMBEDDING_DIMENSIONS` | 1024 | エンベディングの次元数 |
+| `EMBEDDING_AWS_REGION` | `ap-northeast-1` | AWSリージョン（bedrock時に必須） |
 | `EMBEDDING_TIMEOUT` | 60 | APIリクエストのタイムアウト（秒） |
 
 #### ファイル処理設定

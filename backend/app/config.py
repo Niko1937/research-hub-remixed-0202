@@ -52,13 +52,15 @@ class Settings(BaseSettings):
     opensearch_proxy_url: str = ""
 
     # Embedding Configuration
-    embedding_api_url: str = ""
-    embedding_api_key: str = ""
+    embedding_provider: str = "openai"  # "openai" or "bedrock"
+    embedding_api_url: str = ""  # Required for openai provider
+    embedding_api_key: str = ""  # Required for openai provider
     embedding_model: str = "text-embedding-3-large"
     embedding_dimensions: int = 1024
     embedding_timeout: int = 60
     embedding_proxy_enabled: bool = False
     embedding_proxy_url: str = ""
+    embedding_aws_region: str = "ap-northeast-1"  # Required for bedrock provider
 
     # KnowWho Configuration
     knowwho_current_user_id: str = ""  # Current user's employee_id
@@ -78,7 +80,12 @@ class Settings(BaseSettings):
 
     def is_embedding_configured(self) -> bool:
         """Check if Embedding API is properly configured"""
-        return bool(self.embedding_api_url and self.embedding_api_key)
+        if self.embedding_provider == "bedrock":
+            # Bedrock uses IAM role, no API key needed
+            return bool(self.embedding_model and self.embedding_aws_region)
+        else:
+            # OpenAI-compatible requires URL and API key
+            return bool(self.embedding_api_url and self.embedding_api_key)
 
 
 @lru_cache()
