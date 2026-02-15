@@ -2,6 +2,8 @@
 LLM Client Module
 
 LLM APIクライアント（要約生成、タグ抽出用）
+- OpenAI互換API（OpenAI, LiteLLM等）
+- AWS Bedrock（Claude, Titan等）
 プロキシ環境にも対応
 画像解析（Vision LLM）にも対応
 """
@@ -48,8 +50,9 @@ class LLMClient:
     """
     LLM API Client
 
+    マルチプロバイダー対応（OpenAI互換、AWS Bedrock）
     要約生成やタグ抽出のためのLLMクライアント
-    OpenAI互換API対応、プロキシ環境にも対応
+    プロキシ環境にも対応
     """
 
     def __init__(
@@ -71,15 +74,33 @@ class LLMClient:
             llm_config: LLM configuration including proxy (default: from env)
         """
         self._config = llm_config or config.llm
-        self.base_url = (base_url or self._config.base_url).rstrip("/")
+        self.provider = self._config.provider
+        self.base_url = (base_url or self._config.base_url).rstrip("/") if self._config.base_url else ""
         self.api_key = api_key or self._config.api_key
         self.model = model or self._config.model
+        self.aws_region = self._config.aws_region
         self.timeout = timeout
+        self._bedrock_client = None
 
-        if not self.base_url:
-            raise ValueError("LLM_BASE_URL is not configured")
-        if not self.api_key:
-            raise ValueError("LLM_API_KEY is not configured")
+        # Validate configuration based on provider
+        if self.provider == "openai":
+            if not self.base_url:
+                raise ValueError("LLM_BASE_URL is not configured")
+            if not self.api_key:
+                raise ValueError("LLM_API_KEY is not configured")
+        elif self.provider == "bedrock":
+            if not self.model:
+                raise ValueError("LLM_MODEL is not configured for Bedrock")
+
+    def _get_bedrock_client(self):
+        """Get or create boto3 Bedrock client"""
+        if self._bedrock_client is None:
+            import boto3
+            self._bedrock_client = boto3.client(
+                "bedrock-runtime",
+                region_name=self.aws_region,
+            )
+        return self._bedrock_client
 
     def _get_headers(self) -> dict:
         """Get request headers"""
@@ -120,6 +141,19 @@ class LLMClient:
         Returns:
             LLMResult with generated content or error
         """
+        if self.provider == "bedrock":
+            return await self._generate_bedrock(prompt, system_prompt, max_tokens, temperature)
+        else:
+            return await self._generate_openai(prompt, system_prompt, max_tokens, temperature)
+
+    async def _generate_openai(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 1000,
+        temperature: float = 0.3,
+    ) -> LLMResult:
+        """Generate text using OpenAI-compatible API"""
         messages = []
 
         if system_prompt:
@@ -180,6 +214,58 @@ class LLMClient:
                 content="",
                 error=f"LLM error: {str(e)}",
                 model=self.model,
+            )
+
+    async def _generate_bedrock(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 1000,
+        temperature: float = 0.3,
+    ) -> LLMResult:
+        """Generate text using AWS Bedrock"""
+        model_id = self.model
+
+        def _invoke_bedrock():
+            client = self._get_bedrock_client()
+
+            # Build messages for Converse API
+            messages = [{"role": "user", "content": [{"text": prompt}]}]
+
+            inference_config = {
+                "maxTokens": max_tokens,
+                "temperature": temperature,
+            }
+
+            converse_kwargs = {
+                "modelId": model_id,
+                "messages": messages,
+                "inferenceConfig": inference_config,
+            }
+
+            if system_prompt:
+                converse_kwargs["system"] = [{"text": system_prompt}]
+
+            response = client.converse(**converse_kwargs)
+
+            return LLMResult(
+                success=True,
+                content=response["output"]["message"]["content"][0]["text"],
+                model=model_id,
+                usage={
+                    "input_tokens": response.get("usage", {}).get("inputTokens", 0),
+                    "output_tokens": response.get("usage", {}).get("outputTokens", 0),
+                },
+            )
+
+        try:
+            return await asyncio.to_thread(_invoke_bedrock)
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Bedrock error: {str(e)}",
+                model=model_id,
             )
 
     def generate_sync(
@@ -473,6 +559,17 @@ John Smith
                 model=self.model,
             )
 
+        if self.provider == "bedrock":
+            return await self._analyze_image_bedrock(image_path, max_length)
+        else:
+            return await self._analyze_image_openai(image_path, max_length)
+
+    async def _analyze_image_openai(
+        self,
+        image_path: Path,
+        max_length: int = 500,
+    ) -> LLMResult:
+        """Analyze image using OpenAI Vision API"""
         try:
             data_url, mime_type = self._encode_image_to_base64(image_path)
         except Exception as e:
@@ -563,6 +660,90 @@ John Smith
                 model=self.model,
             )
 
+    async def _analyze_image_bedrock(
+        self,
+        image_path: Path,
+        max_length: int = 500,
+    ) -> LLMResult:
+        """Analyze image using AWS Bedrock Converse API with Vision"""
+        model_id = self.model
+
+        # Read and encode image
+        try:
+            ext = image_path.suffix.lower()
+            mime_type = IMAGE_MIME_TYPES.get(ext, "image/jpeg")
+            # Bedrock uses format like "jpeg", "png", etc.
+            image_format = mime_type.split("/")[1]
+            if image_format == "jpg":
+                image_format = "jpeg"
+
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Failed to read image: {str(e)}",
+                model=model_id,
+            )
+
+        def _invoke_bedrock():
+            client = self._get_bedrock_client()
+
+            # Build messages for Converse API with image
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "image": {
+                                "format": image_format,
+                                "source": {"bytes": image_bytes}
+                            }
+                        },
+                        {
+                            "text": "この画像の内容を詳しく説明してください。"
+                        }
+                    ]
+                }
+            ]
+
+            system_prompt = f"""あなたは画像分析の専門家です。与えられた画像の内容を詳しく説明してください。
+説明は日本語で、{max_length}文字以内にしてください。
+画像に含まれる主要な要素、テキスト、図表、グラフなどがあれば、それらも説明に含めてください。"""
+
+            inference_config = {
+                "maxTokens": max_length * 2,
+                "temperature": 0.3,
+            }
+
+            response = client.converse(
+                modelId=model_id,
+                messages=messages,
+                system=[{"text": system_prompt}],
+                inferenceConfig=inference_config,
+            )
+
+            return LLMResult(
+                success=True,
+                content=response["output"]["message"]["content"][0]["text"],
+                model=model_id,
+                usage={
+                    "input_tokens": response.get("usage", {}).get("inputTokens", 0),
+                    "output_tokens": response.get("usage", {}).get("outputTokens", 0),
+                },
+            )
+
+        try:
+            return await asyncio.to_thread(_invoke_bedrock)
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Bedrock Vision error: {str(e)}",
+                model=model_id,
+            )
+
     def analyze_image_sync(
         self,
         image_path: Union[str, Path],
@@ -596,6 +777,17 @@ John Smith
                 model=self.model,
             )
 
+        if self.provider == "bedrock":
+            return await self._extract_tags_from_image_bedrock(image_path, max_tags)
+        else:
+            return await self._extract_tags_from_image_openai(image_path, max_tags)
+
+    async def _extract_tags_from_image_openai(
+        self,
+        image_path: Path,
+        max_tags: int = 5,
+    ) -> LLMResult:
+        """Extract tags from image using OpenAI Vision API"""
         try:
             data_url, mime_type = self._encode_image_to_base64(image_path)
         except Exception as e:
@@ -670,6 +862,78 @@ John Smith
                 model=self.model,
             )
 
+    async def _extract_tags_from_image_bedrock(
+        self,
+        image_path: Path,
+        max_tags: int = 5,
+    ) -> LLMResult:
+        """Extract tags from image using AWS Bedrock Converse API with Vision"""
+        model_id = self.model
+
+        # Read and encode image
+        try:
+            ext = image_path.suffix.lower()
+            mime_type = IMAGE_MIME_TYPES.get(ext, "image/jpeg")
+            image_format = mime_type.split("/")[1]
+            if image_format == "jpg":
+                image_format = "jpeg"
+
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Failed to read image: {str(e)}",
+                model=model_id,
+            )
+
+        def _invoke_bedrock():
+            client = self._get_bedrock_client()
+
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "image": {
+                                "format": image_format,
+                                "source": {"bytes": image_bytes}
+                            }
+                        },
+                        {
+                            "text": f"この画像から最大{max_tags}個の主要なテーマタグを抽出してください。タグのみをカンマ区切りで出力してください。"
+                        }
+                    ]
+                }
+            ]
+
+            system_prompt = """あなたは画像分類の専門家です。与えられた画像から主要なテーマやキーワードを抽出してください。
+タグはカンマ区切りで出力してください。各タグは簡潔に（1-3語程度）。"""
+
+            response = client.converse(
+                modelId=model_id,
+                messages=messages,
+                system=[{"text": system_prompt}],
+                inferenceConfig={"maxTokens": 200, "temperature": 0.3},
+            )
+
+            return LLMResult(
+                success=True,
+                content=response["output"]["message"]["content"][0]["text"],
+                model=model_id,
+            )
+
+        try:
+            return await asyncio.to_thread(_invoke_bedrock)
+        except Exception as e:
+            return LLMResult(
+                success=False,
+                content="",
+                error=f"Bedrock Vision error: {str(e)}",
+                model=model_id,
+            )
+
 
 def get_llm_client() -> LLMClient:
     """Get configured LLM client instance"""
@@ -679,6 +943,10 @@ def get_llm_client() -> LLMClient:
 if __name__ == "__main__":
     # Test
     print("LLM Client Configuration:")
-    print(f"  Base URL: {config.llm.base_url or 'NOT SET'}")
+    print(f"  Provider: {config.llm.provider}")
     print(f"  Model: {config.llm.model}")
-    print(f"  Proxy: {'Enabled (' + config.llm.proxy_url + ')' if config.llm.proxy_enabled else 'Disabled'}")
+    if config.llm.provider == "bedrock":
+        print(f"  AWS Region: {config.llm.aws_region}")
+    else:
+        print(f"  Base URL: {config.llm.base_url or 'NOT SET'}")
+        print(f"  Proxy: {'Enabled (' + config.llm.proxy_url + ')' if config.llm.proxy_enabled else 'Disabled'}")
