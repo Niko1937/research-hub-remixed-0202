@@ -97,6 +97,7 @@ class FolderEmbeddingsPipeline:
         max_file_size_mb: Optional[float] = None,
         max_depth: Optional[int] = None,
         skip_indexed_folders: Optional[bool] = None,
+        embedding_file_types: Optional[str] = None,
         dry_run: bool = False,
         verbose: bool = True,
         max_concurrency: int = 1,
@@ -113,6 +114,7 @@ class FolderEmbeddingsPipeline:
             max_file_size_mb: Maximum file size to process (default: from env MAX_FILE_SIZE_MB or 100MB)
             max_depth: Maximum folder depth to traverse (default: from env MAX_FOLDER_DEPTH or 4)
             skip_indexed_folders: Skip subfolders that already have indexed files (default: from env SKIP_INDEXED_FOLDERS)
+            embedding_file_types: File types to embed: "all", "documents", "images" (default: from env EMBEDDING_FILE_TYPES)
             dry_run: If True, don't actually index documents
             verbose: Enable verbose output
             max_concurrency: Maximum concurrent API calls (default: 1)
@@ -125,10 +127,21 @@ class FolderEmbeddingsPipeline:
         self.max_file_size_mb = max_file_size_mb if max_file_size_mb is not None else config.processing.max_file_size_mb
         self.max_depth = max_depth if max_depth is not None else config.processing.max_depth
         self.skip_indexed_folders = skip_indexed_folders if skip_indexed_folders is not None else config.processing.skip_indexed_folders
+        self.embedding_file_types = embedding_file_types if embedding_file_types is not None else config.processing.embedding_file_types
         self.dry_run = dry_run
         self.verbose = verbose
         self.max_concurrency = max_concurrency
         self.stats = ProcessingStats()
+
+    @property
+    def process_documents(self) -> bool:
+        """Check if documents should be processed"""
+        return self.embedding_file_types in ("all", "documents")
+
+    @property
+    def process_images(self) -> bool:
+        """Check if images should be processed"""
+        return self.embedding_file_types in ("all", "images")
 
     def _log(self, message: str):
         """Log message if verbose"""
@@ -605,6 +618,21 @@ class FolderEmbeddingsPipeline:
         # Separate image files from document files
         image_files = [f for f in successful_loads if f.is_image]
         document_files = [f for f in successful_loads if not f.is_image]
+
+        # Filter based on embedding_file_types setting
+        skipped_by_type = 0
+        if not self.process_documents:
+            skipped_by_type += len(document_files)
+            document_files = []
+            self._log(f"\nSkipping document files (EMBEDDING_FILE_TYPES={self.embedding_file_types})")
+
+        if not self.process_images:
+            skipped_by_type += len(image_files)
+            image_files = []
+            self._log(f"\nSkipping image files (EMBEDDING_FILE_TYPES={self.embedding_file_types})")
+
+        if skipped_by_type > 0:
+            self._log(f"Skipped {skipped_by_type} files due to EMBEDDING_FILE_TYPES setting")
 
         # Process document files
         if document_files:

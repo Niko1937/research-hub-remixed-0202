@@ -168,14 +168,31 @@ class ProcessingConfig:
     max_file_size_mb: float = 100.0  # Default: 100MB
     max_depth: int = 4
     skip_indexed_folders: bool = False  # Skip subfolders that have already been indexed
+    embedding_file_types: str = "all"  # "all", "documents", "images"
 
     @classmethod
     def from_env(cls) -> "ProcessingConfig":
+        file_types = os.getenv("EMBEDDING_FILE_TYPES", "all").lower()
+        # Validate file_types
+        if file_types not in ("all", "documents", "images"):
+            print(f"Warning: Invalid EMBEDDING_FILE_TYPES '{file_types}', using 'all'")
+            file_types = "all"
         return cls(
             max_file_size_mb=float(os.getenv("MAX_FILE_SIZE_MB", "100.0")),
             max_depth=int(os.getenv("MAX_FOLDER_DEPTH", "4")),
             skip_indexed_folders=os.getenv("SKIP_INDEXED_FOLDERS", "false").lower() == "true",
+            embedding_file_types=file_types,
         )
+
+    @property
+    def process_documents(self) -> bool:
+        """Check if documents should be processed"""
+        return self.embedding_file_types in ("all", "documents")
+
+    @property
+    def process_images(self) -> bool:
+        """Check if images should be processed"""
+        return self.embedding_file_types in ("all", "images")
 
 
 @dataclass
@@ -239,6 +256,7 @@ class Config:
         print(f"Processing:")
         print(f"  Max File Size: {self.processing.max_file_size_mb}MB")
         print(f"  Max Folder Depth: {self.processing.max_depth}")
+        print(f"  Embedding File Types: {self.processing.embedding_file_types}")
         print("=" * 28 + "\n")
 
 

@@ -112,6 +112,7 @@ EMBEDDING_MODEL=text-embedding-3-large
 # MAX_FILE_SIZE_MB=100
 # MAX_FOLDER_DEPTH=4
 # SKIP_INDEXED_FOLDERS=false
+# EMBEDDING_FILE_TYPES=all  # エンベディング対象: all(全て), documents(ドキュメントのみ), images(画像のみ)
 
 # ===========================================
 # 汎用プロキシ設定（前処理スクリプト用、オプション）
@@ -326,6 +327,7 @@ EMBEDDING_DIMENSIONS=1024
 MAX_FILE_SIZE_MB=100
 MAX_FOLDER_DEPTH=4
 SKIP_INDEXED_FOLDERS=false
+EMBEDDING_FILE_TYPES=all
 ```
 
 | パラメータ | デフォルト | 説明 |
@@ -333,6 +335,16 @@ SKIP_INDEXED_FOLDERS=false
 | `MAX_FILE_SIZE_MB` | 100 | 最大ファイルサイズ（MB）。これを超えるファイルは処理をスキップ |
 | `MAX_FOLDER_DEPTH` | 4 | 最大フォルダ探索深度。0で無制限 |
 | `SKIP_INDEXED_FOLDERS` | false | 既にインデックス済みのサブフォルダをスキップするかどうか |
+| `EMBEDDING_FILE_TYPES` | all | エンベディング対象ファイルタイプ（下記参照） |
+
+**EMBEDDING_FILE_TYPES の設定値**:
+| 値 | 説明 |
+|----|------|
+| `all` | ドキュメントと画像の両方をエンベディング（デフォルト） |
+| `documents` | ドキュメントのみエンベディング（PDF, Word, Excel等）。画像はスキップ |
+| `images` | 画像のみエンベディング（Vision LLM使用）。ドキュメントはスキップ |
+
+**注意**: `images`を選択した場合、LLMがVision対応モデル（例: `gemini-2.0-flash`）である必要があります。
 
 **SKIP_INDEXED_FOLDERS について**:
 - `true` を設定すると、対象フォルダの1階層下のサブフォルダごとに既存インデックスをチェック
