@@ -95,6 +95,7 @@ class OpenSearchConfig:
 @dataclass
 class EmbeddingConfig:
     """Embedding API configuration"""
+    provider: str = "openai"  # "openai" or "bedrock"
     api_url: str = ""
     api_key: str = ""
     model: str = "text-embedding-3-large"
@@ -103,10 +104,16 @@ class EmbeddingConfig:
     timeout: int = 60
     proxy_enabled: bool = False
     proxy_url: str = ""
+    aws_region: str = "ap-northeast-1"  # For Bedrock
 
     @classmethod
     def from_env(cls) -> "EmbeddingConfig":
+        provider = os.getenv("EMBEDDING_PROVIDER", "openai").lower()
+        if provider not in ("openai", "bedrock"):
+            print(f"Warning: Invalid EMBEDDING_PROVIDER '{provider}', using 'openai'")
+            provider = "openai"
         return cls(
+            provider=provider,
             api_url=os.getenv("EMBEDDING_API_URL", "").rstrip("/"),
             api_key=os.getenv("EMBEDDING_API_KEY", ""),
             model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"),
@@ -115,11 +122,17 @@ class EmbeddingConfig:
             timeout=int(os.getenv("EMBEDDING_TIMEOUT", "60")),
             proxy_enabled=os.getenv("EMBEDDING_PROXY_ENABLED", "false").lower() == "true",
             proxy_url=os.getenv("EMBEDDING_PROXY_URL", ""),
+            aws_region=os.getenv("EMBEDDING_AWS_REGION", "ap-northeast-1"),
         )
 
     def is_configured(self) -> bool:
         """Check if embedding API is properly configured"""
-        return bool(self.api_url and self.api_key)
+        if self.provider == "bedrock":
+            # Bedrock uses IAM role, no API key needed
+            return bool(self.model and self.aws_region)
+        else:
+            # OpenAI-compatible requires URL and API key
+            return bool(self.api_url and self.api_key)
 
     def get_httpx_kwargs(self) -> dict:
         """Get httpx client kwargs with proxy if configured"""
@@ -132,27 +145,40 @@ class EmbeddingConfig:
 @dataclass
 class LLMConfig:
     """LLM API configuration (for summarization, tag extraction)"""
+    provider: str = "openai"  # "openai" or "bedrock"
     base_url: str = ""
     api_key: str = ""
     model: str = "vertex_ai.gemini-2.5-flash"
     timeout: int = 60
     proxy_enabled: bool = False
     proxy_url: str = ""
+    aws_region: str = "ap-northeast-1"  # For Bedrock
 
     @classmethod
     def from_env(cls) -> "LLMConfig":
+        provider = os.getenv("LLM_PROVIDER", "openai").lower()
+        if provider not in ("openai", "bedrock"):
+            print(f"Warning: Invalid LLM_PROVIDER '{provider}', using 'openai'")
+            provider = "openai"
         return cls(
+            provider=provider,
             base_url=os.getenv("LLM_BASE_URL", "").rstrip("/"),
             api_key=os.getenv("LLM_API_KEY", ""),
             model=os.getenv("LLM_MODEL", "vertex_ai.gemini-2.5-flash"),
             timeout=int(os.getenv("LLM_TIMEOUT", "60")),
             proxy_enabled=os.getenv("LLM_PROXY_ENABLED", "false").lower() == "true",
             proxy_url=os.getenv("LLM_PROXY_URL", ""),
+            aws_region=os.getenv("LLM_AWS_REGION", "ap-northeast-1"),
         )
 
     def is_configured(self) -> bool:
         """Check if LLM API is properly configured"""
-        return bool(self.base_url and self.api_key)
+        if self.provider == "bedrock":
+            # Bedrock uses IAM role, no API key needed
+            return bool(self.model and self.aws_region)
+        else:
+            # OpenAI-compatible requires URL and API key
+            return bool(self.base_url and self.api_key)
 
     def get_httpx_kwargs(self) -> dict:
         """Get httpx client kwargs with proxy if configured"""
@@ -223,10 +249,16 @@ class Config:
             errors.append("OpenSearch: OPENSEARCH_URL is not configured")
 
         if not self.embedding.is_configured():
-            errors.append("Embedding: EMBEDDING_API_URL or EMBEDDING_API_KEY is not configured")
+            if self.embedding.provider == "bedrock":
+                errors.append("Embedding: EMBEDDING_MODEL or EMBEDDING_AWS_REGION is not configured for Bedrock")
+            else:
+                errors.append("Embedding: EMBEDDING_API_URL or EMBEDDING_API_KEY is not configured")
 
         if not self.llm.is_configured():
-            errors.append("LLM: LLM_BASE_URL or LLM_API_KEY is not configured")
+            if self.llm.provider == "bedrock":
+                errors.append("LLM: LLM_MODEL or LLM_AWS_REGION is not configured for Bedrock")
+            else:
+                errors.append("LLM: LLM_BASE_URL or LLM_API_KEY is not configured")
 
         return errors
 
@@ -244,14 +276,22 @@ class Config:
 
         print(f"Embedding: {'Configured' if self.embedding.is_configured() else 'NOT CONFIGURED'}")
         if self.embedding.is_configured():
+            print(f"  Provider: {self.embedding.provider}")
             print(f"  Model: {self.embedding.model}")
             print(f"  Dimensions: {self.embedding.dimensions}")
-            print(f"  Proxy: {'Enabled (' + self.embedding.proxy_url + ')' if self.embedding.proxy_enabled else 'Disabled'}")
+            if self.embedding.provider == "bedrock":
+                print(f"  AWS Region: {self.embedding.aws_region}")
+            else:
+                print(f"  Proxy: {'Enabled (' + self.embedding.proxy_url + ')' if self.embedding.proxy_enabled else 'Disabled'}")
 
         print(f"LLM: {'Configured' if self.llm.is_configured() else 'NOT CONFIGURED'}")
         if self.llm.is_configured():
+            print(f"  Provider: {self.llm.provider}")
             print(f"  Model: {self.llm.model}")
-            print(f"  Proxy: {'Enabled (' + self.llm.proxy_url + ')' if self.llm.proxy_enabled else 'Disabled'}")
+            if self.llm.provider == "bedrock":
+                print(f"  AWS Region: {self.llm.aws_region}")
+            else:
+                print(f"  Proxy: {'Enabled (' + self.llm.proxy_url + ')' if self.llm.proxy_enabled else 'Disabled'}")
 
         print(f"Processing:")
         print(f"  Max File Size: {self.processing.max_file_size_mb}MB")

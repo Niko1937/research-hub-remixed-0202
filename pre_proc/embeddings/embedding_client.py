@@ -2,7 +2,8 @@
 Embedding Client Module
 
 エンベディングAPIクライアント
-OpenAI互換のエンベディングAPIに対応
+- OpenAI互換API（OpenAI, LiteLLM等）
+- AWS Bedrock（Titan Embeddings等）
 プロキシ環境にも対応
 並列処理対応
 """
@@ -37,7 +38,7 @@ class EmbeddingClient:
     """
     Embedding API Client
 
-    OpenAI互換のエンベディングAPIクライアント
+    マルチプロバイダー対応（OpenAI互換、AWS Bedrock）
     プロキシ環境にも対応
     並列処理対応
     """
@@ -67,19 +68,37 @@ class EmbeddingClient:
             max_concurrency: Maximum concurrent requests (default: 1)
         """
         self._config = embedding_config or config.embedding
-        self.api_url = (api_url or self._config.api_url).rstrip("/")
+        self.provider = self._config.provider
+        self.api_url = (api_url or self._config.api_url).rstrip("/") if self._config.api_url else ""
         self.api_key = api_key or self._config.api_key
         self.model = model or self._config.model
         self.dimensions = dimensions or self._config.dimensions
+        self.aws_region = self._config.aws_region
         self.encoding_format = encoding_format
         self.timeout = timeout
         self.max_concurrency = max_concurrency
         self._semaphore: Optional[asyncio.Semaphore] = None
+        self._bedrock_client = None
 
-        if not self.api_url:
-            raise ValueError("EMBEDDING_API_URL is not configured")
-        if not self.api_key:
-            raise ValueError("EMBEDDING_API_KEY is not configured")
+        # Validate configuration based on provider
+        if self.provider == "openai":
+            if not self.api_url:
+                raise ValueError("EMBEDDING_API_URL is not configured")
+            if not self.api_key:
+                raise ValueError("EMBEDDING_API_KEY is not configured")
+        elif self.provider == "bedrock":
+            if not self.model:
+                raise ValueError("EMBEDDING_MODEL is not configured for Bedrock")
+
+    def _get_bedrock_client(self):
+        """Get or create boto3 Bedrock client"""
+        if self._bedrock_client is None:
+            import boto3
+            self._bedrock_client = boto3.client(
+                "bedrock-runtime",
+                region_name=self.aws_region,
+            )
+        return self._bedrock_client
 
     def _get_semaphore(self) -> asyncio.Semaphore:
         """Get or create semaphore for concurrency control"""
@@ -124,6 +143,17 @@ class EmbeddingClient:
         Returns:
             EmbeddingResult with embedding or error
         """
+        if self.provider == "bedrock":
+            return await self._embed_text_bedrock(text, model)
+        else:
+            return await self._embed_text_openai(text, model)
+
+    async def _embed_text_openai(
+        self,
+        text: str,
+        model: Optional[str] = None,
+    ) -> EmbeddingResult:
+        """Generate embedding using OpenAI-compatible API"""
         payload = {
             "input": text,
             "model": model or self.model,
@@ -188,6 +218,67 @@ class EmbeddingClient:
                 model=model or self.model,
             )
 
+    async def _embed_text_bedrock(
+        self,
+        text: str,
+        model: Optional[str] = None,
+    ) -> EmbeddingResult:
+        """Generate embedding using AWS Bedrock"""
+        model_id = model or self.model
+
+        def _invoke_bedrock():
+            client = self._get_bedrock_client()
+
+            # Determine request format based on model
+            if "titan-embed" in model_id.lower():
+                # Amazon Titan Embeddings format
+                body = {"inputText": text}
+                # Add dimensions if specified and model supports it (v2)
+                if self.dimensions and "v2" in model_id.lower():
+                    body["dimensions"] = self.dimensions
+            elif "cohere" in model_id.lower():
+                # Cohere Embed format
+                body = {"texts": [text], "input_type": "search_query"}
+            else:
+                # Default to Titan format
+                body = {"inputText": text}
+
+            response = client.invoke_model(
+                modelId=model_id,
+                body=json.dumps(body),
+                contentType="application/json",
+                accept="application/json",
+            )
+
+            response_body = json.loads(response["body"].read())
+
+            # Extract embedding based on model response format
+            if "embedding" in response_body:
+                # Titan format
+                return [response_body["embedding"]]
+            elif "embeddings" in response_body:
+                # Cohere format
+                return [response_body["embeddings"][0]]
+            else:
+                raise ValueError(f"Unexpected Bedrock response format: {response_body}")
+
+        try:
+            async with self._get_semaphore():
+                # Run synchronous boto3 call in thread pool
+                embeddings = await asyncio.to_thread(_invoke_bedrock)
+                return EmbeddingResult(
+                    success=True,
+                    embeddings=embeddings,
+                    model=model_id,
+                )
+        except Exception as e:
+            return EmbeddingResult(
+                success=False,
+                embeddings=[],
+                error=f"Bedrock embedding error: {str(e)}",
+                model=model_id,
+            )
+
     def embed_text_sync(
         self,
         text: str,
@@ -218,6 +309,17 @@ class EmbeddingClient:
                 model=model or self.model,
             )
 
+        if self.provider == "bedrock":
+            return await self._embed_texts_bedrock(texts, model)
+        else:
+            return await self._embed_texts_openai(texts, model)
+
+    async def _embed_texts_openai(
+        self,
+        texts: list[str],
+        model: Optional[str] = None,
+    ) -> EmbeddingResult:
+        """Generate embeddings using OpenAI-compatible API (batch)"""
         payload = {
             "input": texts,
             "model": model or self.model,
@@ -279,6 +381,27 @@ class EmbeddingClient:
                 error=f"Embedding error: {str(e)}",
                 model=model or self.model,
             )
+
+    async def _embed_texts_bedrock(
+        self,
+        texts: list[str],
+        model: Optional[str] = None,
+    ) -> EmbeddingResult:
+        """Generate embeddings using AWS Bedrock (sequential)"""
+        # Bedrock doesn't have native batch API for all models,
+        # so we process sequentially
+        all_embeddings = []
+        for text in texts:
+            result = await self._embed_text_bedrock(text, model)
+            if not result.success:
+                return result
+            all_embeddings.extend(result.embeddings)
+
+        return EmbeddingResult(
+            success=True,
+            embeddings=all_embeddings,
+            model=model or self.model,
+        )
 
     def embed_texts_sync(
         self,
@@ -515,10 +638,13 @@ def main():
 
     if not args.quiet:
         print(f"Embedding {len(texts)} text(s)...")
+        print(f"  Provider: {client.provider}")
         print(f"  Model: {client.model}")
         print(f"  Dimensions: {client.dimensions}")
         print(f"  Parallel: {args.parallel}")
-        if config.embedding.proxy_enabled:
+        if client.provider == "bedrock":
+            print(f"  AWS Region: {client.aws_region}")
+        elif config.embedding.proxy_enabled:
             print(f"  Proxy: {config.embedding.proxy_url}")
 
     # Progress callback
