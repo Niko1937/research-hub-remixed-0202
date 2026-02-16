@@ -169,15 +169,11 @@ async def handle_assistant_mode(
 Available tools:
 - wide-knowledge: Search external papers and research
 - internal-docs: Search internal SharePoint documents (社内資料検索)
-- deep-file-search: Search related files in research data folders (DeepDive mode)
 - knowwho: Search for experts and researchers
-- positioning-analysis: Create positioning analysis
-- seeds-needs-matching: Match research seeds with business needs
-- html-generation: Generate HTML infographics
 - chat: Summarize or format results
 
 Return JSON: {"steps": [{"tool": "name", "query": "query", "description": "desc"}]}
-Keep it concise, 2-4 steps. Always end with "chat"."""
+Keep it concise, 2-3 steps. Always end with "chat"."""
 
         try:
             plan_content = await llm_client.generate_json(planning_context, plan_system_prompt)
