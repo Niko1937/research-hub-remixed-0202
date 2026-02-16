@@ -20,9 +20,11 @@ interface ResearchResultsProps {
   data: ResearchData;
   onPdfClick?: (paper: { url: string; title: string; authors?: string[]; source?: string }) => void;
   onDeepDive?: (paper: Paper) => void;
+  onResearchIdClick?: (researchId: string) => void;
+  selectedResearchIds?: string[];
 }
 
-export function ResearchResults({ data, onPdfClick, onDeepDive }: ResearchResultsProps) {
+export function ResearchResults({ data, onPdfClick, onDeepDive, onResearchIdClick, selectedResearchIds = [] }: ResearchResultsProps) {
   // If we have a summary (cited answer format), show the new layout
   // Answer text first, then all citation tabs below
   if (data.summary && data.external.length > 0) {
@@ -68,14 +70,37 @@ export function ResearchResults({ data, onPdfClick, onDeepDive }: ResearchResult
                       <FileText className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-semibold text-foreground mb-2 group-hover:text-highlight transition-colors">
+                    <h4 className="text-sm font-semibold text-foreground mb-1 group-hover:text-highlight transition-colors">
                         {research.title}
                       </h4>
-                      <div className="flex items-center gap-2 mb-2">
+                      {research.research_id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onResearchIdClick?.(research.research_id!);
+                          }}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                            selectedResearchIds.includes(research.research_id)
+                              ? "bg-orange-500 text-white"
+                              : "bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50"
+                          }`}
+                        >
+                          研究ID: {research.research_id}
+                        </button>
+                      )}
+                      {research.abstract && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{research.abstract}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 mb-2">
                         <Badge variant="secondary" className="text-xs">
                           類似度: {(research.similarity * 100).toFixed(0)}%
                         </Badge>
                         <span className="text-xs text-muted-foreground">{research.year}年</span>
+                        {research.file_path && (
+                          <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={research.file_path}>
+                            📁 {research.file_path.split('/').pop()}
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {research.tags.map((tag, i) => (
@@ -206,24 +231,45 @@ export function ResearchResults({ data, onPdfClick, onDeepDive }: ResearchResult
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-foreground mb-2 group-hover:text-highlight transition-colors">
-                      {research.title}
-                    </h4>
-
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="secondary" className="text-xs">
-                        類似度: {(research.similarity * 100).toFixed(0)}%
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{research.year}年</span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1">
-                      {research.tags.map((tag, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
+                    <h4 className="text-sm font-semibold text-foreground mb-1 group-hover:text-highlight transition-colors">
+                       {research.title}
+                     </h4>
+                     {research.research_id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onResearchIdClick?.(research.research_id!);
+                          }}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                            selectedResearchIds.includes(research.research_id)
+                              ? "bg-orange-500 text-white"
+                              : "bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:hover:bg-orange-900/50"
+                          }`}
+                        >
+                          研究ID: {research.research_id}
+                        </button>
+                     )}
+                     {research.abstract && (
+                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{research.abstract}</p>
+                     )}
+                     <div className="flex items-center gap-2 mt-2 mb-2">
+                       <Badge variant="secondary" className="text-xs">
+                         類似度: {(research.similarity * 100).toFixed(0)}%
+                       </Badge>
+                       <span className="text-xs text-muted-foreground">{research.year}年</span>
+                       {research.file_path && (
+                         <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={research.file_path}>
+                           📁 {research.file_path.split('/').pop()}
+                         </span>
+                       )}
+                     </div>
+                     <div className="flex flex-wrap gap-1">
+                       {research.tags.map((tag, i) => (
+                         <Badge key={i} variant="outline" className="text-xs">
+                           {tag}
+                         </Badge>
+                       ))}
+                     </div>
                   </div>
                 </div>
               </Card>

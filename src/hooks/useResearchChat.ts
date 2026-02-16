@@ -31,10 +31,13 @@ export interface DeepFileSearchResult {
 export interface ResearchData {
   summary?: string;
   internal: Array<{
+    research_id?: string;
     title: string;
+    abstract?: string;
     tags: string[];
     similarity: number;
     year: string;
+    file_path?: string;
   }>;
   business: Array<{
     challenge: string;

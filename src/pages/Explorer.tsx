@@ -174,6 +174,7 @@ const Explorer = () => {
   const [showIntro, setShowIntro] = useState(false);
   const [deepDiveContext, setDeepDiveContext] = useState<DeepDiveContext | null>(null);
   const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
+  const [selectedResearchIds, setSelectedResearchIds] = useState<string[]>([]);
   const isMobile = useIsMobile();
 
   const clearHighlight = useCallback(() => {
@@ -515,6 +516,12 @@ const Explorer = () => {
     [clearHighlight, handleHtmlViewerClose]
   );
 
+  const handleResearchIdClick = useCallback((researchId: string) => {
+    setSelectedResearchIds((prev) =>
+      prev.includes(researchId) ? [] : [researchId]
+    );
+  }, []);
+
   const handleSubmit = (
     message: string,
     tool?: string,
@@ -534,6 +541,13 @@ const Explorer = () => {
       setCapturedScreenshot(null);
     }
     
+    // Prepend research ID context if any are selected
+    let finalMessage = message;
+    if (selectedResearchIds.length > 0) {
+      const idList = selectedResearchIds.join(", ");
+      finalMessage = `調査対象の研究ID: ${idList}\n\n${message}`;
+    }
+    
     // Build DeepDive context if active
     const deepDivePayload = deepDiveContext ? {
       source: deepDiveContext.source,
@@ -542,12 +556,12 @@ const Explorer = () => {
     
     // Don't change mode when in search mode without a tool selected
     if (mode === "search" && !tool) {
-      sendMessage(message, "search", tool, pdfContextArg || pdfContext, highlightedText, screenshot, deepDivePayload);
+      sendMessage(finalMessage, "search", tool, pdfContextArg || pdfContext, highlightedText, screenshot, deepDivePayload);
     } else {
       if (mode === "search") {
         setMode("assistant");
       }
-      sendMessage(message, "assistant", tool, pdfContextArg || pdfContext, highlightedText, screenshot, deepDivePayload);
+      sendMessage(finalMessage, "assistant", tool, pdfContextArg || pdfContext, highlightedText, screenshot, deepDivePayload);
     }
   };
 
@@ -679,6 +693,8 @@ const Explorer = () => {
                                   data={item.data}
                                   onPdfClick={openPdfDocument}
                                   onDeepDive={handleDeepDive}
+                                  onResearchIdClick={handleResearchIdClick}
+                                  selectedResearchIds={selectedResearchIds}
                                 />
                               );
                             
@@ -858,6 +874,8 @@ const Explorer = () => {
                   screenshot={capturedScreenshot}
                   onCaptureScreenshot={handleCaptureScreenshot}
                   onClearScreenshot={handleClearScreenshot}
+                  selectedResearchIds={selectedResearchIds}
+                  onRemoveResearchId={(id) => setSelectedResearchIds((prev) => prev.filter((r) => r !== id))}
                 />
               </div>
             </div>

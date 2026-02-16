@@ -21,6 +21,8 @@ interface ChatInputProps {
   screenshot?: string | null;
   onCaptureScreenshot?: () => void;
   onClearScreenshot?: () => void;
+  selectedResearchIds?: string[];
+  onRemoveResearchId?: (id: string) => void;
 }
 
 export function ChatInput({ 
@@ -34,6 +36,8 @@ export function ChatInput({
   screenshot,
   onCaptureScreenshot,
   onClearScreenshot,
+  selectedResearchIds = [],
+  onRemoveResearchId,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
@@ -82,7 +86,7 @@ export function ChatInput({
         {/* Unified Chat Input Component */}
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           {/* PDF Context Indicators */}
-          {(highlightedText || pdfContext || screenshot || isDeepDiveActive) && (
+          {(highlightedText || pdfContext || screenshot || isDeepDiveActive || selectedResearchIds.length > 0) && (
             <div className="px-4 pt-3 pb-2 space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {isDeepDiveActive && (
@@ -96,6 +100,22 @@ export function ChatInput({
                     <span className="text-xs">PDF参照中</span>
                   </Badge>
                 )}
+                {selectedResearchIds.map((id) => (
+                  <Badge
+                    key={id}
+                    className="gap-1.5 pr-1 bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800"
+                  >
+                    <span className="text-xs font-medium">研究ID: {id}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 p-0 hover:bg-transparent shrink-0"
+                      onClick={() => onRemoveResearchId?.(id)}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </Badge>
+                ))}
               </div>
               {highlightedText && (
                 <Badge 

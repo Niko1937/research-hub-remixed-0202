@@ -7,7 +7,8 @@ SSE (Server-Sent Events) ストリーミング対応
 
 import json
 import asyncio
-from typing import AsyncGenerator
+import re
+from typing import AsyncGenerator, Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
@@ -29,6 +30,37 @@ from app.services.internal_research_search import (
 from app.services.knowwho_service import knowwho_service
 
 router = APIRouter()
+
+
+def extract_research_id_from_message(message: str) -> Optional[str]:
+    """
+    Extract research_id from user message.
+
+    Looks for patterns like:
+    - "調査対象の研究ID: OIPF-2024-001"
+    - "研究ID: OIPF-2024-001"
+    - "研究ID：OIPF-2024-001" (full-width colon)
+    - "OIPF-2024-001について"
+
+    Returns:
+        Research ID string or None if not found
+    """
+    # Pattern 1: Explicit research ID mention
+    patterns = [
+        r'調査対象の研究ID[：:]\s*([A-Za-z0-9\-_]+)',
+        r'研究ID[：:]\s*([A-Za-z0-9\-_]+)',
+        r'対象ID[：:]\s*([A-Za-z0-9\-_]+)',
+        r'research_id[：:]\s*([A-Za-z0-9\-_]+)',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, message, re.IGNORECASE)
+        if match:
+            research_id = match.group(1)
+            print(f"[extract_research_id] Found research_id: {research_id}")
+            return research_id
+
+    return None
 
 
 # Markdown formatting guidelines for LLM responses
@@ -97,7 +129,17 @@ async def handle_assistant_mode(
         print(f"[assistant_mode] Fetching internal research from OpenSearch...")
         try:
             chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
-            internal_results = await internal_research_service.search(user_message, chat_history)
+
+            # Extract research_id from user message for filtering
+            research_id_filter = extract_research_id_from_message(user_message)
+            if research_id_filter:
+                print(f"[assistant_mode] Filtering by research_id: {research_id_filter}")
+
+            internal_results = await internal_research_service.search(
+                user_message,
+                chat_history,
+                research_id_filter=research_id_filter,
+            )
 
             if internal_results:
                 print(f"[assistant_mode] Found {len(internal_results)} internal research results")
@@ -118,6 +160,8 @@ async def handle_assistant_mode(
                         item["research_id"] = r.research_id
                     if r.abstract:
                         item["abstract"] = r.abstract
+                    if r.file_path:
+                        item["file_path"] = r.file_path
                     internal_data.append(item)
 
                 yield create_sse_message({
@@ -263,8 +307,17 @@ Keep it concise, 2-3 steps. Always end with "chat"."""
                 # Build chat history for context-aware search
                 chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
 
+                # Extract research_id from query for filtering
+                research_id_filter = extract_research_id_from_message(query)
+                if research_id_filter:
+                    print(f"[internal-docs] Filtering by research_id: {research_id_filter}")
+
                 # Perform OpenSearch search
-                internal_results = await internal_research_service.search(query, chat_history)
+                internal_results = await internal_research_service.search(
+                    query,
+                    chat_history,
+                    research_id_filter=research_id_filter,
+                )
 
                 yield create_sse_message({
                     "type": "internal_docs_thinking",
@@ -731,12 +784,17 @@ async def handle_search_mode(
     # Build chat history for context-aware search
     chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
 
+    # Extract research_id from user message for filtering
+    research_id_filter = extract_research_id_from_message(user_message)
+    if research_id_filter:
+        print(f"[search_mode] Filtering by research_id: {research_id_filter}")
+
     # Search all sources in parallel
     # Use OpenSearch for internal research if configured, otherwise fallback to mock data
     if internal_research_service.is_configured:
         papers, internal, challenges = await asyncio.gather(
             search_all_sources(user_message),
-            internal_research_service.search(user_message, chat_history),
+            internal_research_service.search(user_message, chat_history, research_id_filter=research_id_filter),
             asyncio.to_thread(search_business_challenges, user_message),
         )
     else:
@@ -761,6 +819,8 @@ async def handle_search_mode(
             item["research_id"] = r.research_id
         if hasattr(r, "abstract") and r.abstract:
             item["abstract"] = r.abstract
+        if hasattr(r, "file_path") and r.file_path:
+            item["file_path"] = r.file_path
         internal_data.append(item)
 
     yield create_sse_message({

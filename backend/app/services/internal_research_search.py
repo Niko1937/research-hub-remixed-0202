@@ -136,7 +136,10 @@ class InternalResearchSearchService:
         limit: int = 10,
     ) -> list[InternalResearchResult]:
         """
-        Follow-up query search using LLM-generated OpenSearch query on oipf-details
+        Follow-up query search using vector similarity on oipf-details
+
+        Uses cosine similarity (same as search_initial) for consistent scoring.
+        The oipf-details index has oipf_abstract_embedding for KNN vector search.
 
         Args:
             query: User's question
@@ -156,61 +159,32 @@ class InternalResearchSearchService:
         print(f"[InternalResearchSearch] search_followup: Searching for '{query[:50]}...'")
 
         try:
-            # 1. Use LLM to generate OpenSearch query
-            llm_client = get_llm_client()
-            opensearch_query = await self._generate_opensearch_query(
-                query, chat_history, research_id_filter, llm_client
-            )
+            # 1. Embed the query (same as search_initial)
+            query_embedding = await embedding_client.embed_text(query)
 
-            if not opensearch_query:
-                # Fallback to simple text search
-                opensearch_query = {
-                    "multi_match": {
-                        "query": query,
-                        "fields": [
-                            "oipf_file_abstract^2",
-                            "oipf_file_richtext",
-                            "oipf_file_tags",
-                            "oipf_file_name",
-                        ],
-                    }
-                }
+            # 2. Build filter if research_id is provided
+            filters = None
+            if research_id_filter:
+                filters = {"term": {"oipf_research_id": research_id_filter}}
 
-                # Add research_id filter if provided
-                if research_id_filter:
-                    opensearch_query = {
-                        "bool": {
-                            "must": [opensearch_query],
-                            "filter": [
-                                {"term": {"oipf_research_id": research_id_filter}}
-                            ],
-                        }
-                    }
-
-            # 2. Execute search on oipf-details
+            # 3. Perform vector search on oipf-details
             # Fetch more results for deduplication (3x limit)
             fetch_size = limit * 3
-            response = await opensearch_client.search(
+            response = await opensearch_client.vector_search(
                 index="oipf-details",
-                query=opensearch_query,
-                size=fetch_size,
+                vector_field="oipf_abstract_embedding",
+                query_vector=query_embedding,
+                k=fetch_size,
+                filters=filters,
             )
 
-            # 3. Parse results
+            # 4. Parse results
             results = []
             hits = response.get("hits", {}).get("hits", [])
-
-            # Get max score for normalization (BM25 scores need relative normalization)
-            max_score = max((hit.get("_score", 0.0) for hit in hits), default=1.0)
-            if max_score <= 0:
-                max_score = 1.0
 
             for hit in hits:
                 source = hit.get("_source", {})
                 score = hit.get("_score", 0.0)
-
-                # Normalize score relative to max score (0.0 - 1.0)
-                normalized_score = score / max_score if max_score > 0 else 0.0
 
                 # Use file name as title
                 file_name = source.get("oipf_file_name", "")
@@ -223,14 +197,14 @@ class InternalResearchSearchService:
                 results.append(InternalResearchResult(
                     title=title,
                     tags=tags[:5],
-                    similarity=normalized_score,
+                    similarity=min(score, 1.0),  # Cosine similarity is already 0-1
                     year=year,
                     research_id=source.get("oipf_research_id", ""),
                     abstract=abstract[:500] if abstract else "",
                     file_path=source.get("oipf_file_path", ""),
                 ))
 
-            # 4. Deduplicate similar files
+            # 5. Deduplicate similar files
             deduplicated_results = self._deduplicate_results(results, limit)
             print(f"[InternalResearchSearch] Deduplication: {len(results)} → {len(deduplicated_results)} results")
 
@@ -400,11 +374,11 @@ JSON形式で出力（説明不要）:"""
         limit: int = 10,
     ) -> list[DeepFileSearchResult]:
         """
-        Deep file search for DeepDive mode using OpenSearch oipf-details.
+        Deep file search for DeepDive mode using vector similarity on oipf-details.
 
-        Search for files related to a query, optionally filtered by research_id.
-        This is used to find related internal documents when diving deep into
-        a research topic.
+        Search for files related to a query using cosine similarity,
+        optionally filtered by research_id. This is used to find related
+        internal documents when diving deep into a research topic.
 
         Args:
             query: User's search query
@@ -431,42 +405,26 @@ JSON形式で出力（説明不要）:"""
 
             combined_query = " ".join(search_terms)
 
-            # Build OpenSearch query
-            opensearch_query = {
-                "multi_match": {
-                    "query": combined_query,
-                    "fields": [
-                        "oipf_file_abstract^3",
-                        "oipf_file_name^2",
-                        "oipf_file_richtext",
-                        "oipf_file_tags^2",
-                    ],
-                    "type": "best_fields",
-                    "fuzziness": "AUTO",
-                }
-            }
+            # 1. Embed the query
+            query_embedding = await embedding_client.embed_text(combined_query)
 
-            # Add research_id filter if provided
+            # 2. Build filter if research_id is provided
+            filters = None
             if research_id_filter:
-                opensearch_query = {
-                    "bool": {
-                        "must": [opensearch_query],
-                        "filter": [
-                            {"term": {"oipf_research_id": research_id_filter}}
-                        ],
-                    }
-                }
+                filters = {"term": {"oipf_research_id": research_id_filter}}
 
-            # Execute search on oipf-details
+            # 3. Perform vector search on oipf-details
             # Fetch more results for deduplication (3x limit)
             fetch_size = limit * 3
-            response = await opensearch_client.search(
+            response = await opensearch_client.vector_search(
                 index="oipf-details",
-                query=opensearch_query,
-                size=fetch_size,
+                vector_field="oipf_abstract_embedding",
+                query_vector=query_embedding,
+                k=fetch_size,
+                filters=filters,
             )
 
-            # Parse results
+            # 4. Parse results
             results = []
             hits = response.get("hits", {}).get("hits", [])
 
@@ -487,13 +445,13 @@ JSON形式で出力（説明不要）:"""
                     path=file_path or file_name,
                     relevantContent=abstract[:300] if abstract else "",
                     type=type_category,
-                    score=score,
+                    score=min(score, 1.0),  # Cosine similarity is already 0-1
                     keywords=tags[:5] if isinstance(tags, list) else [],
                     research_id=source.get("oipf_research_id", ""),
                     file_name=file_name,
                 ))
 
-            # Deduplicate similar files
+            # 5. Deduplicate similar files
             deduplicated_results = self._deduplicate_deep_file_results(results, limit)
             print(f"[InternalResearchSearch] deep_file_search deduplication: {len(results)} → {len(deduplicated_results)} results")
 
