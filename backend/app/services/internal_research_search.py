@@ -196,9 +196,17 @@ class InternalResearchSearchService:
             results = []
             hits = response.get("hits", {}).get("hits", [])
 
+            # Get max score for normalization (BM25 scores need relative normalization)
+            max_score = max((hit.get("_score", 0.0) for hit in hits), default=1.0)
+            if max_score <= 0:
+                max_score = 1.0
+
             for hit in hits:
                 source = hit.get("_source", {})
                 score = hit.get("_score", 0.0)
+
+                # Normalize score relative to max score (0.0 - 1.0)
+                normalized_score = score / max_score if max_score > 0 else 0.0
 
                 # Use file name as title
                 file_name = source.get("oipf_file_name", "")
@@ -211,7 +219,7 @@ class InternalResearchSearchService:
                 results.append(InternalResearchResult(
                     title=title,
                     tags=tags[:5],
-                    similarity=min(score / 10.0, 1.0),  # Normalize BM25 score
+                    similarity=normalized_score,
                     year=year,
                     research_id=source.get("oipf_research_id", ""),
                     abstract=abstract[:500] if abstract else "",
