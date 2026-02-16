@@ -1,8 +1,6 @@
 export type ToolId = 
   | "wide-knowledge" 
   | "knowwho" 
-  | "positioning-analysis" 
-  | "seeds-needs-matching" 
   | "html-generation"
   | "deep-file-search";
 
@@ -26,18 +24,6 @@ export const TOOL_DEFINITIONS: ToolConfig[] = [
     name: "KnowWho検索", 
     description: "専門家・研究者を検索", 
     defaultEnabled: true 
-  },
-  { 
-    id: "positioning-analysis", 
-    name: "ポジショニング分析", 
-    description: "比較検討軸でビジュアル分析", 
-    defaultEnabled: false 
-  },
-  { 
-    id: "seeds-needs-matching", 
-    name: "シーズ・ニーズマッチング", 
-    description: "研究シーズとニーズ候補を評価", 
-    defaultEnabled: false 
   },
   { 
     id: "html-generation", 

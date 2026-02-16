@@ -43,43 +43,23 @@ interface ExpertNetworkGraphProps {
   experts: Expert[];
 }
 
-// 職階レベルを取得（役職名ベース）
-const getRoleLevelFromTitle = (role: string): number => {
+// 職階レベルを取得
+const getRoleLevel = (role: string): number => {
   const roleLower = role.toLowerCase();
-  // 経営層（仮想CEOを含む）
-  if (roleLower.includes('経営層') || roleLower.includes('ceo') || roleLower.includes('社長') || roleLower.includes('代表')) return 4;
-  // 役員級
+  if (roleLower.includes('ceo') || roleLower.includes('社長') || roleLower.includes('代表')) return 4;
   if (roleLower.includes('執行役') || roleLower.includes('vp') || roleLower.includes('vice president') || roleLower.includes('役員') || roleLower.includes('cto') || roleLower.includes('cso') || roleLower.includes('cfo')) return 3;
-  // 部長級
   if (roleLower.includes('部長') || roleLower.includes('director') || roleLower.includes('manager') || roleLower.includes('教授')) return 2;
-  // 課長級
   if (roleLower.includes('課長') || roleLower.includes('lead') || roleLower.includes('主任') || roleLower.includes('准教授') || roleLower.includes('講師')) return 1;
   return 0;
 };
 
-// 経路の位置からレベルを計算（上に行くほど高いレベル）
-const getRoleLevelFromPath = (pathIndex: number, pathLength: number, isUser: boolean, isTarget: boolean): number => {
-  if (pathLength <= 1) return 0;
-
-  // 自分とターゲットは末端（レベル0）
-  if (isUser || isTarget) return 0;
-
-  // 中間ノードは経路の位置に基づいてレベルを設定
-  // 経路の中央付近が最も高いレベル（LCA付近）
-  const midPoint = Math.floor(pathLength / 2);
-  const distanceFromMid = Math.abs(pathIndex - midPoint);
-  const maxLevel = Math.min(4, Math.floor(pathLength / 2));
-
-  return Math.max(1, maxLevel - distanceFromMid);
-};
-
-const getRoleLevelLabel = (level: number): string => {
+const getRoleLevelLabel = (level: number): string[] => {
   switch (level) {
-    case 4: return '経営層';
-    case 3: return '役員級';
-    case 2: return '部長級';
-    case 1: return '課長級';
-    default: return '一般';
+    case 4: return ['経営層'];
+    case 3: return ['役員級'];
+    case 2: return ['部長', '室長'];
+    case 1: return ['課長', 'マネージャー', 'MG'];
+    default: return ['一般'];
   }
 };
 
@@ -110,6 +90,9 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
   const leftMargin = 80;
   const rightMargin = 200; // ラベル用に余裕を持たせる
 
+  // 役員級以上（レベル3以上）を除外するかどうかのフィルタリング閾値
+  const EXECUTIVE_LEVEL_THRESHOLD = 3;
+
   const { nodes, edges, roleLevels, expertPaths } = useMemo(() => {
     const nodeMap = new Map<string, NetworkNode>();
     const edgeList: NetworkEdge[] = [];
@@ -119,30 +102,29 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
     experts.forEach(expert => {
       if (expert.pathDetails && expert.pathDetails.length > 0) {
         const pathNodeIds = new Set<string>();
-        const expertNodeId = expert.pathDetails[expert.pathDetails.length - 1].employee_id ||
+        const expertNodeId = expert.pathDetails[expert.pathDetails.length - 1].employee_id || 
                             `node-${expert.pathDetails[expert.pathDetails.length - 1].name}`;
-        const pathLength = expert.pathDetails.length;
-
+        
         for (let i = 0; i < expert.pathDetails.length; i++) {
           const pathNode = expert.pathDetails[i];
           const isFirst = i === 0;
           const isLast = i === expert.pathDetails.length - 1;
-
+          
           const nodeId = pathNode.employee_id || `node-${pathNode.name}`;
+          const roleLevel = getRoleLevel(pathNode.role);
+          
+          // 役員級以上（レベル3以上）のノードはスキップ
+          if (roleLevel >= EXECUTIVE_LEVEL_THRESHOLD) {
+            continue;
+          }
+          
           pathNodeIds.add(nodeId);
-
+          
           if (!nodeMap.has(nodeId)) {
-            const isUser = pathNode.name === '自分' || isFirst;
-
-            // 役職名からのレベルと経路位置からのレベルを組み合わせ
-            const titleLevel = getRoleLevelFromTitle(pathNode.role);
-            const pathLevel = getRoleLevelFromPath(i, pathLength, isUser, isLast);
-
-            // 役職名レベルが明示的に設定されている場合（>0）はそれを優先
-            // そうでなければ経路位置からのレベルを使用
-            const roleLevel = titleLevel > 0 ? titleLevel : pathLevel;
             roleLevelSet.add(roleLevel);
-
+            
+            const isUser = pathNode.name === '自分' || isFirst;
+            
             nodeMap.set(nodeId, {
               id: nodeId,
               label: pathNode.name,
@@ -161,23 +143,41 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
               existingNode.approachability = expert.approachability;
             }
           }
-
-          if (i > 0) {
-            const prevNode = expert.pathDetails[i - 1];
-            const prevNodeId = prevNode.employee_id || `node-${prevNode.name}`;
-            
-            const edgeExists = edgeList.some(e => 
-              (e.source === prevNodeId && e.target === nodeId) ||
-              (e.source === nodeId && e.target === prevNodeId)
-            );
-            
-            if (!edgeExists) {
-              edgeList.push({
-                source: prevNodeId,
-                target: nodeId,
-                expertId: expertNodeId
-              });
-            }
+        }
+        
+        // エッジの作成（役員級を除外したノード間のみ）
+        const filteredPathDetails = expert.pathDetails.filter(
+          pathNode => getRoleLevel(pathNode.role) < EXECUTIVE_LEVEL_THRESHOLD
+        );
+        
+        // 部長/室長レベル（レベル2）の定数
+        const DEPARTMENT_HEAD_LEVEL = 2;
+        
+        for (let i = 1; i < filteredPathDetails.length; i++) {
+          const prevNode = filteredPathDetails[i - 1];
+          const currNode = filteredPathDetails[i];
+          const prevNodeId = prevNode.employee_id || `node-${prevNode.name}`;
+          const currNodeId = currNode.employee_id || `node-${currNode.name}`;
+          
+          const prevRoleLevel = getRoleLevel(prevNode.role);
+          const currRoleLevel = getRoleLevel(currNode.role);
+          
+          // 同じ部長/室長レベル間のエッジはスキップ
+          if (prevRoleLevel === DEPARTMENT_HEAD_LEVEL && currRoleLevel === DEPARTMENT_HEAD_LEVEL) {
+            continue;
+          }
+          
+          const edgeExists = edgeList.some(e => 
+            (e.source === prevNodeId && e.target === currNodeId) ||
+            (e.source === currNodeId && e.target === prevNodeId)
+          );
+          
+          if (!edgeExists) {
+            edgeList.push({
+              source: prevNodeId,
+              target: currNodeId,
+              expertId: expertNodeId
+            });
           }
         }
 
@@ -185,7 +185,10 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
       }
     });
 
-    const sortedLevels = Array.from(roleLevelSet).sort((a, b) => b - a);
+    // 役員級以上を除外したレベルのみ
+    const sortedLevels = Array.from(roleLevelSet)
+      .filter(level => level < EXECUTIVE_LEVEL_THRESHOLD)
+      .sort((a, b) => b - a);
     const nodesByLevel: Map<number, NetworkNode[]> = new Map();
     
     nodeMap.forEach(node => {
@@ -368,6 +371,11 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
               const levelCount = roleLevels.length || 1;
               const y = topMargin + idx * (usableHeight / Math.max(levelCount - 1, 1));
               
+              const labels = getRoleLevelLabel(level);
+              const lineHeight = 13;
+              const totalHeight = labels.length * lineHeight;
+              const startY = y - (totalHeight / 2) + (lineHeight / 2) + 4;
+              
               return (
                 <g key={`level-label-${level}`}>
                   <line
@@ -380,15 +388,18 @@ const ExpertNetworkGraph: React.FC<ExpertNetworkGraphProps> = ({ experts }) => {
                     strokeDasharray="6 4"
                     opacity={0.25}
                   />
-                  <text
-                    x={10}
-                    y={y + 4}
-                    fill="hsl(var(--muted-foreground))"
-                    fontSize={11}
-                    fontWeight={500}
-                  >
-                    {getRoleLevelLabel(level)}
-                  </text>
+                  {labels.map((label, labelIdx) => (
+                    <text
+                      key={`${level}-${labelIdx}`}
+                      x={10}
+                      y={startY + (labelIdx * lineHeight)}
+                      fill="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      fontWeight={500}
+                    >
+                      {label}
+                    </text>
+                  ))}
                 </g>
               );
             })}

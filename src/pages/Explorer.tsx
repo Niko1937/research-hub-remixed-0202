@@ -702,25 +702,10 @@ const Explorer = () => {
                               );
                             
                             case "positioning_analysis":
-                              return (
-                                <PositioningAnalysis
-                                  key={index}
-                                  data={item.data}
-                                  onAddAxis={handleAddAxis}
-                                  onRemoveAxis={handleRemoveAxis}
-                                  onRegenerateAxis={handleRegenerateAxis}
-                                />
-                              );
+                              return null;
                             
                             case "seeds_needs_matching":
-                              return (
-                                <SeedsNeedsMatching
-                                  key={index}
-                                  seedTitle={item.data.seedTitle}
-                                  seedDescription={item.data.seedDescription}
-                                  candidates={item.data.candidates}
-                                />
-                              );
+                              return null;
                             
                             case "deep_file_search":
                               return (
