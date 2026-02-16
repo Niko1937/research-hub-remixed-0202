@@ -98,6 +98,138 @@ python -m app.main
 | `final_answer` | 最終回答（引用付き） |
 | `chat_start` | ストリーミング回答開始 |
 
+##### 内部処理フロー
+
+```
+リクエスト受信
+     │
+     ▼
+┌─────────────┐
+│ mode の判定  │
+└─────────────┘
+     │
+     ├─── mode="search" ──────► handle_search_mode
+     │
+     └─── mode="assistant" ──► handle_assistant_mode
+```
+
+###### Search Mode（検索モード）
+
+シンプルな並列検索 → AI要約のフロー
+
+```
+1. 並列検索実行
+   ├── 外部論文検索 (arXiv, OpenAlex, Semantic Scholar)
+   ├── 社内研究検索 (OpenSearch / モック)
+   └── ビジネス課題検索 (モック)
+            │
+            ▼
+2. SSE送信: research_data
+   { internal: [...], business: [...], external: [...] }
+            │
+            ▼
+3. LLMストリーミング回答
+   (検索結果をコンテキストとして使用)
+            │
+            ▼
+4. SSE送信: choices[0].delta.content (チャンクごと)
+            │
+            ▼
+5. [DONE]
+```
+
+###### Assistant Mode（アシスタントモード）
+
+ツール実行を含む複雑なフロー
+
+```
+1. OpenSearch社内研究検索（自動実行、設定時のみ）
+            │
+            ▼
+2. SSE送信: research_data
+            │
+            ▼
+3. プラン決定
+   ├── deepDiveContext あり → 固定プラン [deep-file-search, knowwho, chat]
+   ├── tool 指定あり        → 固定プラン [指定ツール, chat]
+   └── tool 指定なし        → LLMでプラン生成
+            │
+            ▼
+4. SSE送信: thinking_start
+            │
+            ▼
+5. SSE送信: plan { steps: [{tool, query, description}, ...] }
+            │
+            ▼
+6. 各ステップをループ実行
+   ┌────────────────────────────────────────────────┐
+   │  SSE: step_start                               │
+   │           │                                    │
+   │           ▼                                    │
+   │  ツール実行（ツール別処理）                      │
+   │  ├── wide-knowledge  → 外部論文検索 + 要約生成  │
+   │  ├── internal-docs   → OpenSearch/モック検索   │
+   │  ├── knowwho         → 専門家検索 + t-SNEデータ │
+   │  ├── deep-file-search → 詳細ファイル検索       │
+   │  ├── positioning-analysis → LLMでJSON生成     │
+   │  ├── seeds-needs-matching → マッチング分析     │
+   │  └── html-generation → HTMLストリーミング生成  │
+   │           │                                    │
+   │           ▼                                    │
+   │  SSE: ツール結果 (knowwho_results等)            │
+   │           │                                    │
+   │           ▼                                    │
+   │  SSE: step_complete                            │
+   └────────────────────────────────────────────────┘
+            │
+            ▼
+7. SSE送信: chat_start
+            │
+            ▼
+8. 最終回答生成
+   ├── sources あり (wide-knowledge実行後)
+   │    → LLM一括生成 → SSE: final_answer {content, sources}
+   │
+   └── sources なし
+        → LLMストリーミング → SSE: choices[0].delta.content
+            │
+            ▼
+9. [DONE]
+```
+
+###### SSEイベント発火順序（典型例）
+
+**wide-knowledge検索の場合**:
+```
+1. research_data      ← OpenSearch自動検索結果
+2. thinking_start
+3. plan
+4. step_start (0)
+5. step_complete (0)
+6. step_start (1)     ← chat ステップ
+7. step_complete (1)
+8. chat_start
+9. final_answer       ← 引用付き回答（一括）
+10. [DONE]
+```
+
+**knowwho検索の場合**:
+```
+1. research_data
+2. thinking_start
+3. plan
+4. step_start (0)
+5. knowwho_thinking   ← "部署特定中..."
+6. knowwho_thinking   ← "候補者検索中..."
+7. knowwho_results    ← 専門家リスト + t-SNEデータ
+8. step_complete (0)
+9. step_start (1)
+10. step_complete (1)
+11. chat_start
+12. delta.content     ← ストリーミング回答
+13. [DONE]
+```
+
 ---
 
 #### `POST /api-v1/research-chat`
