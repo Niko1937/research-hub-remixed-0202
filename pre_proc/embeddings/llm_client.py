@@ -318,10 +318,13 @@ class LLMClient:
             LLMResult with tags (comma-separated)
         """
         system_prompt = """あなたは文書分類の専門家です。与えられたテキストから主要なテーマやキーワードを抽出してください。
-タグはカンマ区切りで出力してください。各タグは簡潔に（1-3語程度）。"""
+【重要】タグのみをカンマ区切りで出力してください。前置きや説明は一切不要です。
+例: 機械学習, 画像認識, ニューラルネットワーク"""
 
         prompt = f"""以下のテキストから最大{max_tags}個の主要なテーマタグを抽出してください。
-タグのみをカンマ区切りで出力してください。
+
+【出力形式】タグ1, タグ2, タグ3
+※前置き（「以下が〜」等）は不要。タグのみを出力。
 
 テキスト：
 {text[:5000]}"""
@@ -341,12 +344,44 @@ class LLMClient:
         if not tags_str:
             return []
 
-        # Handle various separators
-        tags_str = tags_str.replace("、", ",").replace("・", ",")
-        tags = [tag.strip() for tag in tags_str.split(",")]
-        tags = [tag for tag in tags if tag]
+        # Remove common prefix phrases that LLM might add
+        prefixes_to_remove = [
+            "以下が抽出したタグです：",
+            "以下が抽出したタグです:",
+            "以下のタグを抽出しました：",
+            "以下のタグを抽出しました:",
+            "抽出したタグ：",
+            "抽出したタグ:",
+            "タグ：",
+            "タグ:",
+            "以下がタグです：",
+            "以下がタグです:",
+            "以下のタグです：",
+            "以下のタグです:",
+        ]
 
-        return tags
+        cleaned_str = tags_str.strip()
+        for prefix in prefixes_to_remove:
+            if cleaned_str.startswith(prefix):
+                cleaned_str = cleaned_str[len(prefix):].strip()
+                break
+
+        # Handle various separators
+        cleaned_str = cleaned_str.replace("、", ",").replace("・", ",")
+        tags = [tag.strip() for tag in cleaned_str.split(",")]
+
+        # Filter out empty tags and tags that look like explanatory text
+        invalid_patterns = ["以下", "抽出", "タグ", "です", "ました"]
+        filtered_tags = []
+        for tag in tags:
+            if not tag:
+                continue
+            # Skip if tag contains invalid patterns (likely explanatory text)
+            if any(pattern in tag for pattern in invalid_patterns) and len(tag) > 10:
+                continue
+            filtered_tags.append(tag)
+
+        return filtered_tags
 
     async def extract_researchers(
         self,
@@ -502,10 +537,13 @@ John Smith
 - 応用領域（例：製造業、医療、エネルギー）
 - キーワード（例：最適化、予測、自動化）
 
-タグはカンマ区切りで出力してください。各タグは簡潔に（1-4語程度）。"""
+【重要】タグのみをカンマ区切りで出力してください。前置きや説明は一切不要です。
+例: 深層学習, 画像認識, 製造プロセス最適化"""
 
         prompt = f"""以下の研究資料から、分類用のタグを{num_tags}個程度抽出してください。
-タグのみをカンマ区切りで出力してください。
+
+【出力形式】タグ1, タグ2, タグ3
+※前置き（「以下が〜」等）は不要。タグのみを出力。
 
 研究資料：
 {text[:8000]}"""
@@ -802,14 +840,15 @@ John Smith
             {
                 "role": "system",
                 "content": """あなたは画像分類の専門家です。与えられた画像から主要なテーマやキーワードを抽出してください。
-タグはカンマ区切りで出力してください。各タグは簡潔に（1-3語程度）。"""
+【重要】タグのみをカンマ区切りで出力してください。前置きや説明は一切不要です。
+例: グラフ, データ分析, 実験結果"""
             },
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": f"この画像から最大{max_tags}個の主要なテーマタグを抽出してください。タグのみをカンマ区切りで出力してください。"
+                        "text": f"この画像から最大{max_tags}個の主要なテーマタグを抽出してください。【出力形式】タグ1, タグ2, タグ3 ※前置き不要、タグのみ出力"
                     },
                     {
                         "type": "image_url",
@@ -902,14 +941,15 @@ John Smith
                             }
                         },
                         {
-                            "text": f"この画像から最大{max_tags}個の主要なテーマタグを抽出してください。タグのみをカンマ区切りで出力してください。"
+                            "text": f"この画像から最大{max_tags}個の主要なテーマタグを抽出してください。【出力形式】タグ1, タグ2, タグ3 ※前置き不要、タグのみ出力"
                         }
                     ]
                 }
             ]
 
             system_prompt = """あなたは画像分類の専門家です。与えられた画像から主要なテーマやキーワードを抽出してください。
-タグはカンマ区切りで出力してください。各タグは簡潔に（1-3語程度）。"""
+【重要】タグのみをカンマ区切りで出力してください。前置きや説明は一切不要です。
+例: グラフ, データ分析, 実験結果"""
 
             response = client.converse(
                 modelId=model_id,

@@ -187,11 +187,13 @@ class SummarizerClient:
             Tuple of (success, tags, error)
         """
         system_prompt = """あなたは文書分類の専門家です。与えられたテキストから主要なテーマやキーワードを抽出してください。
-タグはカンマ区切りで出力してください。各タグは簡潔に（1-3語程度）。
-タグのみを出力し、説明や番号は不要です。"""
+【重要】タグのみをカンマ区切りで出力してください。前置きや説明は一切不要です。
+例: 機械学習, 画像認識, ニューラルネットワーク"""
 
         prompt = f"""以下のテキストから最大{max_tags}個の主要なテーマタグを抽出してください。
-タグのみをカンマ区切りで出力してください。
+
+【出力形式】タグ1, タグ2, タグ3
+※前置き（「以下が〜」等）は不要。タグのみを出力。
 
 テキスト：
 {text[:5000]}"""
@@ -201,12 +203,39 @@ class SummarizerClient:
         if not success:
             return False, [], error
 
-        # Parse tags
-        tags_str = content.replace("、", ",").replace("・", ",")
-        tags = [tag.strip() for tag in tags_str.split(",")]
-        tags = [tag for tag in tags if tag and len(tag) < 50][:max_tags]
+        # Remove common prefix phrases that LLM might add
+        prefixes_to_remove = [
+            "以下が抽出したタグです：",
+            "以下が抽出したタグです:",
+            "以下のタグを抽出しました：",
+            "以下のタグを抽出しました:",
+            "抽出したタグ：",
+            "抽出したタグ:",
+            "タグ：",
+            "タグ:",
+        ]
 
-        return True, tags, None
+        cleaned_str = content.strip()
+        for prefix in prefixes_to_remove:
+            if cleaned_str.startswith(prefix):
+                cleaned_str = cleaned_str[len(prefix):].strip()
+                break
+
+        # Parse tags
+        tags_str = cleaned_str.replace("、", ",").replace("・", ",")
+        tags = [tag.strip() for tag in tags_str.split(",")]
+
+        # Filter out empty tags and tags that look like explanatory text
+        invalid_patterns = ["以下", "抽出", "です", "ました"]
+        filtered_tags = []
+        for tag in tags:
+            if not tag or len(tag) >= 50:
+                continue
+            if any(pattern in tag for pattern in invalid_patterns) and len(tag) > 10:
+                continue
+            filtered_tags.append(tag)
+
+        return True, filtered_tags[:max_tags], None
 
     async def summarize_and_extract_tags(
         self,
