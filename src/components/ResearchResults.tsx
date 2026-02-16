@@ -91,17 +91,17 @@ export function ResearchResults({ data, onPdfClick, onDeepDive, onResearchIdClic
                       {research.abstract && (
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{research.abstract}</p>
                       )}
-                      <div className="flex items-center gap-2 mt-2 mb-2">
+                      <div className="flex items-center gap-2 mt-2 mb-1">
                         <Badge variant="secondary" className="text-xs">
                           類似度: {(research.similarity * 100).toFixed(0)}%
                         </Badge>
                         <span className="text-xs text-muted-foreground">{research.year}年</span>
-                        {research.file_path && (
-                          <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={research.file_path}>
-                            📁 {research.file_path.split('/').pop()}
-                          </span>
-                        )}
                       </div>
+                      {research.file_path && (
+                        <p className="text-xs text-muted-foreground mb-2 break-all">
+                          📁 {research.file_path}
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-1">
                         {research.tags.map((tag, i) => (
                           <Badge key={i} variant="outline" className="text-xs">
@@ -252,17 +252,17 @@ export function ResearchResults({ data, onPdfClick, onDeepDive, onResearchIdClic
                      {research.abstract && (
                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{research.abstract}</p>
                      )}
-                     <div className="flex items-center gap-2 mt-2 mb-2">
+                     <div className="flex items-center gap-2 mt-2 mb-1">
                        <Badge variant="secondary" className="text-xs">
                          類似度: {(research.similarity * 100).toFixed(0)}%
                        </Badge>
                        <span className="text-xs text-muted-foreground">{research.year}年</span>
-                       {research.file_path && (
-                         <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={research.file_path}>
-                           📁 {research.file_path.split('/').pop()}
-                         </span>
-                       )}
                      </div>
+                     {research.file_path && (
+                       <p className="text-xs text-muted-foreground mb-2 break-all">
+                         📁 {research.file_path}
+                       </p>
+                     )}
                      <div className="flex flex-wrap gap-1">
                        {research.tags.map((tag, i) => (
                          <Badge key={i} variant="outline" className="text-xs">

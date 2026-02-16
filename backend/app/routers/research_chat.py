@@ -185,7 +185,6 @@ async def handle_assistant_mode(
 
         steps = [
             {"tool": "deep-file-search", "query": user_message, "description": "関連する社内資料を検索"},
-            {"tool": "knowwho", "query": user_message, "description": "関連する専門家を検索"},
             {"tool": "chat", "query": "Summarize the results", "description": "AI summary"},
         ]
 
@@ -213,7 +212,6 @@ async def handle_assistant_mode(
 Available tools:
 - wide-knowledge: Search external papers and research
 - internal-docs: Search internal SharePoint documents (社内資料検索)
-- knowwho: Search for experts and researchers
 - chat: Summarize or format results
 
 Return JSON: {"steps": [{"tool": "name", "query": "query", "description": "desc"}]}
