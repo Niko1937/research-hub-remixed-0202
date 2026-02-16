@@ -28,6 +28,18 @@ class InternalResearchResult:
     file_path: str = ""
 
 
+@dataclass
+class DeepFileSearchResult:
+    """Deep file search result for DeepDive mode"""
+    path: str
+    relevantContent: str
+    type: str  # "data", "figure", "code", "reference", "folder"
+    score: float
+    keywords: list[str]
+    research_id: str = ""
+    file_name: str = ""
+
+
 class InternalResearchSearchService:
     """
     OpenSearch-based internal research search service
@@ -363,6 +375,141 @@ JSON形式で出力（説明不要）:"""
         # Try tags
         tags = source.get("oipf_file_tags", [])
         return self._extract_year_from_tags(tags)
+
+    async def deep_file_search(
+        self,
+        query: str,
+        research_id_filter: Optional[str] = None,
+        paper_keywords: Optional[list[str]] = None,
+        limit: int = 10,
+    ) -> list[DeepFileSearchResult]:
+        """
+        Deep file search for DeepDive mode using OpenSearch oipf-details.
+
+        Search for files related to a query, optionally filtered by research_id.
+        This is used to find related internal documents when diving deep into
+        a research topic.
+
+        Args:
+            query: User's search query
+            research_id_filter: Optional oipf_research_id to filter by
+            paper_keywords: Additional keywords from the paper being analyzed
+            limit: Maximum number of results
+
+        Returns:
+            List of DeepFileSearchResult
+        """
+        if not self.is_configured:
+            print("[InternalResearchSearch] deep_file_search: Not configured, returning empty results")
+            return []
+
+        print(f"[InternalResearchSearch] deep_file_search: '{query[:50]}...'")
+        if research_id_filter:
+            print(f"  - research_id_filter: {research_id_filter}")
+
+        try:
+            # Build search query combining user query and paper keywords
+            search_terms = [query]
+            if paper_keywords:
+                search_terms.extend(paper_keywords[:5])  # Limit additional keywords
+
+            combined_query = " ".join(search_terms)
+
+            # Build OpenSearch query
+            opensearch_query = {
+                "multi_match": {
+                    "query": combined_query,
+                    "fields": [
+                        "oipf_file_abstract^3",
+                        "oipf_file_name^2",
+                        "oipf_file_richtext",
+                        "oipf_file_tags^2",
+                    ],
+                    "type": "best_fields",
+                    "fuzziness": "AUTO",
+                }
+            }
+
+            # Add research_id filter if provided
+            if research_id_filter:
+                opensearch_query = {
+                    "bool": {
+                        "must": [opensearch_query],
+                        "filter": [
+                            {"term": {"oipf_research_id": research_id_filter}}
+                        ],
+                    }
+                }
+
+            # Execute search on oipf-details
+            response = await opensearch_client.search(
+                index="oipf-details",
+                query=opensearch_query,
+                size=limit,
+            )
+
+            # Parse results
+            results = []
+            hits = response.get("hits", {}).get("hits", [])
+
+            for hit in hits:
+                source = hit.get("_source", {})
+                score = hit.get("_score", 0.0)
+
+                file_path = source.get("oipf_file_path", "")
+                file_name = source.get("oipf_file_name", "")
+                abstract = source.get("oipf_file_abstract", "")
+                tags = source.get("oipf_file_tags", [])
+                file_type = source.get("oipf_file_type", "")
+
+                # Determine file type category for display
+                type_category = self._categorize_file_type(file_path, file_name, file_type)
+
+                results.append(DeepFileSearchResult(
+                    path=file_path or file_name,
+                    relevantContent=abstract[:300] if abstract else "",
+                    type=type_category,
+                    score=score,
+                    keywords=tags[:5] if isinstance(tags, list) else [],
+                    research_id=source.get("oipf_research_id", ""),
+                    file_name=file_name,
+                ))
+
+            return results
+
+        except Exception as e:
+            print(f"[InternalResearchSearch] deep_file_search failed: {e}")
+            return []
+
+    def _categorize_file_type(
+        self,
+        file_path: str,
+        file_name: str,
+        file_type: str,
+    ) -> str:
+        """Categorize file type for display"""
+        path_lower = (file_path + file_name).lower()
+        file_type_lower = file_type.lower() if file_type else ""
+
+        # Check by file extension
+        if file_type_lower in [".py", ".js", ".ts", ".java", ".cpp", ".c", ".ipynb"]:
+            return "code"
+        if file_type_lower in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf"]:
+            return "figure"
+        if file_type_lower in [".csv", ".xlsx", ".json", ".parquet"]:
+            return "data"
+
+        # Check by path/name keywords
+        if any(kw in path_lower for kw in ["モデル", "データ", "実験", "model", "data", "experiment"]):
+            return "data"
+        if any(kw in path_lower for kw in ["図", "資料", "レポート", "figure", "report", "chart"]):
+            return "figure"
+        if any(kw in path_lower for kw in ["コード", "アーキテクチャ", "設計", "code", "src", "script"]):
+            return "code"
+        if any(kw in path_lower for kw in ["論文", "研究", "文献", "paper", "reference", "literature"]):
+            return "reference"
+
+        return "folder"
 
 
 # Global service instance

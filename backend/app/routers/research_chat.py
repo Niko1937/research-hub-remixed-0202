@@ -511,13 +511,10 @@ insightsの各要素はMarkdown形式で、見出し・箇条書き・太字・�
 
         elif tool_name == "deep-file-search":
             # Deep file search for DeepDive mode
-            yield create_sse_message({
-                "type": "deep_file_search_thinking",
-                "message": "関連する社内資料を検索中...",
-            })
-
-            # Extract keywords from deepDiveContext if available
+            # Extract research_id from deepDiveContext if available (for filtering)
+            research_id_filter = None
             paper_keywords = []
+
             if request.deepDiveContext:
                 source = request.deepDiveContext.get("source", {})
                 title = source.get("title", "")
@@ -531,8 +528,45 @@ insightsの各要素はMarkdown形式で、見出し・箇条書き・太字・�
                     if item.get("description"):
                         paper_keywords.append(item["description"][:20])
 
-            # Perform deep file search
-            search_results = deep_file_search(query, paper_keywords)
+                # Get research_id if available
+                research_id_filter = source.get("research_id")
+
+            # Use OpenSearch if configured, otherwise fall back to mock data
+            if internal_research_service.is_configured:
+                yield create_sse_message({
+                    "type": "deep_file_search_thinking",
+                    "message": "関連する社内資料をOpenSearchで検索中...",
+                })
+
+                # Perform OpenSearch-based deep file search
+                opensearch_results = await internal_research_service.deep_file_search(
+                    query=query,
+                    research_id_filter=research_id_filter,
+                    paper_keywords=paper_keywords,
+                    limit=10,
+                )
+
+                # Convert to dict format for response
+                search_results = [
+                    {
+                        "path": r.path,
+                        "relevantContent": r.relevantContent,
+                        "type": r.type,
+                        "score": r.score,
+                        "keywords": r.keywords,
+                        "research_id": r.research_id,
+                        "file_name": r.file_name,
+                    }
+                    for r in opensearch_results
+                ]
+            else:
+                yield create_sse_message({
+                    "type": "deep_file_search_thinking",
+                    "message": "関連する社内資料を検索中...",
+                })
+
+                # Fall back to mock data
+                search_results = deep_file_search(query, paper_keywords)
 
             tool_results.append({
                 "tool": "deep-file-search",
