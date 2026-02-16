@@ -7,8 +7,10 @@ OpenSearchを使った社内研究検索サービス
 """
 
 import json
+import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
+from pathlib import PurePosixPath
 
 from app.config import get_settings
 from app.services.opensearch_client import opensearch_client
@@ -186,10 +188,12 @@ class InternalResearchSearchService:
                     }
 
             # 2. Execute search on oipf-details
+            # Fetch more results for deduplication (3x limit)
+            fetch_size = limit * 3
             response = await opensearch_client.search(
                 index="oipf-details",
                 query=opensearch_query,
-                size=limit,
+                size=fetch_size,
             )
 
             # 3. Parse results
@@ -226,7 +230,11 @@ class InternalResearchSearchService:
                     file_path=source.get("oipf_file_path", ""),
                 ))
 
-            return results
+            # 4. Deduplicate similar files
+            deduplicated_results = self._deduplicate_results(results, limit)
+            print(f"[InternalResearchSearch] Deduplication: {len(results)} → {len(deduplicated_results)} results")
+
+            return deduplicated_results
 
         except Exception as e:
             print(f"[InternalResearchSearch] Follow-up search failed: {e}")
@@ -450,10 +458,12 @@ JSON形式で出力（説明不要）:"""
                 }
 
             # Execute search on oipf-details
+            # Fetch more results for deduplication (3x limit)
+            fetch_size = limit * 3
             response = await opensearch_client.search(
                 index="oipf-details",
                 query=opensearch_query,
-                size=limit,
+                size=fetch_size,
             )
 
             # Parse results
@@ -483,7 +493,11 @@ JSON形式で出力（説明不要）:"""
                     file_name=file_name,
                 ))
 
-            return results
+            # Deduplicate similar files
+            deduplicated_results = self._deduplicate_deep_file_results(results, limit)
+            print(f"[InternalResearchSearch] deep_file_search deduplication: {len(results)} → {len(deduplicated_results)} results")
+
+            return deduplicated_results
 
         except Exception as e:
             print(f"[InternalResearchSearch] deep_file_search failed: {e}")
@@ -518,6 +532,223 @@ JSON形式で出力（説明不要）:"""
             return "reference"
 
         return "folder"
+
+    def _extract_base_name(self, file_name: str) -> str:
+        """
+        Extract base name from file name by removing version/date suffixes.
+
+        Examples:
+            "analysis_v2.xlsx" → "analysis"
+            "report_2024_final.pdf" → "report"
+            "実験データ_修正版.csv" → "実験データ"
+        """
+        if not file_name:
+            return ""
+
+        # Remove extension
+        name_without_ext = re.sub(r'\.[^.]+$', '', file_name)
+
+        # Remove common suffixes (version, date, status)
+        patterns = [
+            r'[_\-\s]*(v\d+|ver\d+|version\d+)$',  # v1, ver2, version3
+            r'[_\-\s]*\d{4}[_\-]?\d{0,2}[_\-]?\d{0,2}$',  # 2024, 2024_01, 20240115
+            r'[_\-\s]*(final|最終|確定|完成)$',
+            r'[_\-\s]*(draft|下書き|ドラフト)$',
+            r'[_\-\s]*(revised|修正|改訂|修正版|改訂版)$',
+            r'[_\-\s]*(backup|バックアップ|bak)$',
+            r'[_\-\s]*(copy|コピー|\(\d+\))$',
+            r'[_\-\s]*\d+$',  # trailing numbers
+        ]
+
+        base_name = name_without_ext
+        for pattern in patterns:
+            base_name = re.sub(pattern, '', base_name, flags=re.IGNORECASE)
+
+        return base_name.strip('_- ')
+
+    def _get_directory_path(self, file_path: str) -> str:
+        """Extract directory path from file path"""
+        if not file_path:
+            return ""
+        try:
+            return str(PurePosixPath(file_path).parent)
+        except Exception:
+            # Fallback: remove last component
+            parts = file_path.replace('\\', '/').rsplit('/', 1)
+            return parts[0] if len(parts) > 1 else ""
+
+    def _get_path_depth(self, file_path: str) -> int:
+        """Get depth of file path (number of directory levels)"""
+        if not file_path:
+            return 0
+        return file_path.replace('\\', '/').count('/')
+
+    def _calculate_version_score(self, file_name: str, file_path: str) -> int:
+        """
+        Calculate version score for prioritization.
+        Higher score = newer/more important version.
+        """
+        score = 0
+        combined = (file_name + " " + file_path).lower()
+
+        # Final/completed versions get highest priority
+        if any(kw in combined for kw in ['final', '最終', '確定', '完成']):
+            score += 100
+
+        # Revised versions
+        if any(kw in combined for kw in ['revised', '修正', '改訂', '改訂版', '修正版']):
+            score += 50
+
+        # Version numbers (higher = better)
+        version_match = re.search(r'v(\d+)|ver(\d+)|version(\d+)', combined)
+        if version_match:
+            version_num = int(version_match.group(1) or version_match.group(2) or version_match.group(3))
+            score += version_num * 10
+
+        # Year (more recent = better)
+        year_match = re.search(r'(20\d{2})', combined)
+        if year_match:
+            year = int(year_match.group(1))
+            score += (year - 2000)  # 2024 → 24 points
+
+        # Penalize backup/draft/copy
+        if any(kw in combined for kw in ['backup', 'バックアップ', 'bak', 'draft', '下書き', 'copy', 'コピー']):
+            score -= 50
+
+        # Penalize deeper paths (likely backups or archives)
+        depth = self._get_path_depth(file_path)
+        score -= depth * 2
+
+        return score
+
+    def _are_paths_nearby(self, path1: str, path2: str, max_depth_diff: int = 2) -> bool:
+        """
+        Check if two paths are in nearby directories (within max_depth_diff levels).
+        """
+        dir1 = self._get_directory_path(path1)
+        dir2 = self._get_directory_path(path2)
+
+        # Same directory
+        if dir1 == dir2:
+            return True
+
+        # Check if one is ancestor/descendant of the other
+        dir1_normalized = dir1.replace('\\', '/').rstrip('/')
+        dir2_normalized = dir2.replace('\\', '/').rstrip('/')
+
+        if dir1_normalized.startswith(dir2_normalized) or dir2_normalized.startswith(dir1_normalized):
+            depth_diff = abs(self._get_path_depth(dir1) - self._get_path_depth(dir2))
+            return depth_diff <= max_depth_diff
+
+        return False
+
+    def _deduplicate_results(
+        self,
+        results: list[InternalResearchResult],
+        limit: int,
+    ) -> list[InternalResearchResult]:
+        """
+        Deduplicate similar files, keeping only the newest/most relevant version.
+
+        Groups files by base name + nearby path, then selects the best from each group.
+        """
+        if not results:
+            return []
+
+        # Group by (base_name, directory_group)
+        groups: dict[str, list[tuple[InternalResearchResult, int]]] = {}
+
+        for result in results:
+            base_name = self._extract_base_name(result.title)
+            if not base_name:
+                base_name = result.title
+
+            # Find existing group with same base name and nearby path
+            group_key = None
+            for existing_key in groups.keys():
+                existing_base, existing_path = existing_key.rsplit('|', 1) if '|' in existing_key else (existing_key, '')
+                if existing_base == base_name:
+                    # Check if paths are nearby
+                    if existing_path and result.file_path:
+                        if self._are_paths_nearby(existing_path, result.file_path):
+                            group_key = existing_key
+                            break
+                    elif not existing_path or not result.file_path:
+                        group_key = existing_key
+                        break
+
+            if group_key is None:
+                group_key = f"{base_name}|{self._get_directory_path(result.file_path)}"
+
+            version_score = self._calculate_version_score(result.title, result.file_path)
+
+            if group_key not in groups:
+                groups[group_key] = []
+            groups[group_key].append((result, version_score))
+
+        # Select best from each group
+        deduplicated = []
+        for group_key, group_items in groups.items():
+            # Sort by version_score (desc), then by similarity (desc)
+            group_items.sort(key=lambda x: (x[1], x[0].similarity), reverse=True)
+            best_result = group_items[0][0]
+            deduplicated.append(best_result)
+
+        # Sort by similarity and return top limit
+        deduplicated.sort(key=lambda x: x.similarity, reverse=True)
+        return deduplicated[:limit]
+
+    def _deduplicate_deep_file_results(
+        self,
+        results: list[DeepFileSearchResult],
+        limit: int,
+    ) -> list[DeepFileSearchResult]:
+        """
+        Deduplicate similar files for deep file search results.
+        """
+        if not results:
+            return []
+
+        # Group by (base_name, directory_group)
+        groups: dict[str, list[tuple[DeepFileSearchResult, int]]] = {}
+
+        for result in results:
+            base_name = self._extract_base_name(result.file_name or result.path.split('/')[-1])
+            if not base_name:
+                base_name = result.file_name or result.path
+
+            # Find existing group with same base name and nearby path
+            group_key = None
+            for existing_key in groups.keys():
+                existing_base, existing_path = existing_key.rsplit('|', 1) if '|' in existing_key else (existing_key, '')
+                if existing_base == base_name:
+                    if existing_path and result.path:
+                        if self._are_paths_nearby(existing_path, result.path):
+                            group_key = existing_key
+                            break
+                    elif not existing_path or not result.path:
+                        group_key = existing_key
+                        break
+
+            if group_key is None:
+                group_key = f"{base_name}|{self._get_directory_path(result.path)}"
+
+            version_score = self._calculate_version_score(result.file_name or "", result.path)
+
+            if group_key not in groups:
+                groups[group_key] = []
+            groups[group_key].append((result, version_score))
+
+        # Select best from each group
+        deduplicated = []
+        for group_key, group_items in groups.items():
+            group_items.sort(key=lambda x: (x[1], x[0].score), reverse=True)
+            best_result = group_items[0][0]
+            deduplicated.append(best_result)
+
+        # Sort by score and return top limit
+        deduplicated.sort(key=lambda x: x.score, reverse=True)
+        return deduplicated[:limit]
 
 
 # Global service instance
