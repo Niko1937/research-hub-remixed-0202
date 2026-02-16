@@ -34,6 +34,17 @@ from app.services.mock_data import (
 
 router = APIRouter()
 
+# Markdown formatting guidelines for LLM responses (shared with main router)
+MARKDOWN_FORMAT_GUIDE_COMPACT = """
+**回答フォーマット**: Markdown形式で構造化してください
+- `## 見出し` でセクション分け
+- `- 項目` で箇条書き
+- `**太字**` で重要語を強調
+- `> 引用` で重要な結論
+- 比較データは `| 表 |` 形式で
+- 論文引用は [1], [2] 形式
+"""
+
 
 def create_sse_message(data: dict) -> str:
     """Create SSE formatted message"""
@@ -130,7 +141,7 @@ Keep it concise, 2-4 steps. Always end with "chat"."""
                     for p in papers
                 )
 
-                answer_prompt = f"""あなたは研究支援AIです。以下の論文を引用しながら回答してください。
+                answer_prompt = f"""あなたは研究支援AIです。以下の論文を引用しながら、構造化されたMarkdown形式で回答してください。
 
 ## ユーザーの質問
 {user_message}
@@ -138,9 +149,18 @@ Keep it concise, 2-4 steps. Always end with "chat"."""
 ## 参照可能な論文
 {paper_context}
 
-## 指示
-- 回答は300-600文字の日本語で
-- [1]、[2] のように論文番号で引用"""
+## 回答形式の指示
+### 概要
+[質問への直接的な回答を2-3文で]
+
+### 主な知見
+- **知見1**: 説明 [引用番号]
+- **知見2**: 説明 [引用番号]
+
+## 注意事項
+- 回答は400-800文字の日本語
+- [1]、[2] のように論文番号で必ず引用
+- 重要なキーワードは **太字** で強調"""
 
                 try:
                     summary = await llm_client.generate_text(answer_prompt, max_tokens=1000)
@@ -396,7 +416,8 @@ HTMLのみを出力。最初の文字は<!DOCTYPE html>で始める。"""
     # Generate final AI summary
     yield create_sse_message({"type": "chat_start"})
 
-    context_prompt = f"""あなたはR&D研究支援AIアシスタントです。
+    context_prompt = f"""あなたはR&D研究支援AIアシスタントです。構造化されたMarkdown形式で見やすく回答してください。
+{MARKDOWN_FORMAT_GUIDE_COMPACT}
 
 ## ユーザーの質問:
 {user_message}"""
@@ -424,7 +445,17 @@ HTMLのみを出力。最初の文字は<!DOCTYPE html>で始める。"""
             for p in all_sources
         )
 
-        context_prompt += f"\n\n## 参照可能な論文:\n{paper_context}\n\n[1]、[2] のように引用してください。"
+        context_prompt += f"""
+
+## 参照可能な論文:
+{paper_context}
+
+## 回答形式
+1. **概要**: 質問への直接的な回答（2-3文）
+2. **主な知見**: 箇条書きで各論文からの知見を整理（[1], [2]で引用）
+3. **まとめ**: 結論や示唆
+
+重要なキーワードは **太字** で強調してください。"""
 
         messages = [
             LLMChatMessage(role="system", content=context_prompt),
@@ -489,15 +520,20 @@ async def handle_search_mode(
     })
 
     # Build context and stream AI response
-    context_prompt = f"""あなたはR&D研究者向けのアシスタントです。
+    context_prompt = f"""あなたはR&D研究者向けのアシスタントです。構造化されたMarkdown形式で見やすく回答してください。
 
-【社内研究】
+## 利用可能な情報
+
+### 社内研究
 {chr(10).join(f'- {r.title}' for r in internal) or '- なし'}
 
-【外部論文】
+### 外部論文
 {chr(10).join(f'{i+1}. {p.title}' for i, p in enumerate(papers)) or '- なし'}
 
-ユーザーの質問: {user_message}"""
+## ユーザーの質問
+{user_message}
+
+{MARKDOWN_FORMAT_GUIDE_COMPACT}"""
 
     messages = [
         LLMChatMessage(role="system", content=context_prompt),
