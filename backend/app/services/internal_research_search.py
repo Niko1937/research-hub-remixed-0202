@@ -85,18 +85,26 @@ class InternalResearchSearchService:
         """
         Find a known research_id in the user query.
 
+        Case-insensitive search to handle variations like:
+        - "OIPF-2024-001" vs "oipf-2024-001"
+        - Mixed case inputs from users
+
         Args:
             query: User's query text
 
         Returns:
-            Research ID if found, None otherwise
+            Research ID if found (original case from cache), None otherwise
         """
         if not self._cache_loaded or not self._known_research_ids:
+            print(f"[InternalResearchSearch] find_research_id_in_query: cache not loaded or empty")
+            print(f"  - cache_loaded: {self._cache_loaded}")
+            print(f"  - known_research_ids count: {len(self._known_research_ids)}")
             return None
 
-        # Check each known research_id
+        # Case-insensitive search
+        query_lower = query.lower()
         for rid in self._known_research_ids:
-            if rid in query:
+            if rid.lower() in query_lower:
                 print(f"[InternalResearchSearch] Found known research_id in query: {rid}")
                 return rid
 

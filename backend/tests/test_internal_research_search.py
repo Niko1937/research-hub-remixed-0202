@@ -489,6 +489,28 @@ class TestInternalResearchSearchService:
         result = service.find_research_id_in_query("TEST-123 について")
         assert result == "TEST-123"
 
+    def test_find_research_id_in_query_case_insensitive(self):
+        """Test find_research_id_in_query is case-insensitive"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        # Cache has uppercase research IDs
+        service._known_research_ids = {"OIPF-2024-001", "TEST-ABC-123"}
+        service._cache_loaded = True
+
+        # Should find even with lowercase input
+        result = service.find_research_id_in_query("oipf-2024-001 の詳細を教えて")
+        assert result == "OIPF-2024-001"
+
+        # Should find with mixed case
+        result = service.find_research_id_in_query("Test-ABC-123 について")
+        assert result == "TEST-ABC-123"
+
+        # Should find when embedded in sentence
+        result = service.find_research_id_in_query("研究test-abc-123の分析結果を教えて")
+        assert result == "TEST-ABC-123"
+
     def test_find_research_id_in_query_not_found(self):
         """Test find_research_id_in_query returns None when not found"""
         from app.services.internal_research_search import InternalResearchSearchService
