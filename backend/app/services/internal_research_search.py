@@ -127,6 +127,42 @@ class InternalResearchSearchService:
         print(f"[InternalResearchSearch] No research_id found in query. Known IDs: {sorted(self._known_research_ids)}")
         return None
 
+    def is_research_discovery_query(self, query: str) -> bool:
+        """
+        Detect if the query is asking about finding past/similar research.
+
+        These queries should search oipf-summary (research project level)
+        even on follow-up queries, to find relevant research projects.
+
+        Examples:
+        - "過去にこんな研究はされていたか"
+        - "類似の研究はあるか"
+        - "関連する研究を探して"
+
+        Args:
+            query: User's query text
+
+        Returns:
+            True if query is asking about finding research projects
+        """
+        # Patterns indicating research discovery/exploration queries
+        discovery_patterns = [
+            r'過去に.*(?:研究|事例).*(?:ある|あった|されてい|行われ)',
+            r'(?:類似|似た|同様|関連).*(?:研究|プロジェクト|テーマ|事例)',
+            r'(?:研究|プロジェクト|テーマ|事例).*(?:ある|探し|検索|見つ)',
+            r'(?:他に|別の|同じような).*(?:研究|取り組み|事例)',
+            r'(?:どんな|どのような).*(?:研究|事例).*(?:ある|されてい|行われ)',
+            r'(?:研究|事例).*(?:一覧|リスト|概要)',
+            r'(?:社内|部内|組織).*(?:研究|事例).*(?:ある|探)',
+        ]
+
+        for pattern in discovery_patterns:
+            if re.search(pattern, query, re.IGNORECASE):
+                print(f"[InternalResearchSearch] Research discovery query detected: {pattern}")
+                return True
+
+        return False
+
     def get_cache_status(self) -> dict:
         """Get status of the research_id cache"""
         return {
@@ -308,8 +344,9 @@ class InternalResearchSearchService:
         Routing logic:
         1. If research_id_filter is explicitly provided → oipf-details
         2. If query contains a known research_id → oipf-details (even on first query)
-        3. If initial query (no chat history) → oipf-summary
-        4. Otherwise → oipf-details
+        3. If query is a research discovery query → oipf-summary (even on follow-up)
+        4. If initial query (no chat history) → oipf-summary
+        5. Otherwise → oipf-details
 
         Args:
             query: User's question
@@ -330,7 +367,11 @@ class InternalResearchSearchService:
             or len(chat_history) <= 2  # Only system + first user message
         )
 
+        # Check if this is a research discovery query (should use oipf-summary)
+        is_discovery_query = self.is_research_discovery_query(query)
+
         print(f"  - is_initial: {is_initial}")
+        print(f"  - is_discovery_query: {is_discovery_query}")
         print(f"  - research_id_filter: {research_id_filter}")
 
         # Check if query contains a known research_id (even for initial queries)
@@ -349,8 +390,10 @@ class InternalResearchSearchService:
                 research_id_filter,
                 limit,
             )
-        elif is_initial:
-            # Initial query without research_id: use oipf-summary
+        elif is_initial or is_discovery_query:
+            # Initial query or research discovery query: use oipf-summary
+            if is_discovery_query and not is_initial:
+                print(f"  - Research discovery query on follow-up: using oipf-summary")
             return await self.search_initial(query, limit)
         else:
             # Follow-up query: use oipf-details

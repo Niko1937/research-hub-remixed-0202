@@ -600,6 +600,52 @@ class TestInternalResearchSearchService:
             assert "OIPF-2024-001" in service._known_research_ids
             assert "TEST-123" in service._known_research_ids
 
+    def test_is_research_discovery_query(self):
+        """Test is_research_discovery_query detects research exploration queries"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        # Should detect research discovery queries
+        assert service.is_research_discovery_query("過去にこんな研究はされていたか") == True
+        assert service.is_research_discovery_query("類似の研究はありますか") == True
+        assert service.is_research_discovery_query("関連する研究を探してください") == True
+        assert service.is_research_discovery_query("他に同じような研究はあるか") == True
+        assert service.is_research_discovery_query("社内で類似の事例はありますか") == True
+        assert service.is_research_discovery_query("どんな研究が行われていますか") == True
+
+        # Should NOT detect regular queries
+        assert service.is_research_discovery_query("この実験結果を説明して") == False
+        assert service.is_research_discovery_query("D2PDの見積書を見せて") == False
+        assert service.is_research_discovery_query("委託先はどこですか") == False
+
+    @pytest.mark.asyncio
+    async def test_search_routes_to_summary_for_discovery_query(self):
+        """Test search routes to oipf-summary for research discovery queries even on follow-up"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+        service._cache_loaded = True
+        service._known_research_ids = set()  # Empty cache
+
+        with patch.object(service, 'search_initial', new_callable=AsyncMock) as mock_initial:
+            with patch.object(service, 'search_followup', new_callable=AsyncMock) as mock_followup:
+                mock_initial.return_value = []
+                mock_followup.return_value = []
+
+                # Follow-up query (chat_history has messages) but is a discovery query
+                chat_history = [
+                    {"role": "user", "content": "最初の質問"},
+                    {"role": "assistant", "content": "回答"},
+                    {"role": "user", "content": "過去に類似の研究はありますか"},
+                ]
+
+                await service.search("過去に類似の研究はありますか", chat_history=chat_history)
+
+                # Should call search_initial (oipf-summary) even though it's a follow-up
+                mock_initial.assert_called_once()
+                mock_followup.assert_not_called()
+
 
 # ============================================================================
 # InternalResearchResult Tests
