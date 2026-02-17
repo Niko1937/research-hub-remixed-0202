@@ -188,15 +188,6 @@ export function ChatInput({
               {/* Mode Toggle */}
               <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
                 <Button
-                  variant={mode === "search" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 gap-1.5 text-xs"
-                  onClick={() => onModeChange("search")}
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>検索</span>
-                </Button>
-                <Button
                   variant={mode === "assistant" ? "secondary" : "ghost"}
                   size="sm"
                   className="h-7 gap-1.5 text-xs"
@@ -204,6 +195,15 @@ export function ChatInput({
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                   <span>アシスタント</span>
+                </Button>
+                <Button
+                  variant={mode === "search" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => onModeChange("search")}
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>検索</span>
                 </Button>
               </div>
 

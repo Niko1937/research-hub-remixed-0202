@@ -116,7 +116,7 @@ export function FollowUpActions({ actions, onActionClick }: FollowUpActionsProps
   if (actions.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border/50">
+    <div className="flex flex-wrap gap-2">
       {actions.map((action, index) => (
         <Button
           key={index}

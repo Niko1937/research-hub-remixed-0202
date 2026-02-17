@@ -21,7 +21,9 @@ import { FollowUpActions, generateFollowUpActions, FollowUpAction } from "@/comp
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, FileText, Search, MessageSquare, X } from "lucide-react";
+import { Sparkles, Loader2, FileText, Search, MessageSquare, X, Globe } from "lucide-react";
+import { SourceDrawer } from "@/components/SourceDrawer";
+import { ResearchData } from "@/hooks/useResearchChat";
 import { useResearchChat } from "@/hooks/useResearchChat";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -175,6 +177,7 @@ const Explorer = () => {
   const [deepDiveContext, setDeepDiveContext] = useState<DeepDiveContext | null>(null);
   const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
   const [selectedResearchIds, setSelectedResearchIds] = useState<string[]>([]);
+  const [sourceDrawerOpen, setSourceDrawerOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const clearHighlight = useCallback(() => {
@@ -195,7 +198,7 @@ const Explorer = () => {
 
   const handleResetToExplorer = useCallback(() => {
     clearMessages();
-    setMode("search");
+    setMode("assistant");
     closePdfViewer();
     handleHtmlViewerClose();
     setLastHtmlItemTimestamp(null);
@@ -600,34 +603,31 @@ const Explorer = () => {
                   />
                 </div>
 
-                {/* Recommended Papers */}
+                {/* Search Results (only shown when a search query is active) */}
+                {searchQuery && (
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-8">
                   <div className="flex items-center justify-between mb-4">
-                    {searchQuery ? (
-                      <div className="flex items-center gap-3 flex-1">
-                        <h2 className="text-lg font-semibold text-foreground">検索結果</h2>
-                        <span className="text-sm text-muted-foreground">
-                          「{searchQuery}」
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleResetToExplorer}
-                          className="ml-auto"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <h2 className="text-lg font-semibold text-foreground">本日のおすすめ</h2>
-                    )}
+                    <div className="flex items-center gap-3 flex-1">
+                      <h2 className="text-lg font-semibold text-foreground">検索結果</h2>
+                      <span className="text-sm text-muted-foreground">
+                        「{searchQuery}」
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleResetToExplorer}
+                        className="ml-auto"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   
                   <Card className="bg-card border-border overflow-hidden">
                     {recommendedLoading || isLoading ? (
                       <div className="p-6 flex items-center justify-center gap-2 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        {searchQuery ? "検索中..." : "本日のおすすめを取得しています..."}
+                        検索中...
                       </div>
                     ) : recommendedError ? (
                       <div className="p-6 text-center text-destructive">{recommendedError}</div>
@@ -642,6 +642,7 @@ const Explorer = () => {
                     )}
                   </Card>
                 </div>
+                )}
               </div>
             </ScrollArea>
           ) : (
@@ -818,7 +819,7 @@ const Explorer = () => {
                           </div>
                         )}
 
-                        {/* Follow-up Actions */}
+                        {/* Follow-up Actions + Source Button */}
                         {!isLoading && timeline.length > 0 && (() => {
                           // Find the last meaningful result to generate follow-ups
                           const lastItem = [...timeline].reverse().find(item => 
@@ -848,12 +849,41 @@ const Explorer = () => {
                           const handleFollowUpClick = (action: FollowUpAction) => {
                             handleSubmit(action.prompt, action.tool as any);
                           };
+
+                          // Collect source data from timeline
+                          const lastResearchResult = [...timeline].reverse().find(item => item.type === "research_result");
+                          const sourceData = lastResearchResult?.data as ResearchData | undefined;
+                          const totalSources = sourceData ? (sourceData.internal.length + sourceData.external.length + sourceData.business.length) : 0;
                           
                           return (
-                            <FollowUpActions 
-                              actions={actions} 
-                              onActionClick={handleFollowUpClick}
-                            />
+                            <div className="flex items-start gap-2 mt-4 pt-4 border-t border-border/50 flex-wrap">
+                              <FollowUpActions 
+                                actions={actions} 
+                                onActionClick={handleFollowUpClick}
+                              />
+                              {totalSources > 0 && sourceData && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2 text-xs h-auto py-2 px-3 ml-auto"
+                                    onClick={() => setSourceDrawerOpen(true)}
+                                  >
+                                    <Globe className="w-4 h-4" />
+                                    ソース ({totalSources})
+                                  </Button>
+                                  <SourceDrawer
+                                    open={sourceDrawerOpen}
+                                    onOpenChange={setSourceDrawerOpen}
+                                    data={sourceData}
+                                    onPdfClick={openPdfDocument}
+                                    onDeepDive={handleDeepDive}
+                                    onResearchIdClick={handleResearchIdClick}
+                                    selectedResearchIds={selectedResearchIds}
+                                  />
+                                </>
+                              )}
+                            </div>
                           );
                         })()}
                       </div>
