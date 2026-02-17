@@ -22,6 +22,7 @@ class ResearchChatRequest(BaseModel):
     highlightedText: Optional[str] = None
     screenshot: Optional[str] = None
     deepDiveContext: Optional[dict] = None
+    researchIdFilter: Optional[str] = None  # 研究IDでフィルタリング（初回からoipf-detailsを検索）
 
 
 class Step(BaseModel):

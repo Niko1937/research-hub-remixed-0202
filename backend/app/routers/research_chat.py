@@ -130,8 +130,8 @@ async def handle_assistant_mode(
         try:
             chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
 
-            # Extract research_id from user message for filtering
-            research_id_filter = extract_research_id_from_message(user_message)
+            # Use researchIdFilter from request, or extract from message
+            research_id_filter = request.researchIdFilter or extract_research_id_from_message(user_message)
             if research_id_filter:
                 print(f"[assistant_mode] Filtering by research_id: {research_id_filter}")
 
@@ -305,8 +305,8 @@ Keep it concise, 2-3 steps. Always end with "chat"."""
                 # Build chat history for context-aware search
                 chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
 
-                # Extract research_id from query for filtering
-                research_id_filter = extract_research_id_from_message(query)
+                # Use researchIdFilter from request, or extract from query
+                research_id_filter = request.researchIdFilter or extract_research_id_from_message(query)
                 if research_id_filter:
                     print(f"[internal-docs] Filtering by research_id: {research_id_filter}")
 
@@ -782,8 +782,8 @@ async def handle_search_mode(
     # Build chat history for context-aware search
     chat_history = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    # Extract research_id from user message for filtering
-    research_id_filter = extract_research_id_from_message(user_message)
+    # Use researchIdFilter from request, or extract from message
+    research_id_filter = request.researchIdFilter or extract_research_id_from_message(user_message)
     if research_id_filter:
         print(f"[search_mode] Filtering by research_id: {research_id_filter}")
 

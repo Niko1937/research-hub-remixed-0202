@@ -66,9 +66,18 @@ python -m app.main
   "mode": "search" | "assistant",
   "tool": "wide-knowledge" | "knowwho" | "positioning-analysis" | ...,
   "pdfContext": "PDFのテキスト内容（オプション）",
-  "deepDiveContext": { "source": {...}, "virtualFolder": [...] }
+  "deepDiveContext": { "source": {...}, "virtualFolder": [...] },
+  "researchIdFilter": "AB12"
 }
 ```
+
+**リクエストパラメータ**:
+| パラメータ | 必須 | 説明 |
+|-----------|------|------|
+| `messages` | ○ | チャットメッセージの配列 |
+| `mode` | - | `search` または `assistant`（デフォルト: `assistant`） |
+| `tool` | - | 使用するツール |
+| `researchIdFilter` | - | 研究IDでフィルタリング。指定すると初回から oipf-details を検索 |
 
 **モード**:
 | モード | 説明 |
