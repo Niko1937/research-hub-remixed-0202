@@ -76,6 +76,9 @@ class InternalResearchSearchService:
             self._known_research_ids = set(research_ids)
             self._cache_loaded = True
             print(f"[InternalResearchSearch] Loaded {len(self._known_research_ids)} research_ids into cache")
+            # Debug: show loaded research IDs
+            if self._known_research_ids:
+                print(f"[InternalResearchSearch] Cached research_ids: {sorted(self._known_research_ids)}")
         except Exception as e:
             print(f"[InternalResearchSearch] Failed to load research_ids cache: {e}")
             self._known_research_ids = set()
@@ -120,6 +123,8 @@ class InternalResearchSearchService:
                 print(f"[InternalResearchSearch] Found known research_id in query: {rid}")
                 return rid
 
+        # Debug: log when no match found
+        print(f"[InternalResearchSearch] No research_id found in query. Known IDs: {sorted(self._known_research_ids)}")
         return None
 
     def get_cache_status(self) -> dict:
