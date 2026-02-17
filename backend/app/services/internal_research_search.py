@@ -3,7 +3,8 @@ Internal Research Search Service
 
 OpenSearchを使った社内研究検索サービス
 - 初回質問: ベクトル類似検索 (oipf-summary)
-- 2回目以降: LLMでクエリ生成 (oipf-details)
+- 2回目以降: ベクトル類似検索 (oipf-details)
+- 研究ID指定時: 初回からoipf-detailsを検索
 """
 
 import json
@@ -47,11 +48,66 @@ class InternalResearchSearchService:
     OpenSearch-based internal research search service
 
     - Initial queries: Vector similarity search on oipf-summary
-    - Follow-up queries: LLM-generated OpenSearch query on oipf-details
+    - Follow-up queries: Vector similarity search on oipf-details
+    - Research ID specified: Direct oipf-details search from first query
     """
 
     def __init__(self):
         self.settings = get_settings()
+        self._known_research_ids: set[str] = set()
+        self._cache_loaded: bool = False
+
+    async def load_research_ids_cache(self) -> None:
+        """
+        Load all research_ids from oipf-summary into memory cache.
+        Called on application startup.
+        """
+        if not opensearch_client.is_configured:
+            print("[InternalResearchSearch] OpenSearch not configured, skipping research_id cache load")
+            return
+
+        try:
+            print("[InternalResearchSearch] Loading research_ids cache from oipf-summary...")
+            research_ids = await opensearch_client.get_unique_field_values(
+                index="oipf-summary",
+                field="oipf_research_id",
+                size=10000,
+            )
+            self._known_research_ids = set(research_ids)
+            self._cache_loaded = True
+            print(f"[InternalResearchSearch] Loaded {len(self._known_research_ids)} research_ids into cache")
+        except Exception as e:
+            print(f"[InternalResearchSearch] Failed to load research_ids cache: {e}")
+            self._known_research_ids = set()
+            self._cache_loaded = False
+
+    def find_research_id_in_query(self, query: str) -> Optional[str]:
+        """
+        Find a known research_id in the user query.
+
+        Args:
+            query: User's query text
+
+        Returns:
+            Research ID if found, None otherwise
+        """
+        if not self._cache_loaded or not self._known_research_ids:
+            return None
+
+        # Check each known research_id
+        for rid in self._known_research_ids:
+            if rid in query:
+                print(f"[InternalResearchSearch] Found known research_id in query: {rid}")
+                return rid
+
+        return None
+
+    def get_cache_status(self) -> dict:
+        """Get status of the research_id cache"""
+        return {
+            "loaded": self._cache_loaded,
+            "count": len(self._known_research_ids),
+        }
 
     @property
     def is_configured(self) -> bool:
@@ -224,6 +280,12 @@ class InternalResearchSearchService:
         """
         Smart search that chooses between initial and follow-up search
 
+        Routing logic:
+        1. If research_id_filter is explicitly provided → oipf-details
+        2. If query contains a known research_id → oipf-details (even on first query)
+        3. If initial query (no chat history) → oipf-summary
+        4. Otherwise → oipf-details
+
         Args:
             query: User's question
             chat_history: Previous chat messages (if None, treated as initial query)
@@ -246,9 +308,27 @@ class InternalResearchSearchService:
         print(f"  - is_initial: {is_initial}")
         print(f"  - research_id_filter: {research_id_filter}")
 
-        if is_initial and not research_id_filter:
+        # Check if query contains a known research_id (even for initial queries)
+        detected_research_id = self.find_research_id_in_query(query)
+        if detected_research_id and not research_id_filter:
+            research_id_filter = detected_research_id
+            print(f"  - Detected research_id in query: {detected_research_id}")
+            print(f"  - Routing to oipf-details directly")
+
+        # Route to appropriate search method
+        if research_id_filter:
+            # research_id specified: always use oipf-details
+            return await self.search_followup(
+                query,
+                chat_history or [],
+                research_id_filter,
+                limit,
+            )
+        elif is_initial:
+            # Initial query without research_id: use oipf-summary
             return await self.search_initial(query, limit)
         else:
+            # Follow-up query: use oipf-details
             return await self.search_followup(
                 query,
                 chat_history or [],

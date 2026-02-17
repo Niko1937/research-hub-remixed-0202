@@ -242,6 +242,52 @@ class OpenSearchClient:
         response.raise_for_status()
         return response.json()
 
+    async def get_unique_field_values(
+        self,
+        index: str,
+        field: str,
+        size: int = 10000,
+    ) -> list[str]:
+        """
+        Get unique values for a field using aggregation
+
+        Args:
+            index: Index name (e.g., "oipf-summary")
+            field: Field name to aggregate (e.g., "oipf_research_id")
+            size: Maximum number of unique values to return
+
+        Returns:
+            List of unique field values
+        """
+        if not self.is_configured:
+            raise RuntimeError("OpenSearch is not configured")
+
+        client = await self._get_client()
+        url = f"{self.settings.opensearch_url.rstrip('/')}/{index}/_search"
+
+        body = {
+            "size": 0,
+            "aggs": {
+                "unique_values": {
+                    "terms": {
+                        "field": field,
+                        "size": size,
+                    }
+                }
+            }
+        }
+
+        response = await client.post(
+            url,
+            json=body,
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+
+        result = response.json()
+        buckets = result.get("aggregations", {}).get("unique_values", {}).get("buckets", [])
+        return [bucket["key"] for bucket in buckets]
+
 
 # Global client instance
 opensearch_client = OpenSearchClient()

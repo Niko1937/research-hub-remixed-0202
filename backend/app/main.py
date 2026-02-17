@@ -4,18 +4,42 @@ FastAPI Backend Application
 Research Hub API Server
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.routers import research_chat, research_chat_v1, arxiv_proxy, pdf_proxy
+from app.services.internal_research_search import internal_research_service
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan events.
+    - Startup: Load research_ids cache from OpenSearch
+    - Shutdown: Cleanup resources
+    """
+    # Startup
+    print("[Startup] Loading research_ids cache...")
+    await internal_research_service.load_research_ids_cache()
+    cache_status = internal_research_service.get_cache_status()
+    print(f"[Startup] Research ID cache: {cache_status['count']} IDs loaded")
+
+    yield
+
+    # Shutdown
+    print("[Shutdown] Cleaning up...")
+
 
 app = FastAPI(
     title="Research Hub API",
     description="Research Hub Backend API - FastAPI Version",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS Middleware
