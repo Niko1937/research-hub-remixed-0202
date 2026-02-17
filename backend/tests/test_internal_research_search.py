@@ -507,9 +507,39 @@ class TestInternalResearchSearchService:
         result = service.find_research_id_in_query("Test-ABC-123 について")
         assert result == "TEST-ABC-123"
 
-        # Should find when embedded in sentence
-        result = service.find_research_id_in_query("研究test-abc-123の分析結果を教えて")
-        assert result == "TEST-ABC-123"
+    def test_find_research_id_in_query_word_boundary(self):
+        """Test find_research_id_in_query uses word boundaries to avoid false positives"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        # Short 4-character research IDs
+        service._known_research_ids = {"AB12", "TEST", "X001"}
+        service._cache_loaded = True
+
+        # Should find when ID is a standalone word
+        result = service.find_research_id_in_query("AB12について教えて")
+        assert result == "AB12"
+
+        result = service.find_research_id_in_query("研究ID: AB12 の詳細")
+        assert result == "AB12"
+
+        # Should NOT find when ID is part of a larger word
+        result = service.find_research_id_in_query("FAB12Cという製品について")
+        assert result is None
+
+        result = service.find_research_id_in_query("CONTEST の結果")  # Contains TEST but not as word
+        assert result is None
+
+        result = service.find_research_id_in_query("AX001Bのデータ")  # X001 embedded
+        assert result is None
+
+        # Should find at start/end of query
+        result = service.find_research_id_in_query("TEST の実験結果")
+        assert result == "TEST"
+
+        result = service.find_research_id_in_query("これは X001")
+        assert result == "X001"
 
     def test_find_research_id_in_query_not_found(self):
         """Test find_research_id_in_query returns None when not found"""

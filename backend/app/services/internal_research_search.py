@@ -85,9 +85,16 @@ class InternalResearchSearchService:
         """
         Find a known research_id in the user query.
 
-        Case-insensitive search to handle variations like:
-        - "OIPF-2024-001" vs "oipf-2024-001"
-        - Mixed case inputs from users
+        Case-insensitive search with boundary detection to avoid
+        false positives with short IDs (e.g., 4-character alphanumeric).
+
+        Uses custom boundary check that works with Japanese text:
+        - Research ID must not be preceded by alphanumeric character
+        - Research ID must not be followed by alphanumeric character
+
+        Examples:
+        - "AB12について教えて" → matches "AB12" ✅
+        - "FAB12Cの詳細" → does NOT match "AB12" (embedded in word) ✅
 
         Args:
             query: User's query text
@@ -101,10 +108,15 @@ class InternalResearchSearchService:
             print(f"  - known_research_ids count: {len(self._known_research_ids)}")
             return None
 
-        # Case-insensitive search
-        query_lower = query.lower()
+        # Custom boundary matching that works with Japanese text
+        # (?<![A-Za-z0-9]) = not preceded by alphanumeric
+        # (?![A-Za-z0-9]) = not followed by alphanumeric
         for rid in self._known_research_ids:
-            if rid.lower() in query_lower:
+            # Escape special regex characters in research_id
+            escaped_rid = re.escape(rid)
+            # Match research_id with alphanumeric boundary check
+            pattern = rf'(?<![A-Za-z0-9]){escaped_rid}(?![A-Za-z0-9])'
+            if re.search(pattern, query, re.IGNORECASE):
                 print(f"[InternalResearchSearch] Found known research_id in query: {rid}")
                 return rid
 
