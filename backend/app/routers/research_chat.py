@@ -149,12 +149,15 @@ async def handle_assistant_mode(
 
                 # Send results to frontend
                 internal_data = []
+                # Determine search type from first result (all results have same source_type)
+                search_type = internal_results[0].source_type if internal_results else "summary"
                 for r in internal_results:
                     item = {
                         "title": r.title,
                         "tags": r.tags,
                         "similarity": r.similarity,
                         "year": r.year,
+                        "source_type": r.source_type,  # "summary" or "details"
                     }
                     if r.research_id:
                         item["research_id"] = r.research_id
@@ -170,6 +173,7 @@ async def handle_assistant_mode(
                     "business": [],
                     "external": [],
                     "source": "opensearch_auto",
+                    "search_type": search_type,  # "summary" (research projects) or "details" (files)
                 })
             else:
                 print(f"[assistant_mode] No internal research results found")
@@ -683,17 +687,38 @@ HTMLのみを出力。最初の文字は<!DOCTYPE html>で始める。"""
     # Add internal research context from OpenSearch (if available)
     if internal_research_context:
         internal_context_lines = []
+        # Check if results are from oipf-summary (research projects) or oipf-details (files)
+        is_summary_results = internal_research_context[0].source_type == "summary" if internal_research_context else False
+
         for r in internal_research_context:
-            line = f"- {r.title}"
-            if r.research_id:
-                line += f" (研究ID: {r.research_id})"
-            if r.abstract:
-                line += f"\n  要約: {r.abstract[:300]}..."
-            if r.tags:
-                line += f"\n  タグ: {', '.join(r.tags[:5])}"
+            if is_summary_results:
+                # Research project level - emphasize research overview
+                line = f"- 【研究プロジェクト】{r.title}"
+                if r.research_id:
+                    line += f"\n  研究ID: {r.research_id}"
+                if r.abstract:
+                    line += f"\n  研究概要: {r.abstract[:400]}"
+                if r.tags:
+                    line += f"\n  テーマタグ: {', '.join(r.tags[:5])}"
+                if r.similarity:
+                    line += f"\n  類似度: {r.similarity:.0%}"
+            else:
+                # File level - show file details
+                line = f"- {r.title}"
+                if r.research_id:
+                    line += f" (研究ID: {r.research_id})"
+                if r.file_path:
+                    line += f"\n  ファイル: {r.file_path}"
+                if r.abstract:
+                    line += f"\n  要約: {r.abstract[:300]}..."
+                if r.tags:
+                    line += f"\n  タグ: {', '.join(r.tags[:5])}"
             internal_context_lines.append(line)
 
-        context_prompt += f"\n\n## 関連する社内研究 (OpenSearch):\n" + "\n".join(internal_context_lines)
+        if is_summary_results:
+            context_prompt += f"\n\n## 関連する社内研究プロジェクト:\n以下は社内で実施された研究プロジェクトの一覧です。各プロジェクトの研究ID、概要、テーマタグを参考にして回答してください。\n\n" + "\n\n".join(internal_context_lines)
+        else:
+            context_prompt += f"\n\n## 関連する社内資料 (ファイル):\n" + "\n".join(internal_context_lines)
 
     if tool_results:
         context_prompt += f"\n\n## ツール実行結果:\n{json.dumps(tool_results, ensure_ascii=False, indent=2)}"
@@ -803,8 +828,10 @@ async def handle_search_mode(
         )
 
     # Send research data
-    # Include research_id for OpenSearch results
+    # Include research_id and source_type for OpenSearch results
     internal_data = []
+    # Determine search type from first result
+    search_type = internal[0].source_type if internal and hasattr(internal[0], "source_type") else "summary"
     for r in internal:
         item = {
             "title": r.title,
@@ -812,6 +839,9 @@ async def handle_search_mode(
             "similarity": r.similarity,
             "year": r.year,
         }
+        # Add source_type if available
+        if hasattr(r, "source_type"):
+            item["source_type"] = r.source_type
         # Add research_id if available (OpenSearch results)
         if hasattr(r, "research_id") and r.research_id:
             item["research_id"] = r.research_id
@@ -826,24 +856,48 @@ async def handle_search_mode(
         "internal": internal_data,
         "business": [{"challenge": c.challenge, "business_unit": c.business_unit, "priority": c.priority, "keywords": c.keywords} for c in challenges],
         "external": [p.to_dict() for p in papers],
+        "search_type": search_type,  # "summary" (research projects) or "details" (files)
     })
 
     # Build context and stream AI response
     # Format internal research with more details for OpenSearch results
+    # Check if results are from oipf-summary (research projects) or oipf-details (files)
+    is_summary_results = search_type == "summary"
     internal_context_lines = []
     for r in internal:
-        line = f"- {r.title}"
-        if hasattr(r, "research_id") and r.research_id:
-            line += f" (研究ID: {r.research_id})"
-        if hasattr(r, "abstract") and r.abstract:
-            line += f"\n  要約: {r.abstract[:200]}..."
+        if is_summary_results:
+            # Research project level - emphasize research overview
+            line = f"- 【研究プロジェクト】{r.title}"
+            if hasattr(r, "research_id") and r.research_id:
+                line += f"\n  研究ID: {r.research_id}"
+            if hasattr(r, "abstract") and r.abstract:
+                line += f"\n  研究概要: {r.abstract[:400]}"
+            if r.tags:
+                line += f"\n  テーマタグ: {', '.join(r.tags[:5])}"
+            if r.similarity:
+                line += f"\n  類似度: {r.similarity:.0%}"
+        else:
+            # File level - show file details
+            line = f"- {r.title}"
+            if hasattr(r, "research_id") and r.research_id:
+                line += f" (研究ID: {r.research_id})"
+            if hasattr(r, "file_path") and r.file_path:
+                line += f"\n  ファイル: {r.file_path}"
+            if hasattr(r, "abstract") and r.abstract:
+                line += f"\n  要約: {r.abstract[:200]}..."
         internal_context_lines.append(line)
+
+    # Different header based on search type
+    internal_header = "### 社内研究プロジェクト" if is_summary_results else "### 社内資料"
+    internal_instruction = ""
+    if is_summary_results and internal_context_lines:
+        internal_instruction = "\n以下は社内で実施された研究プロジェクトの一覧です。各プロジェクトの研究ID、概要を引用して回答してください。\n"
 
     context_prompt = f"""あなたはR&D研究者向けのアシスタントです。構造化されたMarkdown形式で見やすく回答してください。
 
 ## 利用可能な情報
 
-### 社内研究
+{internal_header}{internal_instruction}
 {chr(10).join(internal_context_lines) or '- なし'}
 
 ### 外部論文

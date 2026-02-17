@@ -29,6 +29,7 @@ class InternalResearchResult:
     research_id: str = ""  # oipf_research_id
     abstract: str = ""
     file_path: str = ""
+    source_type: str = "summary"  # "summary" (oipf-summary) or "details" (oipf-details)
 
 
 @dataclass
@@ -237,6 +238,7 @@ class InternalResearchSearchService:
                     year=year,
                     research_id=source.get("oipf_research_id", ""),
                     abstract=abstract[:500] if abstract else "",
+                    source_type="summary",  # oipf-summary (research project level)
                 ))
 
             return results
@@ -319,6 +321,7 @@ class InternalResearchSearchService:
                     research_id=source.get("oipf_research_id", ""),
                     abstract=abstract[:500] if abstract else "",
                     file_path=source.get("oipf_file_path", ""),
+                    source_type="details",  # oipf-details (file level)
                 ))
 
             # 5. Deduplicate similar files
