@@ -173,6 +173,55 @@ class TestOpenSearchClient:
             assert len(result["hits"]["hits"]) == 1
             assert result["hits"]["hits"][0]["_source"]["oipf_research_id"] == "ABC1"
 
+    @pytest.mark.asyncio
+    async def test_get_unique_field_values_success(self):
+        """Test get_unique_field_values returns unique values"""
+        from app.services.opensearch_client import OpenSearchClient
+
+        mock_response = {
+            "aggregations": {
+                "unique_values": {
+                    "buckets": [
+                        {"key": "OIPF-2024-001", "doc_count": 10},
+                        {"key": "OIPF-2024-002", "doc_count": 5},
+                        {"key": "TEST-123", "doc_count": 3},
+                    ]
+                }
+            }
+        }
+
+        with patch("app.services.opensearch_client.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(
+                opensearch_url="https://localhost:9200",
+                opensearch_username="admin",
+                opensearch_password="password",
+                opensearch_verify_ssl=False,
+                opensearch_proxy_enabled=False,
+                opensearch_proxy_url="",
+                is_opensearch_configured=lambda: True
+            )
+
+            client = OpenSearchClient()
+
+            # Mock the httpx client
+            mock_http_client = AsyncMock()
+            mock_http_client.post = AsyncMock(return_value=MagicMock(
+                json=lambda: mock_response,
+                raise_for_status=lambda: None
+            ))
+            client._client = mock_http_client
+
+            result = await client.get_unique_field_values(
+                index="oipf-summary",
+                field="oipf_research_id"
+            )
+
+            assert isinstance(result, list)
+            assert len(result) == 3
+            assert "OIPF-2024-001" in result
+            assert "OIPF-2024-002" in result
+            assert "TEST-123" in result
+
 
 # ============================================================================
 # Embedding Client Tests
@@ -397,6 +446,107 @@ class TestInternalResearchSearchService:
                 )
                 mock_followup.assert_called_once()
                 mock_initial.assert_not_called()
+
+    def test_research_id_cache_initialization(self):
+        """Test research_id cache is initialized correctly"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        # Cache should be empty initially
+        assert service._known_research_ids == set()
+        assert service._cache_loaded == False
+
+        # get_cache_status should return correct values
+        status = service.get_cache_status()
+        assert status["loaded"] == False
+        assert status["count"] == 0
+
+    def test_find_research_id_in_query_not_loaded(self):
+        """Test find_research_id_in_query returns None when cache not loaded"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        # Cache not loaded, should return None
+        result = service.find_research_id_in_query("OIPF-2024-001 について教えて")
+        assert result is None
+
+    def test_find_research_id_in_query_found(self):
+        """Test find_research_id_in_query finds known research_id"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        # Manually set cache
+        service._known_research_ids = {"OIPF-2024-001", "OIPF-2024-002", "TEST-123"}
+        service._cache_loaded = True
+
+        # Should find research_id in query
+        result = service.find_research_id_in_query("OIPF-2024-001 の詳細を教えて")
+        assert result == "OIPF-2024-001"
+
+        result = service.find_research_id_in_query("TEST-123 について")
+        assert result == "TEST-123"
+
+    def test_find_research_id_in_query_not_found(self):
+        """Test find_research_id_in_query returns None when not found"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        # Manually set cache
+        service._known_research_ids = {"OIPF-2024-001", "OIPF-2024-002"}
+        service._cache_loaded = True
+
+        # Should not find unknown research_id
+        result = service.find_research_id_in_query("アルミニウムの研究について")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_search_routes_to_details_when_research_id_found(self):
+        """Test search routes to oipf-details when research_id found in query"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        # Manually set cache with known research_id
+        service._known_research_ids = {"OIPF-2024-001"}
+        service._cache_loaded = True
+
+        with patch.object(service, 'search_initial', new_callable=AsyncMock) as mock_initial:
+            with patch.object(service, 'search_followup', new_callable=AsyncMock) as mock_followup:
+                mock_initial.return_value = []
+                mock_followup.return_value = []
+
+                # Query contains known research_id - should route to followup (oipf-details)
+                await service.search("OIPF-2024-001 の詳細を教えて", chat_history=None)
+
+                # Should call search_followup with research_id_filter
+                mock_followup.assert_called_once()
+                call_args = mock_followup.call_args
+                assert call_args[0][2] == "OIPF-2024-001"  # research_id_filter
+                mock_initial.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_load_research_ids_cache(self):
+        """Test load_research_ids_cache loads IDs from OpenSearch"""
+        from app.services.internal_research_search import InternalResearchSearchService
+
+        service = InternalResearchSearchService()
+
+        with patch("app.services.internal_research_search.opensearch_client") as mock_os:
+            mock_os.is_configured = True
+            mock_os.get_unique_field_values = AsyncMock(
+                return_value=["OIPF-2024-001", "OIPF-2024-002", "TEST-123"]
+            )
+
+            await service.load_research_ids_cache()
+
+            assert service._cache_loaded == True
+            assert len(service._known_research_ids) == 3
+            assert "OIPF-2024-001" in service._known_research_ids
+            assert "TEST-123" in service._known_research_ids
 
 
 # ============================================================================
