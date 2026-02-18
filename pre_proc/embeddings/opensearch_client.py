@@ -118,7 +118,12 @@ class OpenSearchClient:
             async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
                 response = await client.head(url)
                 return response.status_code == 200
-        except Exception:
+        except httpx.ConnectError as e:
+            print(f"[OpenSearch] Connection error: {e}")
+            print(f"  Check OPENSEARCH_URL ({self.url}) and network/proxy settings.")
+            return False
+        except Exception as e:
+            print(f"[OpenSearch] Error checking index: {e}")
             return False
 
     async def index_document(

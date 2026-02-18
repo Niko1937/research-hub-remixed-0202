@@ -312,7 +312,9 @@ class FolderEmbeddingsPipeline:
 
         if not self.opensearch_client and not self.dry_run:
             self.opensearch_client = get_opensearch_client()
-            self._log("Initialized OpenSearch client")
+            self._log(f"Initialized OpenSearch client")
+            self._log(f"  URL: {self.opensearch_client.url}")
+            self._log(f"  Index: {self.index_name}")
 
     async def _process_single_file(
         self,
@@ -1002,7 +1004,10 @@ class FolderEmbeddingsPipeline:
         )
 
         if not result.success:
-            self.stats.errors.append(f"{doc_id}: Index failed - {result.error}")
+            error_msg = f"{doc_id}: Index failed - {result.error}"
+            self.stats.errors.append(error_msg)
+            self._log(f"  [ERROR] OpenSearch indexing failed: {doc.oipf_file_name}")
+            self._log(f"    Error: {result.error}")
             return False, is_update
 
         return True, is_update
