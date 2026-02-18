@@ -182,6 +182,50 @@ class InternalResearchSearchService:
         """Alias for is_research_summary_query (backward compatibility)"""
         return self.is_research_summary_query(query)
 
+    # Image file extensions for filtering
+    IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".svg"}
+
+    def is_image_search_query(self, query: str) -> bool:
+        """
+        Detect if the query is asking for images/photos.
+
+        Examples:
+        - "画像を検索してください"
+        - "写真を提示してください"
+        - "図を見せて"
+        - "グラフの画像を探して"
+
+        Args:
+            query: User's query text
+
+        Returns:
+            True if query is asking for images
+        """
+        image_patterns = [
+            r'画像.*(?:検索|探|見せ|提示|表示|出|教え)',
+            r'写真.*(?:検索|探|見せ|提示|表示|出|教え)',
+            r'(?:検索|探|見せ|提示|表示|出).*画像',
+            r'(?:検索|探|見せ|提示|表示|出).*写真',
+            r'図.*(?:見せ|提示|表示|出)',
+            r'(?:見せ|提示|表示|出).*図',
+            r'イメージ.*(?:検索|探|見せ|提示|表示)',
+            r'(?:グラフ|チャート|図表).*(?:画像|見せ|提示)',
+        ]
+
+        for pattern in image_patterns:
+            if re.search(pattern, query, re.IGNORECASE):
+                print(f"[InternalResearchSearch] Image search query detected: {pattern}")
+                return True
+
+        return False
+
+    def _is_image_file(self, file_path: str) -> bool:
+        """Check if file path is an image file based on extension"""
+        if not file_path:
+            return False
+        ext = PurePosixPath(file_path).suffix.lower()
+        return ext in self.IMAGE_EXTENSIONS
+
     def get_cache_status(self) -> dict:
         """Get status of the research_id cache"""
         return {
@@ -411,6 +455,12 @@ class InternalResearchSearchService:
             deduplicated_results = self._deduplicate_results(results, limit)
             print(f"[InternalResearchSearch] Deduplication: {len(results)} → {len(deduplicated_results)} results")
 
+            # 6. Balance image/non-image results if image query
+            if self.is_image_search_query(query):
+                balanced_results = self._balance_image_results(deduplicated_results, limit)
+                print(f"[InternalResearchSearch] Image query: balanced to {len(balanced_results)} results")
+                return balanced_results
+
             return deduplicated_results
 
         except Exception as e:
@@ -554,6 +604,84 @@ JSON形式で出力（説明不要）:"""
         except Exception as e:
             print(f"[InternalResearchSearch] Query generation failed: {e}")
             return None
+
+    def _balance_image_results(
+        self,
+        results: list[InternalResearchResult],
+        limit: int,
+    ) -> list[InternalResearchResult]:
+        """
+        Balance results to include half images when image query is detected.
+
+        For image-related queries, ensures that approximately half of the
+        returned results are image files (jpg, png, etc.).
+
+        Args:
+            results: Original search results
+            limit: Target number of results
+
+        Returns:
+            Balanced list with ~50% image files (if available)
+        """
+        if not results:
+            return results
+
+        # Separate image and non-image results
+        image_results = []
+        non_image_results = []
+
+        for r in results:
+            if self._is_image_file(r.file_path):
+                image_results.append(r)
+            else:
+                non_image_results.append(r)
+
+        print(f"[InternalResearchSearch] Image balance: {len(image_results)} images, {len(non_image_results)} non-images")
+
+        # Calculate target counts (half and half)
+        target_images = limit // 2
+        target_non_images = limit - target_images
+
+        # Adjust if not enough of either type
+        actual_images = min(target_images, len(image_results))
+        actual_non_images = min(target_non_images, len(non_image_results))
+
+        # If we have fewer images than target, fill with more non-images
+        if actual_images < target_images:
+            additional_non_images = min(
+                target_images - actual_images,
+                len(non_image_results) - actual_non_images
+            )
+            actual_non_images += additional_non_images
+
+        # If we have fewer non-images than target, fill with more images
+        if actual_non_images < target_non_images:
+            additional_images = min(
+                target_non_images - actual_non_images,
+                len(image_results) - actual_images
+            )
+            actual_images += additional_images
+
+        # Take the appropriate number from each category
+        selected_images = image_results[:actual_images]
+        selected_non_images = non_image_results[:actual_non_images]
+
+        # Interleave results: image, non-image, image, non-image...
+        balanced = []
+        img_idx = 0
+        non_img_idx = 0
+
+        while img_idx < len(selected_images) or non_img_idx < len(selected_non_images):
+            if img_idx < len(selected_images):
+                balanced.append(selected_images[img_idx])
+                img_idx += 1
+            if non_img_idx < len(selected_non_images):
+                balanced.append(selected_non_images[non_img_idx])
+                non_img_idx += 1
+
+        print(f"[InternalResearchSearch] Balanced: {len(selected_images)} images + {len(selected_non_images)} non-images = {len(balanced)} total")
+
+        return balanced[:limit]
 
     def _create_title(self, abstract: str, folder_summary: str) -> str:
         """Create a title from abstract or folder summary"""
