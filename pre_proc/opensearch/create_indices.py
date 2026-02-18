@@ -192,7 +192,13 @@ def create_oipf_summary_index() -> bool:
                     }
                 },
                 "oipf_research_proper_nouns": {
-                    "type": "keyword"
+                    "type": "text",
+                    "analyzer": "standard",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword"
+                        }
+                    }
                 },
                 "oipf_proper_nouns_embedding": {
                     "type": "knn_vector",
@@ -289,7 +295,13 @@ def create_oipf_details_index() -> bool:
                     }
                 },
                 "oipf_proper_nouns": {
-                    "type": "keyword"
+                    "type": "text",
+                    "analyzer": "standard",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword"
+                        }
+                    }
                 },
                 "oipf_proper_nouns_embedding": {
                     "type": "knn_vector",
@@ -463,9 +475,15 @@ def get_new_fields_for_index(index_name: str) -> dict:
                     }
                 }
             },
-            # Added: proper nouns
+            # Added: proper nouns (text + keyword for partial matching)
             "oipf_research_proper_nouns": {
-                "type": "keyword"
+                "type": "text",
+                "analyzer": "standard",
+                "fields": {
+                    "keyword": {
+                        "type": "keyword"
+                    }
+                }
             },
             "oipf_proper_nouns_embedding": knn_vector_field,
             # Added: tags embedding
@@ -474,9 +492,15 @@ def get_new_fields_for_index(index_name: str) -> dict:
 
     elif index_name == "oipf-details":
         return {
-            # Added: proper nouns
+            # Added: proper nouns (text + keyword for partial matching)
             "oipf_proper_nouns": {
-                "type": "keyword"
+                "type": "text",
+                "analyzer": "standard",
+                "fields": {
+                    "keyword": {
+                        "type": "keyword"
+                    }
+                }
             },
             "oipf_proper_nouns_embedding": knn_vector_field,
             # Added: tags embedding

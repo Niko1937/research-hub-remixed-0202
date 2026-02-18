@@ -496,16 +496,16 @@ class OpenSearchClient:
                 knn_clause["knn"][fields["tags_vector"]]["filter"] = filters
             should_clauses.append(knn_clause)
 
-        # Proper nouns text search (keyword exact match)
+        # Proper nouns text search (partial match using text field)
         if weights["proper_nouns_text"] > 0:
             boost = weights["proper_nouns_text"] / total_weight
-            # For keyword fields, use terms query for exact match
-            # Split query into potential proper nouns
-            query_terms = query_text.upper().split()
+            # Use match query for partial matching on text field
             should_clauses.append({
-                "terms": {
-                    fields["proper_nouns_text"]: query_terms,
-                    "boost": boost,
+                "match": {
+                    fields["proper_nouns_text"]: {
+                        "query": query_text,
+                        "boost": boost,
+                    }
                 }
             })
 
