@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import research_chat, research_chat_v1, arxiv_proxy, pdf_proxy
+from app.routers import research_chat, research_chat_v1, arxiv_proxy, pdf_proxy, expert_network_graph
 from app.services.internal_research_search import internal_research_service
 
 settings = get_settings()
@@ -92,6 +92,12 @@ app.include_router(
     pdf_proxy.router,
     prefix="/api/pdf-proxy",
     tags=["pdf-proxy"],
+)
+
+app.include_router(
+    expert_network_graph.router,
+    prefix="/api/expert-network",
+    tags=["expert-network"],
 )
 
 
