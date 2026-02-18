@@ -428,11 +428,11 @@ class FolderEmbeddingsPipeline:
                         self._log(f"  Warning: Invalid tags embedding dimensions for {file_name}")
                         tags_embedding = []
 
-            # Extract proper nouns from path/filename and generate embedding (if enabled)
+            # Extract proper nouns from path/filename and content (if enabled)
             proper_nouns = []
             proper_nouns_embedding = []
             if self.embed_proper_nouns:
-                # Calculate relative path and folder path for extraction
+                # 1. Extract proper nouns from path/filename
                 rel_path = str(Path(file_path).relative_to(base_folder)) if base_folder else file_path
                 folder_path = str(Path(rel_path).parent) if Path(rel_path).parent != Path(".") else ""
 
@@ -442,17 +442,31 @@ class FolderEmbeddingsPipeline:
                     folder_path=folder_path,
                 )
                 if proper_nouns_result.success:
-                    proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
-                    if proper_nouns:
-                        self._log(f"  Extracted proper nouns: {proper_nouns}")
-                        # Generate embedding for proper nouns
-                        proper_nouns_text = ", ".join(proper_nouns)
-                        proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
-                        if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
-                            proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
-                            if len(proper_nouns_embedding) != 1024:
-                                self._log(f"  Warning: Invalid proper nouns embedding dimensions for {file_name}")
-                                proper_nouns_embedding = []
+                    path_proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
+                    if path_proper_nouns:
+                        self._log(f"  Extracted proper nouns (path): {path_proper_nouns}")
+                        proper_nouns.extend(path_proper_nouns)
+
+                # 2. Extract person names with roles from document content
+                persons_result = await self.llm_client.extract_persons_from_content(
+                    text=processed.full_text,
+                    max_persons=10,
+                )
+                if persons_result.success:
+                    person_proper_nouns = self.llm_client.parse_persons_to_proper_nouns(persons_result.content)
+                    if person_proper_nouns:
+                        self._log(f"  Extracted persons: {person_proper_nouns}")
+                        proper_nouns.extend(person_proper_nouns)
+
+                # 3. Generate embedding for all proper nouns
+                if proper_nouns:
+                    proper_nouns_text = ", ".join(proper_nouns)
+                    proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
+                    if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
+                        proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
+                        if len(proper_nouns_embedding) != 1024:
+                            self._log(f"  Warning: Invalid proper nouns embedding dimensions for {file_name}")
+                            proper_nouns_embedding = []
 
             # Ensure at least one embedding is generated
             if not embedding and not tags_embedding and not proper_nouns_embedding:
@@ -619,10 +633,11 @@ class FolderEmbeddingsPipeline:
                         self._log(f"  Warning: Invalid tags embedding dimensions for {file_name}")
                         tags_embedding = []
 
-            # Extract proper nouns from path/filename and generate embedding (if enabled)
+            # Extract proper nouns from path/filename and content (if enabled)
             proper_nouns = []
             proper_nouns_embedding = []
             if self.embed_proper_nouns:
+                # 1. Extract proper nouns from path/filename
                 rel_path = str(Path(file_path).relative_to(base_folder)) if base_folder else file_path
                 folder_path = str(Path(rel_path).parent) if Path(rel_path).parent != Path(".") else ""
 
@@ -632,16 +647,31 @@ class FolderEmbeddingsPipeline:
                     folder_path=folder_path,
                 )
                 if proper_nouns_result.success:
-                    proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
-                    if proper_nouns:
-                        self._log(f"  Extracted proper nouns: {proper_nouns}")
-                        proper_nouns_text = ", ".join(proper_nouns)
-                        proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
-                        if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
-                            proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
-                            if len(proper_nouns_embedding) != 1024:
-                                self._log(f"  Warning: Invalid proper nouns embedding dimensions for {file_name}")
-                                proper_nouns_embedding = []
+                    path_proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
+                    if path_proper_nouns:
+                        self._log(f"  Extracted proper nouns (path): {path_proper_nouns}")
+                        proper_nouns.extend(path_proper_nouns)
+
+                # 2. Extract person names with roles from document content
+                persons_result = await self.llm_client.extract_persons_from_content(
+                    text=processed.full_text,
+                    max_persons=10,
+                )
+                if persons_result.success:
+                    person_proper_nouns = self.llm_client.parse_persons_to_proper_nouns(persons_result.content)
+                    if person_proper_nouns:
+                        self._log(f"  Extracted persons: {person_proper_nouns}")
+                        proper_nouns.extend(person_proper_nouns)
+
+                # 3. Generate embedding for all proper nouns
+                if proper_nouns:
+                    proper_nouns_text = ", ".join(proper_nouns)
+                    proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
+                    if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
+                        proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
+                        if len(proper_nouns_embedding) != 1024:
+                            self._log(f"  Warning: Invalid proper nouns embedding dimensions for {file_name}")
+                            proper_nouns_embedding = []
 
             # Extract author/editor metadata
             authors = loader_result.metadata.authors if loader_result.metadata else []

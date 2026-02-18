@@ -806,6 +806,131 @@ Background, Objective, Method, Result, Discussion, Future Planの各観点を網
 
         return []
 
+    async def extract_persons_from_content(
+        self,
+        text: str,
+        max_persons: int = 10,
+    ) -> LLMResult:
+        """
+        Extract person names with roles from document content.
+
+        ドキュメント内容から役割付きの氏名を抽出する。
+        検索時に「決済者は誰？」などの質問に答えられるようにする。
+
+        Args:
+            text: Document text (first few pages typically)
+            max_persons: Maximum number of persons to extract
+
+        Returns:
+            LLMResult with persons as JSON array string
+            Format: [{"name": "山田太郎", "role": "決済者"}, ...]
+        """
+        system_prompt = f"""あなたはドキュメントから人名と役割を抽出する専門家です。
+
+【重要】JSON配列形式で出力してください。説明文や前置きは一切不要です。
+
+抽出対象の役割:
+- 決済者、承認者、検印者
+- 報告者、作成者、発表者
+- 担当者、主担当、副担当
+- 責任者、リーダー、サブリーダー
+- 部長、課長、主任、主査
+- 起案者、申請者、確認者
+- 研究者、開発者、設計者
+
+【出力形式】
+[{{"name": "山田太郎", "role": "決済者"}}, {{"name": "鈴木一郎", "role": "報告者"}}]
+
+【ルール】
+- 氏名は姓名の形式で抽出（例：山田太郎、佐藤花子）
+- 役割が不明な場合は "role": "関係者" とする
+- 最大{max_persons}人まで抽出
+- 人名が見つからない場合は空配列 [] を返す
+- 組織名や部署名は抽出しない"""
+
+        prompt = f"""以下のドキュメントから、役割付きの人名を抽出してJSON配列で出力してください。
+
+【出力形式】JSON配列のみ（説明不要）
+例: [{{"name": "山田太郎", "role": "決済者"}}, {{"name": "鈴木一郎", "role": "報告者"}}]
+
+【ドキュメント】
+{text[:6000]}"""
+
+        return await self.generate(prompt, system_prompt, max_tokens=500, temperature=0.1)
+
+    def parse_persons_to_proper_nouns(self, json_str: str) -> list[str]:
+        """
+        Parse persons JSON and convert to proper nouns format.
+
+        役割付き氏名を固有名詞形式に変換する。
+        例: [{"name": "山田太郎", "role": "決済者"}] → ["山田太郎(決済者)"]
+
+        Args:
+            json_str: JSON array string from extract_persons_from_content
+
+        Returns:
+            List of proper nouns in "氏名(役割)" format
+        """
+        if not json_str:
+            return []
+
+        # Clean up the response
+        cleaned = json_str.strip()
+
+        # Remove common prefixes
+        prefixes_to_remove = [
+            "以下が抽出した人名です：",
+            "以下が抽出した人名です:",
+            "抽出結果：",
+            "抽出結果:",
+        ]
+        for prefix in prefixes_to_remove:
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+                break
+
+        # Try to parse as JSON
+        try:
+            result = json.loads(cleaned)
+            if isinstance(result, list):
+                proper_nouns = []
+                for item in result:
+                    if isinstance(item, dict):
+                        name = item.get("name", "").strip()
+                        role = item.get("role", "").strip()
+                        if name:
+                            if role and role != "関係者":
+                                proper_nouns.append(f"{name}({role})")
+                            else:
+                                proper_nouns.append(name)
+                return proper_nouns
+        except json.JSONDecodeError:
+            pass
+
+        # Fallback: try to extract from text pattern
+        import re
+        # Look for JSON array pattern
+        match = re.search(r'\[([^\]]*)\]', cleaned, re.DOTALL)
+        if match:
+            try:
+                result = json.loads(f"[{match.group(1)}]")
+                if isinstance(result, list):
+                    proper_nouns = []
+                    for item in result:
+                        if isinstance(item, dict):
+                            name = item.get("name", "").strip()
+                            role = item.get("role", "").strip()
+                            if name:
+                                if role and role != "関係者":
+                                    proper_nouns.append(f"{name}({role})")
+                                else:
+                                    proper_nouns.append(name)
+                    return proper_nouns
+            except json.JSONDecodeError:
+                pass
+
+        return []
+
     def _encode_image_to_base64(self, image_path: Path) -> tuple[str, str]:
         """
         Encode image file to base64 data URL
