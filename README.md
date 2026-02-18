@@ -859,6 +859,9 @@ python folder_structure/generate_structure.py /path/to/folder --depth 2
 # 基本的な使用方法
 python embeddings/process_folder_embeddings.py /path/to/folder
 
+# 並列処理（5並列）- 大量ファイル処理を高速化
+python embeddings/process_folder_embeddings.py /path/to/folder --parallel 5
+
 # ドライラン（実際に投入しない）
 python embeddings/process_folder_embeddings.py /path/to/folder --dry-run
 
@@ -870,11 +873,26 @@ python embeddings/process_folder_embeddings.py /path/to/folder \
     --index oipf-details \
     --depth 4 \
     --ignore "*.tmp" \
+    --parallel 5 \
     --output-json result.json
 
 # 対応ファイル形式を確認
 python embeddings/process_folder_embeddings.py --supported-formats
 ```
+
+**並列処理オプション**:
+| オプション | 短縮形 | 説明 |
+|-----------|--------|------|
+| `--parallel N` | `-p N` | ファイル単位の並列処理数（デフォルト: 1） |
+
+並列処理では、複数ファイルを同時に以下の処理を実行します：
+- LLMによる要約・タグ生成
+- エンベディング生成
+- OpenSearchへの投入
+
+**推奨並列数**:
+- LLM API: 3〜5（レート制限に注意）
+- ローカルOpenSearch: 5〜10
 
 **対応ファイル形式**:
 - **ドキュメント**: PDF, Word (.docx), Excel (.xlsx, .xls), PowerPoint (.pptx), Markdown, HTML, CSV, JSON, テキストファイル
