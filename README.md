@@ -347,7 +347,11 @@ SEARCH_PROPER_NOUNS_VECTOR_WEIGHT=30 # 固有名詞エンベディング検索
 - 製品識別番号（例: 6S9, AP4DI, M3X-500）
 - 素材識別子（例: CFRP, Al6061, SUS304）
 
-**注意**: 固有名詞検索を使用するには、OpenSearchインデックスの再作成とデータの再投入が必要です。詳細は前処理スクリプトのセクションを参照してください。
+**注意**: 固有名詞検索を使用するには、以下の手順が必要です：
+1. マッピング更新: `python opensearch/create_indices.py --action update-mapping --index oipf-details`
+2. データ再投入: `python embeddings/process_folder_embeddings.py /path/to/folder`
+
+詳細は「前処理スクリプト」セクションを参照してください。
 
 #### 検索結果件数設定
 
@@ -710,9 +714,33 @@ python opensearch/create_indices.py --all
 # employeesインデックスのみ作成
 python opensearch/create_indices.py --index employees
 
-# インデックスを再作成（削除→作成）
+# インデックスを再作成（削除→作成）※データは削除される
 python opensearch/create_indices.py --action recreate --index oipf-details
 ```
+
+### OpenSearchマッピング更新（データ保持）
+
+既存データを保持したまま、新規フィールドを追加する場合は`update-mapping`を使用します。
+
+```bash
+# oipf-detailsに新フィールドを追加（データ保持）
+python opensearch/create_indices.py --action update-mapping --index oipf-details
+
+# oipf-summaryに新フィールドを追加（データ保持）
+python opensearch/create_indices.py --action update-mapping --index oipf-summary
+```
+
+**アクション比較**:
+| アクション | データ | 用途 |
+|-----------|--------|------|
+| `create` | - | 新規インデックス作成（既存時はスキップ） |
+| `update-mapping` | ✅ 保持 | 新フィールドのみ追加 |
+| `recreate` | ❌ 削除 | フィールド型変更、全面再構築 |
+| `delete` | ❌ 削除 | インデックス削除 |
+
+**注意**:
+- `update-mapping`は新規フィールドの追加のみ可能（既存フィールドの型変更は不可）
+- 新フィールドにデータを入れるには、対象ファイルの再処理が必要
 
 **利用可能なインデックス**:
 | インデックス名 | 用途 |
