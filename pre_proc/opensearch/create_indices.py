@@ -366,6 +366,146 @@ def delete_index(index_name: str) -> bool:
         return False
 
 
+def update_mapping(index_name: str, new_properties: dict) -> bool:
+    """
+    Update index mapping by adding new fields (existing data is preserved).
+
+    NOTE: This can only ADD new fields. It cannot modify existing field types.
+    For modifying existing fields, use reindex or recreate.
+
+    Args:
+        index_name: Name of the index
+        new_properties: New properties to add to the mapping
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    opensearch_url = get_opensearch_url()
+    auth = get_opensearch_auth()
+    client_kwargs = get_opensearch_client_kwargs()
+
+    url = f"{opensearch_url}/{index_name}/_mapping"
+
+    print(f"\nUpdating mapping for index: {index_name}")
+    print(f"Adding fields: {list(new_properties.keys())}")
+
+    try:
+        with httpx.Client(**client_kwargs, auth=auth, verify=False) as client:
+            # Check if index exists
+            check_response = client.head(f"{opensearch_url}/{index_name}")
+            if check_response.status_code != 200:
+                print(f"Index '{index_name}' does not exist. Use 'create' action first.")
+                return False
+
+            # Update mapping
+            mapping_body = {"properties": new_properties}
+            response = client.put(
+                url,
+                json=mapping_body,
+                headers={"Content-Type": "application/json"}
+            )
+
+            if response.status_code == 200:
+                print(f"Successfully updated mapping for: {index_name}")
+                print(f"Response: {response.json()}")
+                return True
+            else:
+                print(f"Failed to update mapping: {response.status_code}")
+                print(f"Response: {response.text}")
+                return False
+
+    except Exception as e:
+        print(f"Error updating mapping: {e}")
+        return False
+
+
+def get_new_fields_for_index(index_name: str) -> dict:
+    """
+    Get new fields that should be added to an index.
+
+    Returns the fields that were added in recent updates.
+
+    Args:
+        index_name: Name of the index
+
+    Returns:
+        dict: Properties to add
+    """
+    # Common KNN vector field definition
+    knn_vector_field = {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+            "name": "hnsw",
+            "space_type": "cosinesimil",
+            "engine": "faiss"
+        }
+    }
+
+    if index_name == "oipf-summary":
+        return {
+            # Added: file path and name (same as oipf-details)
+            "oipf_file_path": {
+                "type": "text",
+                "fields": {
+                    "keyword": {
+                        "type": "keyword",
+                        "ignore_above": 1024
+                    }
+                }
+            },
+            "oipf_file_name": {
+                "type": "text",
+                "fields": {
+                    "keyword": {
+                        "type": "keyword",
+                        "ignore_above": 256
+                    }
+                }
+            },
+            # Added: proper nouns
+            "oipf_research_proper_nouns": {
+                "type": "keyword"
+            },
+            "oipf_proper_nouns_embedding": knn_vector_field,
+            # Added: tags embedding
+            "oipf_themetags_embedding": knn_vector_field,
+        }
+
+    elif index_name == "oipf-details":
+        return {
+            # Added: proper nouns
+            "oipf_proper_nouns": {
+                "type": "keyword"
+            },
+            "oipf_proper_nouns_embedding": knn_vector_field,
+            # Added: tags embedding
+            "oipf_tags_embedding": knn_vector_field,
+        }
+
+    else:
+        return {}
+
+
+def update_index_mapping(index_name: str) -> bool:
+    """
+    Update an existing index with new fields (data preserved).
+
+    Args:
+        index_name: Name of the index
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    new_fields = get_new_fields_for_index(index_name)
+
+    if not new_fields:
+        print(f"No new fields to add for index: {index_name}")
+        return True
+
+    return update_mapping(index_name, new_fields)
+
+
 def create_employees_index() -> bool:
     """
     Create employees index for organizational data
@@ -499,13 +639,17 @@ def main():
   # インデックスを削除
   python create_indices.py --action delete --index oipf-details
 
-  # インデックスを再作成（削除→作成）
+  # インデックスを再作成（削除→作成）- データは削除される
   python create_indices.py --action recreate --index oipf-details
+
+  # マッピング更新（新規フィールド追加）- データは保持される
+  python create_indices.py --action update-mapping --index oipf-details
+  python create_indices.py --action update-mapping --index oipf-summary
         """
     )
     parser.add_argument(
         "--action",
-        choices=["create", "delete", "recreate"],
+        choices=["create", "delete", "recreate", "update-mapping"],
         default="create",
         help="Action to perform (default: create)"
     )
@@ -542,6 +686,8 @@ def main():
         elif args.action == "recreate":
             delete_index(args.index)
             success = index_creators[args.index]()
+        elif args.action == "update-mapping":
+            success = update_index_mapping(args.index)
         else:  # create
             success = index_creators[args.index]()
 
