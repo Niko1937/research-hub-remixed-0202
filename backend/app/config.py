@@ -71,11 +71,44 @@ class Settings(BaseSettings):
     # External Search Configuration
     arxiv_enabled: bool = True  # Enable/disable arXiv search
 
-    # Hybrid Vector Search Configuration
-    search_mode: str = "hybrid"  # "abstract" | "tags" | "proper_nouns" | "hybrid" | "triple"
-    search_abstract_weight: int = 50  # 0-100, weight for abstract embedding search
-    search_tags_weight: int = 50  # 0-100, weight for tags embedding search
-    search_proper_nouns_weight: int = 0  # 0-100, weight for proper nouns embedding search
+    # ===========================================
+    # Search Weight Configuration
+    # ===========================================
+    # 各検索方法の重み (0-100)
+    # 重みが0の検索方法は無効化される
+    # 重みの合計は任意（相対比率として使用）
+    #
+    # テキスト検索: BM25/キーワードマッチング
+    # ベクトル検索: エンベディングの類似度検索
+    # ===========================================
+
+    # 要約文（abstract）での検索
+    search_abstract_text_weight: int = int(os.getenv("SEARCH_ABSTRACT_TEXT_WEIGHT", "0"))
+    search_abstract_vector_weight: int = int(os.getenv("SEARCH_ABSTRACT_VECTOR_WEIGHT", "40"))
+
+    # タグ（tags）での検索
+    search_tags_text_weight: int = int(os.getenv("SEARCH_TAGS_TEXT_WEIGHT", "0"))
+    search_tags_vector_weight: int = int(os.getenv("SEARCH_TAGS_VECTOR_WEIGHT", "30"))
+
+    # 固有名詞（proper_nouns）での検索
+    search_proper_nouns_text_weight: int = int(os.getenv("SEARCH_PROPER_NOUNS_TEXT_WEIGHT", "0"))
+    search_proper_nouns_vector_weight: int = int(os.getenv("SEARCH_PROPER_NOUNS_VECTOR_WEIGHT", "30"))
+
+    def get_search_weights(self) -> dict:
+        """Get all search weights as a dictionary"""
+        return {
+            "abstract_text": self.search_abstract_text_weight,
+            "abstract_vector": self.search_abstract_vector_weight,
+            "tags_text": self.search_tags_text_weight,
+            "tags_vector": self.search_tags_vector_weight,
+            "proper_nouns_text": self.search_proper_nouns_text_weight,
+            "proper_nouns_vector": self.search_proper_nouns_vector_weight,
+        }
+
+    def get_active_search_methods(self) -> list[str]:
+        """Get list of active search methods (weight > 0)"""
+        weights = self.get_search_weights()
+        return [k for k, v in weights.items() if v > 0]
 
     model_config = {
         "env_prefix": "",

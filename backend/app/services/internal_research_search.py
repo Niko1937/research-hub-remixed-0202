@@ -207,67 +207,38 @@ class InternalResearchSearchService:
 
         print(f"[InternalResearchSearch] search_initial: Searching for '{query[:50]}...'")
 
-        # Get search configuration
-        search_mode = self.settings.search_mode
-        abstract_weight = self.settings.search_abstract_weight / 100.0
-        tags_weight = self.settings.search_tags_weight / 100.0
-        proper_nouns_weight = self.settings.search_proper_nouns_weight / 100.0
-        print(f"  - search_mode: {search_mode}")
-        print(f"  - weights: abstract={abstract_weight}, tags={tags_weight}, proper_nouns={proper_nouns_weight}")
+        # Get search weights from settings
+        weights = self.settings.get_search_weights()
+        active_methods = self.settings.get_active_search_methods()
+        print(f"  - search_weights: {weights}")
+        print(f"  - active_methods: {active_methods}")
 
         try:
-            # 1. Embed the query
-            query_embedding = await embedding_client.embed_text(query)
+            # 1. Embed the query (only if vector search is needed)
+            query_embedding = None
+            vector_methods = ["abstract_vector", "tags_vector", "proper_nouns_vector"]
+            if any(m in active_methods for m in vector_methods):
+                query_embedding = await embedding_client.embed_text(query)
 
-            # 2. Perform vector search based on mode
-            if search_mode == "abstract":
-                # Abstract embeddings only (traditional behavior)
-                response = await opensearch_client.vector_search(
-                    index="oipf-summary",
-                    vector_field="oipf_research_abstract_embedding",
-                    query_vector=query_embedding,
-                    k=limit,
-                )
-            elif search_mode == "tags":
-                # Tags embeddings only
-                response = await opensearch_client.vector_search(
-                    index="oipf-summary",
-                    vector_field="oipf_themetags_embedding",
-                    query_vector=query_embedding,
-                    k=limit,
-                )
-            elif search_mode == "proper_nouns":
-                # Proper nouns embeddings only
-                response = await opensearch_client.vector_search(
-                    index="oipf-summary",
-                    vector_field="oipf_proper_nouns_embedding",
-                    query_vector=query_embedding,
-                    k=limit,
-                )
-            elif search_mode == "triple":
-                # Triple hybrid search (abstract + tags + proper_nouns)
-                response = await opensearch_client.triple_hybrid_vector_search(
-                    index="oipf-summary",
-                    query_vector=query_embedding,
-                    abstract_field="oipf_research_abstract_embedding",
-                    tags_field="oipf_themetags_embedding",
-                    proper_nouns_field="oipf_proper_nouns_embedding",
-                    abstract_weight=abstract_weight,
-                    tags_weight=tags_weight,
-                    proper_nouns_weight=proper_nouns_weight,
-                    k=limit,
-                )
-            else:
-                # Hybrid search (abstract + tags, default)
-                response = await opensearch_client.hybrid_vector_search(
-                    index="oipf-summary",
-                    query_vector=query_embedding,
-                    abstract_field="oipf_research_abstract_embedding",
-                    tags_field="oipf_themetags_embedding",
-                    abstract_weight=abstract_weight,
-                    tags_weight=tags_weight,
-                    k=limit,
-                )
+            # 2. Field mapping for oipf-summary index
+            summary_fields = {
+                "abstract_text": "oipf_research_abstract",
+                "abstract_vector": "oipf_research_abstract_embedding",
+                "tags_text": "oipf_research_themetags",
+                "tags_vector": "oipf_themetags_embedding",
+                "proper_nouns_text": "oipf_research_proper_nouns",
+                "proper_nouns_vector": "oipf_proper_nouns_embedding",
+            }
+
+            # 3. Perform unified search
+            response = await opensearch_client.unified_search(
+                index="oipf-summary",
+                query_text=query,
+                query_vector=query_embedding,
+                weights=weights,
+                field_mapping=summary_fields,
+                k=limit,
+            )
 
             # 3. Parse results
             results = []
@@ -337,80 +308,47 @@ class InternalResearchSearchService:
 
         print(f"[InternalResearchSearch] search_followup: Searching for '{query[:50]}...'")
 
-        # Get search configuration
-        search_mode = self.settings.search_mode
-        abstract_weight = self.settings.search_abstract_weight / 100.0
-        tags_weight = self.settings.search_tags_weight / 100.0
-        proper_nouns_weight = self.settings.search_proper_nouns_weight / 100.0
-        print(f"  - search_mode: {search_mode}")
-        print(f"  - weights: abstract={abstract_weight}, tags={tags_weight}, proper_nouns={proper_nouns_weight}")
+        # Get search weights from settings
+        weights = self.settings.get_search_weights()
+        active_methods = self.settings.get_active_search_methods()
+        print(f"  - search_weights: {weights}")
+        print(f"  - active_methods: {active_methods}")
 
         try:
-            # 1. Embed the query (same as search_initial)
-            query_embedding = await embedding_client.embed_text(query)
+            # 1. Embed the query (only if vector search is needed)
+            query_embedding = None
+            vector_methods = ["abstract_vector", "tags_vector", "proper_nouns_vector"]
+            if any(m in active_methods for m in vector_methods):
+                query_embedding = await embedding_client.embed_text(query)
 
             # 2. Build filter if research_id is provided
             filters = None
             if research_id_filter:
                 filters = {"term": {"oipf_research_id": research_id_filter}}
 
-            # 3. Perform vector search on oipf-details based on mode
+            # 3. Perform unified search on oipf-details
             # Fetch more results for deduplication (3x limit)
             fetch_size = limit * 3
 
-            if search_mode == "abstract":
-                # Abstract embeddings only (traditional behavior)
-                response = await opensearch_client.vector_search(
-                    index="oipf-details",
-                    vector_field="oipf_abstract_embedding",
-                    query_vector=query_embedding,
-                    k=fetch_size,
-                    filters=filters,
-                )
-            elif search_mode == "tags":
-                # Tags embeddings only
-                response = await opensearch_client.vector_search(
-                    index="oipf-details",
-                    vector_field="oipf_tags_embedding",
-                    query_vector=query_embedding,
-                    k=fetch_size,
-                    filters=filters,
-                )
-            elif search_mode == "proper_nouns":
-                # Proper nouns embeddings only
-                response = await opensearch_client.vector_search(
-                    index="oipf-details",
-                    vector_field="oipf_proper_nouns_embedding",
-                    query_vector=query_embedding,
-                    k=fetch_size,
-                    filters=filters,
-                )
-            elif search_mode == "triple":
-                # Triple hybrid search (abstract + tags + proper_nouns)
-                response = await opensearch_client.triple_hybrid_vector_search(
-                    index="oipf-details",
-                    query_vector=query_embedding,
-                    abstract_field="oipf_abstract_embedding",
-                    tags_field="oipf_tags_embedding",
-                    proper_nouns_field="oipf_proper_nouns_embedding",
-                    abstract_weight=abstract_weight,
-                    tags_weight=tags_weight,
-                    proper_nouns_weight=proper_nouns_weight,
-                    k=fetch_size,
-                    filters=filters,
-                )
-            else:
-                # Hybrid search (default)
-                response = await opensearch_client.hybrid_vector_search(
-                    index="oipf-details",
-                    query_vector=query_embedding,
-                    abstract_field="oipf_abstract_embedding",
-                    tags_field="oipf_tags_embedding",
-                    abstract_weight=abstract_weight,
-                    tags_weight=tags_weight,
-                    k=fetch_size,
-                    filters=filters,
-                )
+            # Field mapping for oipf-details index
+            details_fields = {
+                "abstract_text": "oipf_abstract",
+                "abstract_vector": "oipf_abstract_embedding",
+                "tags_text": "oipf_tags",
+                "tags_vector": "oipf_tags_embedding",
+                "proper_nouns_text": "oipf_proper_nouns",
+                "proper_nouns_vector": "oipf_proper_nouns_embedding",
+            }
+
+            response = await opensearch_client.unified_search(
+                index="oipf-details",
+                query_text=query,
+                query_vector=query_embedding,
+                weights=weights,
+                field_mapping=details_fields,
+                k=fetch_size,
+                filters=filters,
+            )
 
             # 4. Parse results
             results = []
@@ -668,11 +606,10 @@ JSON形式で出力（説明不要）:"""
         if research_id_filter:
             print(f"  - research_id_filter: {research_id_filter}")
 
-        # Get search configuration
-        search_mode = self.settings.search_mode
-        abstract_weight = self.settings.search_abstract_weight / 100.0
-        tags_weight = self.settings.search_tags_weight / 100.0
-        proper_nouns_weight = self.settings.search_proper_nouns_weight / 100.0
+        # Get search weights from settings
+        weights = self.settings.get_search_weights()
+        active_methods = self.settings.get_active_search_methods()
+        print(f"  - search_weights: {weights}")
 
         try:
             # Build search query combining user query and paper keywords
@@ -682,71 +619,40 @@ JSON形式で出力（説明不要）:"""
 
             combined_query = " ".join(search_terms)
 
-            # 1. Embed the query
-            query_embedding = await embedding_client.embed_text(combined_query)
+            # 1. Embed the query (only if vector search is needed)
+            query_embedding = None
+            vector_methods = ["abstract_vector", "tags_vector", "proper_nouns_vector"]
+            if any(m in active_methods for m in vector_methods):
+                query_embedding = await embedding_client.embed_text(combined_query)
 
             # 2. Build filter if research_id is provided
             filters = None
             if research_id_filter:
                 filters = {"term": {"oipf_research_id": research_id_filter}}
 
-            # 3. Perform vector search on oipf-details based on mode
+            # 3. Perform unified search on oipf-details
             # Fetch more results for deduplication (3x limit)
             fetch_size = limit * 3
 
-            if search_mode == "abstract":
-                # Abstract embeddings only (traditional behavior)
-                response = await opensearch_client.vector_search(
-                    index="oipf-details",
-                    vector_field="oipf_abstract_embedding",
-                    query_vector=query_embedding,
-                    k=fetch_size,
-                    filters=filters,
-                )
-            elif search_mode == "tags":
-                # Tags embeddings only
-                response = await opensearch_client.vector_search(
-                    index="oipf-details",
-                    vector_field="oipf_tags_embedding",
-                    query_vector=query_embedding,
-                    k=fetch_size,
-                    filters=filters,
-                )
-            elif search_mode == "proper_nouns":
-                # Proper nouns embeddings only
-                response = await opensearch_client.vector_search(
-                    index="oipf-details",
-                    vector_field="oipf_proper_nouns_embedding",
-                    query_vector=query_embedding,
-                    k=fetch_size,
-                    filters=filters,
-                )
-            elif search_mode == "triple":
-                # Triple hybrid search (abstract + tags + proper_nouns)
-                response = await opensearch_client.triple_hybrid_vector_search(
-                    index="oipf-details",
-                    query_vector=query_embedding,
-                    abstract_field="oipf_abstract_embedding",
-                    tags_field="oipf_tags_embedding",
-                    proper_nouns_field="oipf_proper_nouns_embedding",
-                    abstract_weight=abstract_weight,
-                    tags_weight=tags_weight,
-                    proper_nouns_weight=proper_nouns_weight,
-                    k=fetch_size,
-                    filters=filters,
-                )
-            else:
-                # Hybrid search (default)
-                response = await opensearch_client.hybrid_vector_search(
-                    index="oipf-details",
-                    query_vector=query_embedding,
-                    abstract_field="oipf_abstract_embedding",
-                    tags_field="oipf_tags_embedding",
-                    abstract_weight=abstract_weight,
-                    tags_weight=tags_weight,
-                    k=fetch_size,
-                    filters=filters,
-                )
+            # Field mapping for oipf-details index
+            details_fields = {
+                "abstract_text": "oipf_abstract",
+                "abstract_vector": "oipf_abstract_embedding",
+                "tags_text": "oipf_tags",
+                "tags_vector": "oipf_tags_embedding",
+                "proper_nouns_text": "oipf_proper_nouns",
+                "proper_nouns_vector": "oipf_proper_nouns_embedding",
+            }
+
+            response = await opensearch_client.unified_search(
+                index="oipf-details",
+                query_text=combined_query,
+                query_vector=query_embedding,
+                weights=weights,
+                field_mapping=details_fields,
+                k=fetch_size,
+                filters=filters,
+            )
 
             # 4. Parse results
             results = []

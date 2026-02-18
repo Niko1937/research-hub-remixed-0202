@@ -84,14 +84,21 @@ OPENSEARCH_PASSWORD=your-password
 # ARXIV_ENABLED=true  # arXiv検索の有効/無効（false: 無効化、デフォルト: true）
 
 # ===========================================
-# ハイブリッドベクトル検索設定
+# 検索重み設定（6つの検索方法を個別に重み付け）
 # ===========================================
-# 検索モード: abstract(要約のみ) | tags(タグのみ) | proper_nouns(固有名詞のみ) | hybrid(要約+タグ) | triple(全部)
-# SEARCH_MODE=hybrid
-# ハイブリッド検索時の重み（0-100、合計100推奨）
-# SEARCH_ABSTRACT_WEIGHT=50       # 要約エンベディング検索の重み
-# SEARCH_TAGS_WEIGHT=50           # タグエンベディング検索の重み
-# SEARCH_PROPER_NOUNS_WEIGHT=0    # 固有名詞エンベディング検索の重み（triple モード時に使用）
+# 各検索方法の重み (0-100)
+# 重みが0の検索方法は無効化される
+# 重みの合計は任意（相対比率として使用）
+#
+# --- テキスト検索（BM25/キーワードマッチング）---
+# SEARCH_ABSTRACT_TEXT_WEIGHT=0        # 要約文テキスト検索
+# SEARCH_TAGS_TEXT_WEIGHT=0            # タグテキスト検索
+# SEARCH_PROPER_NOUNS_TEXT_WEIGHT=0    # 固有名詞テキスト検索（完全一致）
+#
+# --- ベクトル検索（エンベディング類似度）---
+# SEARCH_ABSTRACT_VECTOR_WEIGHT=40     # 要約エンベディング検索
+# SEARCH_TAGS_VECTOR_WEIGHT=30         # タグエンベディング検索
+# SEARCH_PROPER_NOUNS_VECTOR_WEIGHT=30 # 固有名詞エンベディング検索
 
 # ===========================================
 # エンベディングAPI設定（社内研究検索に必須）
@@ -273,32 +280,46 @@ Internal Research Search:
   Status: ENABLED (OpenSearch)  ← または DISABLED (Mock Data)
 ```
 
-#### ハイブリッドベクトル検索設定
+#### 検索重み設定（6つの検索方法）
 
-社内研究検索のベクトル検索方式を設定できます。要約ベクトル、タグベクトル、固有名詞ベクトルを組み合わせたハイブリッド検索により、同義語（「アルミ」→「アルミニウム」など）や固有名詞（研究ID、製品識別番号、素材識別子）も意味的に捉えた高精度な検索が可能です。
+社内研究検索では、6つの検索方法を個別に重み付けして組み合わせることができます。
+
+| 検索方法 | 環境変数 | 説明 |
+|----------|----------|------|
+| 要約テキスト検索 | `SEARCH_ABSTRACT_TEXT_WEIGHT` | BM25による要約文のテキストマッチ |
+| 要約ベクトル検索 | `SEARCH_ABSTRACT_VECTOR_WEIGHT` | 要約エンベディングの類似度検索 |
+| タグテキスト検索 | `SEARCH_TAGS_TEXT_WEIGHT` | タグのキーワードマッチ |
+| タグベクトル検索 | `SEARCH_TAGS_VECTOR_WEIGHT` | タグエンベディングの類似度検索 |
+| 固有名詞テキスト検索 | `SEARCH_PROPER_NOUNS_TEXT_WEIGHT` | 固有名詞の完全一致検索 |
+| 固有名詞ベクトル検索 | `SEARCH_PROPER_NOUNS_VECTOR_WEIGHT` | 固有名詞エンベディングの類似度検索 |
 
 ```env
-# 検索モード
-SEARCH_MODE=hybrid  # abstract | tags | proper_nouns | hybrid | triple（デフォルト: hybrid）
+# ===========================================
+# 検索重み設定例
+# ===========================================
+# 重みが0の検索方法は無効化される
+# 重みの合計は任意（相対比率として使用）
 
-# ハイブリッド検索時の重み（0-100、合計100推奨）
-SEARCH_ABSTRACT_WEIGHT=50       # 要約エンベディング検索の重み
-SEARCH_TAGS_WEIGHT=50           # タグエンベディング検索の重み
-SEARCH_PROPER_NOUNS_WEIGHT=0    # 固有名詞エンベディング検索の重み（tripleモード時）
+# --- テキスト検索（BM25/キーワードマッチング）---
+SEARCH_ABSTRACT_TEXT_WEIGHT=0        # 要約文テキスト検索
+SEARCH_TAGS_TEXT_WEIGHT=0            # タグテキスト検索
+SEARCH_PROPER_NOUNS_TEXT_WEIGHT=0    # 固有名詞テキスト検索（完全一致）
+
+# --- ベクトル検索（エンベディング類似度）---
+SEARCH_ABSTRACT_VECTOR_WEIGHT=40     # 要約エンベディング検索
+SEARCH_TAGS_VECTOR_WEIGHT=30         # タグエンベディング検索
+SEARCH_PROPER_NOUNS_VECTOR_WEIGHT=30 # 固有名詞エンベディング検索
 ```
 
-| 設定値 | 説明 |
-|--------|------|
-| `abstract` | 要約エンベディングのみで検索（従来動作） |
-| `tags` | タグエンベディングのみで検索 |
-| `proper_nouns` | 固有名詞エンベディングのみで検索 |
-| `hybrid` | 要約+タグで検索し、重み付けでスコア統合（デフォルト） |
-| `triple` | 要約+タグ+固有名詞で検索し、3つの重み付けでスコア統合 |
+**設定例**:
 
-**重み設定例**:
-- `SEARCH_ABSTRACT_WEIGHT=50, SEARCH_TAGS_WEIGHT=50`: バランス型（デフォルト、hybridモード）
-- `SEARCH_ABSTRACT_WEIGHT=40, SEARCH_TAGS_WEIGHT=30, SEARCH_PROPER_NOUNS_WEIGHT=30`: 3ベクトル統合（tripleモード）
-- `SEARCH_ABSTRACT_WEIGHT=70, SEARCH_TAGS_WEIGHT=30`: 要約重視
+| ユースケース | 設定 |
+|-------------|------|
+| ベクトル検索のみ（デフォルト） | `ABSTRACT_VECTOR=40, TAGS_VECTOR=30, PROPER_NOUNS_VECTOR=30` |
+| 要約ベクトルのみ（従来動作） | `ABSTRACT_VECTOR=100`（他は0） |
+| テキスト検索のみ | `ABSTRACT_TEXT=50, TAGS_TEXT=30, PROPER_NOUNS_TEXT=20`（ベクトルは全て0） |
+| ハイブリッド（テキスト+ベクトル） | 全て適切な値を設定 |
+| 固有名詞優先 | `PROPER_NOUNS_TEXT=30, PROPER_NOUNS_VECTOR=40`（他は低め） |
 
 **固有名詞について**:
 固有名詞はファイルパスとファイル名からLLMで自動抽出されます:
@@ -306,7 +327,7 @@ SEARCH_PROPER_NOUNS_WEIGHT=0    # 固有名詞エンベディング検索の重�
 - 製品識別番号（例: 6S9, AP4DI, M3X-500）
 - 素材識別子（例: CFRP, Al6061, SUS304）
 
-**注意**: ハイブリッド検索やトリプル検索を使用するには、OpenSearchインデックスの再作成とデータの再投入が必要です。詳細は前処理スクリプトのセクションを参照してください。
+**注意**: 固有名詞検索を使用するには、OpenSearchインデックスの再作成とデータの再投入が必要です。詳細は前処理スクリプトのセクションを参照してください。
 
 #### OpenSearch設定
 
@@ -404,10 +425,12 @@ EMBEDDING_FILE_TYPES=all
 | `proper_nouns` | 固有名詞のみエンベディング |
 
 **注意**:
-- `EMBEDDING_TARGETS`は`SEARCH_MODE`と組み合わせて使用します
-- `SEARCH_MODE=hybrid`を使用する場合は`EMBEDDING_TARGETS=both`が必要です
-- `SEARCH_MODE=triple`を使用する場合は`EMBEDDING_TARGETS=all`が必要です
-- 片方のみエンベディングする場合、検索モードも合わせてください（例: `EMBEDDING_TARGETS=tags`と`SEARCH_MODE=tags`）
+- `EMBEDDING_TARGETS`は検索重み設定と組み合わせて使用します
+- ベクトル検索（`SEARCH_*_VECTOR_WEIGHT`）を使用する場合、対応するエンベディングが必要です
+  - 要約ベクトル検索 → `EMBEDDING_TARGETS`に`abstract`を含む設定
+  - タグベクトル検索 → `EMBEDDING_TARGETS`に`tags`を含む設定
+  - 固有名詞ベクトル検索 → `EMBEDDING_TARGETS`に`proper_nouns`または`all`を含む設定
+- テキスト検索（`SEARCH_*_TEXT_WEIGHT`）はエンベディング不要で動作します
 
 **METADATA_ONLY について**:
 - `true` を設定すると、既存のエンベディングを再利用し、メタデータ（要約、タグ等）のみをLLMで再生成

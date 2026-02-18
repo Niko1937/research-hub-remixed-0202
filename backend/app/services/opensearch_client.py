@@ -351,6 +351,213 @@ class OpenSearchClient:
         response.raise_for_status()
         return response.json()
 
+    async def unified_search(
+        self,
+        index: str,
+        query_text: str,
+        query_vector: Optional[list[float]] = None,
+        weights: Optional[dict] = None,
+        field_mapping: Optional[dict] = None,
+        k: int = 10,
+        filters: Optional[dict] = None,
+    ) -> dict:
+        """
+        Execute unified search combining text and vector searches.
+
+        Combines 6 search methods with configurable weights:
+        - abstract_text: BM25 text search on abstract field
+        - abstract_vector: KNN vector search on abstract embedding
+        - tags_text: Keyword match on tags field
+        - tags_vector: KNN vector search on tags embedding
+        - proper_nouns_text: Keyword match on proper_nouns field
+        - proper_nouns_vector: KNN vector search on proper_nouns embedding
+
+        Args:
+            index: Index name (e.g., "oipf-details")
+            query_text: Query text for text searches
+            query_vector: Query embedding vector for vector searches (required if any vector weight > 0)
+            weights: Dict with weights for each search method (default: all 0 except abstract_vector=100)
+                {
+                    "abstract_text": 0,
+                    "abstract_vector": 40,
+                    "tags_text": 0,
+                    "tags_vector": 30,
+                    "proper_nouns_text": 0,
+                    "proper_nouns_vector": 30,
+                }
+            field_mapping: Dict mapping search methods to field names (uses defaults if not provided)
+                {
+                    "abstract_text": "oipf_abstract",
+                    "abstract_vector": "oipf_abstract_embedding",
+                    "tags_text": "oipf_tags",
+                    "tags_vector": "oipf_tags_embedding",
+                    "proper_nouns_text": "oipf_proper_nouns",
+                    "proper_nouns_vector": "oipf_proper_nouns_embedding",
+                }
+            k: Number of results to return
+            filters: Optional filter query
+
+        Returns:
+            OpenSearch response as dict
+        """
+        if not self.is_configured:
+            raise RuntimeError("OpenSearch is not configured")
+
+        # Default weights
+        default_weights = {
+            "abstract_text": 0,
+            "abstract_vector": 100,
+            "tags_text": 0,
+            "tags_vector": 0,
+            "proper_nouns_text": 0,
+            "proper_nouns_vector": 0,
+        }
+        weights = {**default_weights, **(weights or {})}
+
+        # Default field mapping for oipf-details
+        default_fields = {
+            "abstract_text": "oipf_abstract",
+            "abstract_vector": "oipf_abstract_embedding",
+            "tags_text": "oipf_tags",
+            "tags_vector": "oipf_tags_embedding",
+            "proper_nouns_text": "oipf_proper_nouns",
+            "proper_nouns_vector": "oipf_proper_nouns_embedding",
+        }
+        fields = {**default_fields, **(field_mapping or {})}
+
+        # Check if vector search is needed but no vector provided
+        vector_methods = ["abstract_vector", "tags_vector", "proper_nouns_vector"]
+        needs_vector = any(weights.get(m, 0) > 0 for m in vector_methods)
+        if needs_vector and not query_vector:
+            raise ValueError("query_vector is required when any vector search weight > 0")
+
+        # Calculate total weight for normalization
+        total_weight = sum(w for w in weights.values() if w > 0)
+        if total_weight == 0:
+            raise ValueError("At least one search weight must be greater than 0")
+
+        # Build should clauses
+        should_clauses = []
+
+        # Abstract text search (BM25)
+        if weights["abstract_text"] > 0:
+            boost = weights["abstract_text"] / total_weight
+            should_clauses.append({
+                "match": {
+                    fields["abstract_text"]: {
+                        "query": query_text,
+                        "boost": boost,
+                    }
+                }
+            })
+
+        # Abstract vector search (KNN)
+        if weights["abstract_vector"] > 0 and query_vector:
+            boost = weights["abstract_vector"] / total_weight
+            knn_clause = {
+                "knn": {
+                    fields["abstract_vector"]: {
+                        "vector": query_vector,
+                        "k": k,
+                        "boost": boost,
+                    }
+                }
+            }
+            if filters:
+                knn_clause["knn"][fields["abstract_vector"]]["filter"] = filters
+            should_clauses.append(knn_clause)
+
+        # Tags text search (keyword match)
+        if weights["tags_text"] > 0:
+            boost = weights["tags_text"] / total_weight
+            # Use multi_match for tags as they can be multiple values
+            should_clauses.append({
+                "match": {
+                    fields["tags_text"]: {
+                        "query": query_text,
+                        "boost": boost,
+                    }
+                }
+            })
+
+        # Tags vector search (KNN)
+        if weights["tags_vector"] > 0 and query_vector:
+            boost = weights["tags_vector"] / total_weight
+            knn_clause = {
+                "knn": {
+                    fields["tags_vector"]: {
+                        "vector": query_vector,
+                        "k": k,
+                        "boost": boost,
+                    }
+                }
+            }
+            if filters:
+                knn_clause["knn"][fields["tags_vector"]]["filter"] = filters
+            should_clauses.append(knn_clause)
+
+        # Proper nouns text search (keyword exact match)
+        if weights["proper_nouns_text"] > 0:
+            boost = weights["proper_nouns_text"] / total_weight
+            # For keyword fields, use terms query for exact match
+            # Split query into potential proper nouns
+            query_terms = query_text.upper().split()
+            should_clauses.append({
+                "terms": {
+                    fields["proper_nouns_text"]: query_terms,
+                    "boost": boost,
+                }
+            })
+
+        # Proper nouns vector search (KNN)
+        if weights["proper_nouns_vector"] > 0 and query_vector:
+            boost = weights["proper_nouns_vector"] / total_weight
+            knn_clause = {
+                "knn": {
+                    fields["proper_nouns_vector"]: {
+                        "vector": query_vector,
+                        "k": k,
+                        "boost": boost,
+                    }
+                }
+            }
+            if filters:
+                knn_clause["knn"][fields["proper_nouns_vector"]]["filter"] = filters
+            should_clauses.append(knn_clause)
+
+        # Build final query
+        if len(should_clauses) == 1:
+            query = should_clauses[0]
+        else:
+            query = {
+                "bool": {
+                    "should": should_clauses,
+                }
+            }
+
+        # Add filters to bool query if not already applied to KNN
+        text_methods = ["abstract_text", "tags_text", "proper_nouns_text"]
+        has_text_search = any(weights.get(m, 0) > 0 for m in text_methods)
+        if filters and has_text_search and len(should_clauses) > 1:
+            if "bool" in query:
+                query["bool"]["filter"] = [filters]
+
+        body = {
+            "size": k,
+            "query": query,
+        }
+
+        client = await self._get_client()
+        url = f"{self.settings.opensearch_url.rstrip('/')}/{index}/_search"
+
+        response = await client.post(
+            url,
+            json=body,
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+        return response.json()
+
     async def get_document(
         self,
         index: str,
