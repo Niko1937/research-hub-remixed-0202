@@ -1321,8 +1321,13 @@ class FolderEmbeddingsPipeline:
         # Load documents from folder (include unsupported files)
         self._log("Loading documents from folder...")
 
+        # Progress indicator during document loading
+        load_progress_interval = 100  # Show progress every N files
         def on_load_progress(file_path: str, current: int, total: int):
-            pass  # Progress handled by tqdm
+            if current == 1 or current % load_progress_interval == 0 or current == total:
+                print(f"\r  Loading files: {current}/{total} ({current*100//total}%)", end="", flush=True)
+            if current == total:
+                print()  # New line after completion
 
         successful_loads, failed_loads = load_documents_from_folder(
             folder_path=Path(folder_path),
@@ -1330,6 +1335,7 @@ class FolderEmbeddingsPipeline:
             max_depth=self.max_depth,
             max_file_size_mb=self.max_file_size_mb,
             ignore_patterns=ignore_patterns,
+            on_progress=on_load_progress,
             include_unsupported=True,  # Include unsupported files for path-only indexing
         )
 

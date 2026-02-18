@@ -7,12 +7,20 @@ LangChainのドキュメントローダーを統合し、
 
 import os
 import sys
+import logging
+import warnings
 from pathlib import Path
 from typing import Optional, Callable
 from dataclasses import dataclass
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Suppress noisy warnings from PDF parsing libraries
+# "No features in text." and "Advanced encoding /90ms-RKSJ-H not implemented yet"
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", message=".*Advanced encoding.*not implemented.*")
+warnings.filterwarnings("ignore", message=".*No features in text.*")
 
 import chardet
 
