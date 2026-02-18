@@ -10,7 +10,7 @@ OpenSearchを使った社内研究検索サービス
 import json
 import re
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 from pathlib import PurePosixPath
 
 from app.config import get_settings
@@ -225,6 +225,51 @@ class InternalResearchSearchService:
             return False
         ext = PurePosixPath(file_path).suffix.lower()
         return ext in self.IMAGE_EXTENSIONS
+
+    # Table/data file extensions for filtering
+    TABLE_EXTENSIONS = {".xlsx", ".xls", ".csv", ".tsv", ".ods", ".xlsm", ".xlsb"}
+
+    def is_table_data_query(self, query: str) -> bool:
+        """
+        Detect if the query is asking for table/data files (Excel, CSV, etc.).
+
+        Examples:
+        - "データセットを確認したいです"
+        - "実験データを表示してください"
+        - "表データで教えてください"
+        - "Excelファイルを探して"
+
+        Args:
+            query: User's query text
+
+        Returns:
+            True if query is asking for table/data files
+        """
+        table_patterns = [
+            r'データセット.*(?:確認|検索|探|見せ|提示|表示|出|教え)',
+            r'(?:実験|測定|試験).*データ.*(?:確認|検索|探|見せ|提示|表示|出|教え)',
+            r'表.*データ.*(?:確認|検索|探|見せ|提示|表示|出|教え)',
+            r'(?:確認|検索|探|見せ|提示|表示|出).*(?:データセット|表データ)',
+            r'(?:Excel|エクセル|CSV|csv).*(?:確認|検索|探|見せ|提示|表示|出|教え|ファイル)',
+            r'(?:確認|検索|探|見せ|提示|表示|出).*(?:Excel|エクセル|CSV|csv)',
+            r'(?:スプレッドシート|表形式).*(?:確認|検索|探|見せ|提示|表示|出|教え)',
+            r'(?:数値|数表|一覧表).*(?:データ|確認|検索|探|見せ|提示|表示)',
+            r'(?:生データ|元データ|ローデータ).*(?:確認|検索|探|見せ|提示|表示|出|教え)',
+        ]
+
+        for pattern in table_patterns:
+            if re.search(pattern, query, re.IGNORECASE):
+                print(f"[InternalResearchSearch] Table data query detected: {pattern}")
+                return True
+
+        return False
+
+    def _is_table_file(self, file_path: str) -> bool:
+        """Check if file path is a table/data file based on extension"""
+        if not file_path:
+            return False
+        ext = PurePosixPath(file_path).suffix.lower()
+        return ext in self.TABLE_EXTENSIONS
 
     def get_cache_status(self) -> dict:
         """Get status of the research_id cache"""
@@ -455,10 +500,21 @@ class InternalResearchSearchService:
             deduplicated_results = self._deduplicate_results(results, limit)
             print(f"[InternalResearchSearch] Deduplication: {len(results)} → {len(deduplicated_results)} results")
 
-            # 6. Balance image/non-image results if image query
+            # 6. Balance results based on query type
+            # Check for image query
             if self.is_image_search_query(query):
-                balanced_results = self._balance_image_results(deduplicated_results, limit)
+                balanced_results = self._balance_results_by_file_type(
+                    deduplicated_results, limit, self._is_image_file, "image"
+                )
                 print(f"[InternalResearchSearch] Image query: balanced to {len(balanced_results)} results")
+                return balanced_results
+
+            # Check for table/data query
+            if self.is_table_data_query(query):
+                balanced_results = self._balance_results_by_file_type(
+                    deduplicated_results, limit, self._is_table_file, "table"
+                )
+                print(f"[InternalResearchSearch] Table data query: balanced to {len(balanced_results)} results")
                 return balanced_results
 
             return deduplicated_results
@@ -605,81 +661,85 @@ JSON形式で出力（説明不要）:"""
             print(f"[InternalResearchSearch] Query generation failed: {e}")
             return None
 
-    def _balance_image_results(
+    def _balance_results_by_file_type(
         self,
         results: list[InternalResearchResult],
         limit: int,
+        file_type_checker: Callable[[str], bool],
+        file_type_name: str = "target",
     ) -> list[InternalResearchResult]:
         """
-        Balance results to include half images when image query is detected.
+        Balance results to include half of a specific file type.
 
-        For image-related queries, ensures that approximately half of the
-        returned results are image files (jpg, png, etc.).
+        Generic method to ensure approximately half of the returned results
+        are of a specific file type (images, tables, etc.).
 
         Args:
             results: Original search results
             limit: Target number of results
+            file_type_checker: Function that takes file_path and returns True if file matches type
+            file_type_name: Name of file type for logging (e.g., "image", "table")
 
         Returns:
-            Balanced list with ~50% image files (if available)
+            Balanced list with ~50% target file type (if available)
         """
         if not results:
             return results
 
-        # Separate image and non-image results
-        image_results = []
-        non_image_results = []
+        # Separate target type and other results
+        target_results = []
+        other_results = []
 
         for r in results:
-            if self._is_image_file(r.file_path):
-                image_results.append(r)
+            if file_type_checker(r.file_path):
+                target_results.append(r)
             else:
-                non_image_results.append(r)
+                other_results.append(r)
 
-        print(f"[InternalResearchSearch] Image balance: {len(image_results)} images, {len(non_image_results)} non-images")
+        print(f"[InternalResearchSearch] {file_type_name} balance: {len(target_results)} {file_type_name}, {len(other_results)} other")
 
         # Calculate target counts (half and half)
-        target_images = limit // 2
-        target_non_images = limit - target_images
+        target_count = limit // 2
+        other_count = limit - target_count
 
         # Adjust if not enough of either type
-        actual_images = min(target_images, len(image_results))
-        actual_non_images = min(target_non_images, len(non_image_results))
+        actual_target = min(target_count, len(target_results))
+        actual_other = min(other_count, len(other_results))
 
-        # If we have fewer images than target, fill with more non-images
-        if actual_images < target_images:
-            additional_non_images = min(
-                target_images - actual_images,
-                len(non_image_results) - actual_non_images
+        # If we have fewer target files than needed, fill with more other files
+        if actual_target < target_count:
+            additional_other = min(
+                target_count - actual_target,
+                len(other_results) - actual_other
             )
-            actual_non_images += additional_non_images
+            actual_other += additional_other
 
-        # If we have fewer non-images than target, fill with more images
-        if actual_non_images < target_non_images:
-            additional_images = min(
-                target_non_images - actual_non_images,
-                len(image_results) - actual_images
+        # If we have fewer other files than needed, fill with more target files
+        if actual_other < other_count:
+            additional_target = min(
+                other_count - actual_other,
+                len(target_results) - actual_target
             )
-            actual_images += additional_images
+            actual_target += additional_target
 
         # Take the appropriate number from each category
-        selected_images = image_results[:actual_images]
-        selected_non_images = non_image_results[:actual_non_images]
+        selected_target = target_results[:actual_target]
+        selected_other = other_results[:actual_other]
 
-        # Interleave results: image, non-image, image, non-image...
+        # Interleave results: target, other, target, other...
         balanced = []
-        img_idx = 0
-        non_img_idx = 0
+        target_idx = 0
+        other_idx = 0
 
-        while img_idx < len(selected_images) or non_img_idx < len(selected_non_images):
-            if img_idx < len(selected_images):
-                balanced.append(selected_images[img_idx])
-                img_idx += 1
-            if non_img_idx < len(selected_non_images):
-                balanced.append(selected_non_images[non_img_idx])
-                non_img_idx += 1
+        while target_idx < len(selected_target) or other_idx < len(selected_other):
+            if target_idx < len(selected_target):
+                balanced.append(selected_target[target_idx])
+                target_idx += 1
+            if other_idx < len(selected_other):
+                balanced.append(selected_other[other_idx])
+                other_idx += 1
 
-        print(f"[InternalResearchSearch] Balanced: {len(selected_images)} images + {len(selected_non_images)} non-images = {len(balanced)} total")
+        print(f"[InternalResearchSearch] Balanced: {len(selected_target)} {file_type_name} + {len(selected_other)} other = {len(balanced)} total")
 
         return balanced[:limit]
 

@@ -400,7 +400,7 @@ class TestInternalResearchSearchService:
                 mock_os.is_configured = True
                 mock_emb.is_configured = True
                 mock_emb.embed_text = AsyncMock(return_value=[0.1] * 1024)
-                mock_os.vector_search = AsyncMock(return_value=mock_opensearch_response)
+                mock_os.unified_search = AsyncMock(return_value=mock_opensearch_response)
 
                 service = InternalResearchSearchService()
                 results = await service.search_initial("AIについて教えて")
@@ -414,38 +414,35 @@ class TestInternalResearchSearchService:
 
     @pytest.mark.asyncio
     async def test_search_determines_initial_vs_followup(self):
-        """Test search method correctly determines initial vs follow-up"""
+        """Test search method correctly routes based on query type
+
+        New routing logic (2024):
+        - Default: oipf-details (search_followup)
+        - Research discovery queries (e.g., "研究業績は？"): oipf-summary (search_initial)
+        """
         from app.services.internal_research_search import InternalResearchSearchService
 
-        # Test initial query detection
         service = InternalResearchSearchService()
 
-        # Mock search_initial to verify it's called for initial queries
+        # Mock search_initial and search_followup
         with patch.object(service, 'search_initial', new_callable=AsyncMock) as mock_initial:
             with patch.object(service, 'search_followup', new_callable=AsyncMock) as mock_followup:
                 mock_initial.return_value = []
                 mock_followup.return_value = []
 
-                # Initial query (no history)
+                # Default query routes to oipf-details (search_followup)
                 await service.search("test query", chat_history=None)
-                mock_initial.assert_called_once()
-                mock_followup.assert_not_called()
+                mock_followup.assert_called_once()
+                mock_initial.assert_not_called()
 
                 # Reset mocks
                 mock_initial.reset_mock()
                 mock_followup.reset_mock()
 
-                # Follow-up query (with history > 2 messages)
-                await service.search(
-                    "test query",
-                    chat_history=[
-                        {"role": "user", "content": "first question"},
-                        {"role": "assistant", "content": "first answer"},
-                        {"role": "user", "content": "follow up question"},
-                    ]
-                )
-                mock_followup.assert_called_once()
-                mock_initial.assert_not_called()
+                # Research discovery query routes to oipf-summary (search_initial)
+                await service.search("過去にこんな研究はされていたか", chat_history=None)
+                mock_initial.assert_called_once()
+                mock_followup.assert_not_called()
 
     def test_research_id_cache_initialization(self):
         """Test research_id cache is initialized correctly"""
@@ -701,12 +698,15 @@ class TestSearchModeIntegration:
 
     @pytest.mark.asyncio
     async def test_search_mode_uses_opensearch_when_configured(self):
-        """Test that search mode uses OpenSearch when configured"""
+        """Test that search mode uses OpenSearch when configured
+
+        Default routing goes to oipf-details (search_followup)
+        """
         from app.services.internal_research_search import InternalResearchSearchService, InternalResearchResult
 
         service = InternalResearchSearchService()
 
-        # Mock the search_initial method directly
+        # Mock the search_followup method (default routing is oipf-details)
         expected_results = [
             InternalResearchResult(
                 title="Internal research about AI",
@@ -715,15 +715,16 @@ class TestSearchModeIntegration:
                 year="2024",
                 research_id="INT1",
                 abstract="Internal research about AI",
+                source_type="details",
             )
         ]
 
-        with patch.object(service, 'search_initial', new_callable=AsyncMock) as mock_search:
+        with patch.object(service, 'search_followup', new_callable=AsyncMock) as mock_search:
             mock_search.return_value = expected_results
 
             results = await service.search("AI research", chat_history=None)
 
-            mock_search.assert_called_once_with("AI research", 10)
+            mock_search.assert_called_once()
             assert len(results) == 1
             assert results[0].research_id == "INT1"
             assert results[0].title == "Internal research about AI"
