@@ -182,7 +182,7 @@ class InternalResearchSearchService:
     async def search_initial(
         self,
         query: str,
-        limit: int = 10,
+        limit: Optional[int] = None,
     ) -> list[InternalResearchResult]:
         """
         Initial query search using vector similarity on oipf-summary
@@ -205,7 +205,10 @@ class InternalResearchSearchService:
             print(f"  - Embedding configured: {embedding_client.is_configured}")
             return []
 
-        print(f"[InternalResearchSearch] search_initial: Searching for '{query[:50]}...'")
+        # Use config value if limit not specified
+        if limit is None:
+            limit = self.settings.search_oipf_summary_limit
+        print(f"[InternalResearchSearch] search_initial: Searching for '{query[:50]}...' (limit={limit})")
 
         # Get search weights from settings
         weights = self.settings.get_search_weights()
@@ -278,7 +281,7 @@ class InternalResearchSearchService:
         query: str,
         chat_history: list[dict],
         research_id_filter: Optional[str] = None,
-        limit: int = 10,
+        limit: Optional[int] = None,
     ) -> list[InternalResearchResult]:
         """
         Follow-up query search using vector similarity on oipf-details
@@ -306,7 +309,10 @@ class InternalResearchSearchService:
             print(f"  - Embedding configured: {embedding_client.is_configured}")
             return []
 
-        print(f"[InternalResearchSearch] search_followup: Searching for '{query[:50]}...'")
+        # Use config value if limit not specified
+        if limit is None:
+            limit = self.settings.search_oipf_details_limit
+        print(f"[InternalResearchSearch] search_followup: Searching for '{query[:50]}...' (limit={limit})")
 
         # Get search weights from settings
         weights = self.settings.get_search_weights()
@@ -392,7 +398,7 @@ class InternalResearchSearchService:
         query: str,
         chat_history: Optional[list[dict]] = None,
         research_id_filter: Optional[str] = None,
-        limit: int = 10,
+        limit: Optional[int] = None,
     ) -> list[InternalResearchResult]:
         """
         Smart search that chooses between initial and follow-up search
@@ -575,7 +581,7 @@ JSON形式で出力（説明不要）:"""
         query: str,
         research_id_filter: Optional[str] = None,
         paper_keywords: Optional[list[str]] = None,
-        limit: int = 10,
+        limit: Optional[int] = None,
     ) -> list[DeepFileSearchResult]:
         """
         Deep file search for DeepDive mode using vector similarity on oipf-details.
@@ -602,7 +608,10 @@ JSON形式で出力（説明不要）:"""
             print("[InternalResearchSearch] deep_file_search: Not configured, returning empty results")
             return []
 
-        print(f"[InternalResearchSearch] deep_file_search: '{query[:50]}...'")
+        # Use config value if limit not specified
+        if limit is None:
+            limit = self.settings.search_oipf_details_limit
+        print(f"[InternalResearchSearch] deep_file_search: '{query[:50]}...' (limit={limit})")
         if research_id_filter:
             print(f"  - research_id_filter: {research_id_filter}")
 

@@ -594,11 +594,11 @@ insightsの各要素はMarkdown形式で、見出し・箇条書き・太字・�
                 })
 
                 # Perform OpenSearch-based deep file search
+                # limit uses config value (SEARCH_OIPF_DETAILS_LIMIT)
                 opensearch_results = await internal_research_service.deep_file_search(
                     query=query,
                     research_id_filter=research_id_filter,
                     paper_keywords=paper_keywords,
-                    limit=10,
                 )
 
                 # Convert to dict format for response

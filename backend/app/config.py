@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     search_proper_nouns_text_weight: int = int(os.getenv("SEARCH_PROPER_NOUNS_TEXT_WEIGHT", "0"))
     search_proper_nouns_vector_weight: int = int(os.getenv("SEARCH_PROPER_NOUNS_VECTOR_WEIGHT", "30"))
 
+    # ===========================================
+    # 検索結果件数設定
+    # ===========================================
+    # LLM回答生成に使用する検索結果の件数
+    # oipf-summary: 研究プロジェクト単位の検索結果
+    # oipf-details: ファイル単位の検索結果
+    search_oipf_summary_limit: int = int(os.getenv("SEARCH_OIPF_SUMMARY_LIMIT", "3"))
+    search_oipf_details_limit: int = int(os.getenv("SEARCH_OIPF_DETAILS_LIMIT", "5"))
+
     def get_search_weights(self) -> dict:
         """Get all search weights as a dictionary"""
         return {

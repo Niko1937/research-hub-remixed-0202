@@ -348,6 +348,25 @@ SEARCH_PROPER_NOUNS_VECTOR_WEIGHT=30 # 固有名詞エンベディング検索
 
 **注意**: 固有名詞検索を使用するには、OpenSearchインデックスの再作成とデータの再投入が必要です。詳細は前処理スクリプトのセクションを参照してください。
 
+#### 検索結果件数設定
+
+LLM回答生成に使用する検索結果の件数を設定できます。
+
+| 環境変数 | デフォルト | 説明 |
+|----------|-----------|------|
+| `SEARCH_OIPF_SUMMARY_LIMIT` | 3 | oipf-summary（研究プロジェクト単位）の検索結果件数 |
+| `SEARCH_OIPF_DETAILS_LIMIT` | 5 | oipf-details（ファイル単位）の検索結果件数 |
+
+```env
+# 検索結果件数設定
+SEARCH_OIPF_SUMMARY_LIMIT=3   # 研究プロジェクトの検索結果件数
+SEARCH_OIPF_DETAILS_LIMIT=5   # ファイルの検索結果件数
+```
+
+**ユースケース例**:
+- 精度重視: 件数を少なく（3〜5件）→ LLMが詳細に分析
+- 網羅性重視: 件数を多く（10〜20件）→ より多くの関連情報を参照
+
 #### OpenSearch設定
 
 OpenSearchを使用する場合は以下を設定:
