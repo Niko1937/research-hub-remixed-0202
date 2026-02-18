@@ -128,26 +128,30 @@ class InternalResearchSearchService:
         print(f"[InternalResearchSearch] No research_id found in query. Known IDs: {sorted(self._known_research_ids)}")
         return None
 
-    def is_research_discovery_query(self, query: str) -> bool:
+    def is_research_summary_query(self, query: str) -> bool:
         """
-        Detect if the query is asking about finding past/similar research.
+        Detect if the query should search oipf-summary (research project level).
 
-        These queries should search oipf-summary (research project level)
-        even on follow-up queries, to find relevant research projects.
+        This includes:
+        - Queries about research achievements/history
+        - Queries asking for research IDs
+        - Queries about research themes/projects
 
         Examples:
         - "過去にこんな研究はされていたか"
+        - "〜〜の研究実績はあるか"
+        - "〜〜に関する研究IDを教えてください"
         - "類似の研究はあるか"
-        - "関連する研究を探して"
 
         Args:
             query: User's query text
 
         Returns:
-            True if query is asking about finding research projects
+            True if query should use oipf-summary
         """
-        # Patterns indicating research discovery/exploration queries
-        discovery_patterns = [
+        # Patterns indicating research project-level queries
+        summary_patterns = [
+            # Research discovery patterns
             r'過去に.*(?:研究|事例).*(?:ある|あった|されてい|行われ)',
             r'(?:類似|似た|同様|関連).*(?:研究|プロジェクト|テーマ|事例)',
             r'(?:研究|プロジェクト|テーマ|事例).*(?:ある|探し|検索|見つ)',
@@ -155,14 +159,28 @@ class InternalResearchSearchService:
             r'(?:どんな|どのような).*(?:研究|事例).*(?:ある|されてい|行われ)',
             r'(?:研究|事例).*(?:一覧|リスト|概要)',
             r'(?:社内|部内|組織).*(?:研究|事例).*(?:ある|探)',
+            # Research achievement patterns
+            r'(?:研究|開発).*(?:実績|成果|履歴)',
+            r'(?:実績|成果).*(?:ある|あった|教え)',
+            r'(?:取り組み|取組み).*(?:ある|あった|されてい)',
+            # Research ID patterns
+            r'研究ID.*(?:教え|知り|一覧|リスト|何)',
+            r'(?:研究|プロジェクト).*ID.*(?:教え|知り|何)',
+            r'(?:どの|何の).*研究ID',
+            r'ID.*(?:教え|一覧)',
         ]
 
-        for pattern in discovery_patterns:
+        for pattern in summary_patterns:
             if re.search(pattern, query, re.IGNORECASE):
-                print(f"[InternalResearchSearch] Research discovery query detected: {pattern}")
+                print(f"[InternalResearchSearch] Research summary query detected: {pattern}")
                 return True
 
         return False
+
+    # Backward compatibility alias
+    def is_research_discovery_query(self, query: str) -> bool:
+        """Alias for is_research_summary_query (backward compatibility)"""
+        return self.is_research_summary_query(query)
 
     def get_cache_status(self) -> dict:
         """Get status of the research_id cache"""
@@ -407,14 +425,13 @@ class InternalResearchSearchService:
         limit: Optional[int] = None,
     ) -> list[InternalResearchResult]:
         """
-        Smart search that chooses between initial and follow-up search
+        Smart search that chooses between oipf-details and oipf-summary
 
         Routing logic:
-        1. If research_id_filter is explicitly provided → oipf-details
-        2. If query contains a known research_id → oipf-details (even on first query)
-        3. If query is a research discovery query → oipf-summary (even on follow-up)
-        4. If initial query (no chat history) → oipf-summary
-        5. Otherwise → oipf-details
+        1. If research_id_filter is explicitly provided → oipf-details (filtered)
+        2. If query contains a known research_id → oipf-details (filtered)
+        3. If query is about research achievements/IDs → oipf-summary
+        4. Otherwise (default) → oipf-details
 
         Args:
             query: User's question
@@ -429,42 +446,36 @@ class InternalResearchSearchService:
         print(f"  - Query: {query[:50]}...")
         print(f"  - is_configured: {self.is_configured}")
 
-        # Determine if this is initial or follow-up query
-        is_initial = (
-            chat_history is None
-            or len(chat_history) <= 2  # Only system + first user message
-        )
+        # Check if this is a research summary query (should use oipf-summary)
+        is_summary_query = self.is_research_summary_query(query)
 
-        # Check if this is a research discovery query (should use oipf-summary)
-        is_discovery_query = self.is_research_discovery_query(query)
-
-        print(f"  - is_initial: {is_initial}")
-        print(f"  - is_discovery_query: {is_discovery_query}")
+        print(f"  - is_summary_query: {is_summary_query}")
         print(f"  - research_id_filter: {research_id_filter}")
 
-        # Check if query contains a known research_id (even for initial queries)
+        # Check if query contains a known research_id
         detected_research_id = self.find_research_id_in_query(query)
         if detected_research_id and not research_id_filter:
             research_id_filter = detected_research_id
             print(f"  - Detected research_id in query: {detected_research_id}")
-            print(f"  - Routing to oipf-details directly")
+            print(f"  - Routing to oipf-details with filter")
 
         # Route to appropriate search method
         if research_id_filter:
-            # research_id specified: always use oipf-details
+            # research_id specified: use oipf-details with filter
+            print(f"  - Routing: oipf-details (research_id filter: {research_id_filter})")
             return await self.search_followup(
                 query,
                 chat_history or [],
                 research_id_filter,
                 limit,
             )
-        elif is_initial or is_discovery_query:
-            # Initial query or research discovery query: use oipf-summary
-            if is_discovery_query and not is_initial:
-                print(f"  - Research discovery query on follow-up: using oipf-summary")
+        elif is_summary_query:
+            # Research summary query: use oipf-summary
+            print(f"  - Routing: oipf-summary (research summary query)")
             return await self.search_initial(query, limit)
         else:
-            # Follow-up query: use oipf-details
+            # Default: use oipf-details for file-level search
+            print(f"  - Routing: oipf-details (default)")
             return await self.search_followup(
                 query,
                 chat_history or [],
