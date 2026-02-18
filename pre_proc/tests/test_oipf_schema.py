@@ -27,6 +27,8 @@ class TestOIPFDocument:
         """Test conversion to dictionary"""
         doc = OIPFDocument(
             id="test-id",
+            oipf_file_path="project/folder/file.pdf",
+            oipf_file_name="file.pdf",
             related_researchers=["researcher-1"],
             oipf_research_abstract="Test abstract",
             oipf_research_abstract_embedding=[0.1] * 1024,
@@ -38,6 +40,8 @@ class TestOIPFDocument:
         result = doc.to_dict()
 
         assert result["id"] == "test-id"
+        assert result["oipf_file_path"] == "project/folder/file.pdf"
+        assert result["oipf_file_name"] == "file.pdf"
         assert result["related_researchers"] == ["researcher-1"]
         assert result["oipf_research_abstract"] == "Test abstract"
         assert len(result["oipf_research_abstract_embedding"]) == 1024
@@ -75,7 +79,7 @@ class TestOIPFDocument:
 
         errors = doc.validate()
         assert len(errors) == 1
-        assert "embedding is required" in errors[0]
+        assert "At least one embedding is required" in errors[0]
 
     def test_validate_wrong_dimensions(self):
         """Test validation catches wrong embedding dimensions"""
@@ -87,6 +91,103 @@ class TestOIPFDocument:
         errors = doc.validate()
         assert len(errors) == 1
         assert "1024 dimensions" in errors[0]
+
+    def test_validate_tags_embedding_only(self):
+        """Test validation passes with only tags embedding"""
+        doc = OIPFDocument(
+            id="test-id",
+            oipf_themetags_embedding=[0.1] * 1024,
+        )
+
+        errors = doc.validate()
+        assert len(errors) == 0
+
+    def test_validate_tags_embedding_wrong_dimensions(self):
+        """Test validation catches wrong tags embedding dimensions"""
+        doc = OIPFDocument(
+            id="test-id",
+            oipf_themetags_embedding=[0.1] * 512,  # Wrong size
+        )
+
+        errors = doc.validate()
+        assert len(errors) == 1
+        assert "1024 dimensions" in errors[0]
+
+    def test_to_dict_includes_tags_embedding(self):
+        """Test to_dict includes tags embedding when present"""
+        doc = OIPFDocument(
+            id="test-id",
+            oipf_research_abstract_embedding=[0.1] * 1024,
+            oipf_themetags_embedding=[0.2] * 1024,
+        )
+
+        result = doc.to_dict()
+
+        assert "oipf_themetags_embedding" in result
+        assert len(result["oipf_themetags_embedding"]) == 1024
+
+    def test_to_dict_excludes_empty_tags_embedding(self):
+        """Test to_dict excludes tags embedding when empty"""
+        doc = OIPFDocument(
+            id="test-id",
+            oipf_research_abstract_embedding=[0.1] * 1024,
+            oipf_themetags_embedding=[],
+        )
+
+        result = doc.to_dict()
+
+        assert "oipf_themetags_embedding" not in result
+
+    def test_validate_proper_nouns_embedding_only(self):
+        """Test validation passes with only proper nouns embedding"""
+        doc = OIPFDocument(
+            id="test-id",
+            oipf_proper_nouns_embedding=[0.1] * 1024,
+        )
+
+        errors = doc.validate()
+        assert len(errors) == 0
+
+    def test_validate_proper_nouns_embedding_wrong_dimensions(self):
+        """Test validation catches wrong proper nouns embedding dimensions"""
+        doc = OIPFDocument(
+            id="test-id",
+            oipf_proper_nouns_embedding=[0.1] * 512,  # Wrong size
+        )
+
+        errors = doc.validate()
+        assert len(errors) == 1
+        assert "1024 dimensions" in errors[0]
+
+    def test_to_dict_includes_proper_nouns(self):
+        """Test to_dict includes proper nouns when present"""
+        doc = OIPFDocument(
+            id="test-id",
+            oipf_research_abstract_embedding=[0.1] * 1024,
+            oipf_research_proper_nouns=["6S9", "CFRP", "RD-2024-001"],
+            oipf_proper_nouns_embedding=[0.2] * 1024,
+        )
+
+        result = doc.to_dict()
+
+        assert "oipf_research_proper_nouns" in result
+        assert result["oipf_research_proper_nouns"] == ["6S9", "CFRP", "RD-2024-001"]
+        assert "oipf_proper_nouns_embedding" in result
+        assert len(result["oipf_proper_nouns_embedding"]) == 1024
+
+    def test_to_dict_excludes_empty_proper_nouns(self):
+        """Test to_dict excludes proper nouns fields when empty"""
+        doc = OIPFDocument(
+            id="test-id",
+            oipf_research_abstract_embedding=[0.1] * 1024,
+            oipf_research_proper_nouns=[],
+            oipf_proper_nouns_embedding=[],
+        )
+
+        result = doc.to_dict()
+
+        assert "oipf_research_proper_nouns" not in result
+        assert "oipf_proper_nouns_embedding" not in result
 
 
 class TestGenerateDocumentId:
@@ -183,12 +284,28 @@ class TestCreateOIPFDocument:
         )
 
         assert doc.id is not None
+        assert doc.oipf_file_path == "paper.pdf"
+        assert doc.oipf_file_name == "paper.pdf"
         assert doc.oipf_research_abstract == "This is the abstract."
         assert len(doc.oipf_research_abstract_embedding) == 1024
         assert doc.oipf_research_richtext == "This is the full text content of the paper."
         assert doc.oipf_research_themetags == ["AI", "research"]
         assert doc.related_researchers == ["researcher-1"]
         assert "paper.pdf" in doc.oipf_spo_folderstructure_summary
+
+    def test_create_document_with_nested_path(self):
+        """Test creating document with nested file path"""
+        doc = create_oipf_document(
+            file_path="/data/research/project/subdir/report.pdf",
+            full_text="Text",
+            abstract="Abstract",
+            embedding=[0.1] * 1024,
+            tags=[],
+            base_folder="/data/research",
+        )
+
+        assert doc.oipf_file_path == "project/subdir/report.pdf"
+        assert doc.oipf_file_name == "report.pdf"
 
     def test_create_document_without_optional_fields(self):
         """Test creating document without optional fields"""
@@ -201,6 +318,8 @@ class TestCreateOIPFDocument:
         )
 
         assert doc.id is not None
+        assert doc.oipf_file_path == "/paper.pdf"
+        assert doc.oipf_file_name == "paper.pdf"
         assert doc.related_researchers == []
         assert doc.oipf_research_themetags == []
 
@@ -288,7 +407,7 @@ class TestOIPFDetailsDocument:
 
         errors = doc.validate()
         assert len(errors) == 1
-        assert "embedding is required" in errors[0]
+        assert "At least one embedding is required" in errors[0]
 
     def test_validate_wrong_dimensions(self):
         """Test validation catches wrong embedding dimensions"""
@@ -300,6 +419,103 @@ class TestOIPFDetailsDocument:
         errors = doc.validate()
         assert len(errors) == 1
         assert "1024 dimensions" in errors[0]
+
+    def test_validate_tags_embedding_only(self):
+        """Test validation passes with only tags embedding"""
+        doc = OIPFDetailsDocument(
+            id="test-id",
+            oipf_tags_embedding=[0.1] * 1024,
+        )
+
+        errors = doc.validate()
+        assert len(errors) == 0
+
+    def test_validate_tags_embedding_wrong_dimensions(self):
+        """Test validation catches wrong tags embedding dimensions"""
+        doc = OIPFDetailsDocument(
+            id="test-id",
+            oipf_tags_embedding=[0.1] * 512,  # Wrong size
+        )
+
+        errors = doc.validate()
+        assert len(errors) == 1
+        assert "1024 dimensions" in errors[0]
+
+    def test_to_dict_includes_tags_embedding(self):
+        """Test to_dict includes tags embedding when present"""
+        doc = OIPFDetailsDocument(
+            id="test-id",
+            oipf_abstract_embedding=[0.1] * 1024,
+            oipf_tags_embedding=[0.2] * 1024,
+        )
+
+        result = doc.to_dict()
+
+        assert "oipf_tags_embedding" in result
+        assert len(result["oipf_tags_embedding"]) == 1024
+
+    def test_to_dict_excludes_empty_tags_embedding(self):
+        """Test to_dict excludes tags embedding when empty"""
+        doc = OIPFDetailsDocument(
+            id="test-id",
+            oipf_abstract_embedding=[0.1] * 1024,
+            oipf_tags_embedding=[],
+        )
+
+        result = doc.to_dict()
+
+        assert "oipf_tags_embedding" not in result
+
+    def test_validate_proper_nouns_embedding_only(self):
+        """Test validation passes with only proper nouns embedding"""
+        doc = OIPFDetailsDocument(
+            id="test-id",
+            oipf_proper_nouns_embedding=[0.1] * 1024,
+        )
+
+        errors = doc.validate()
+        assert len(errors) == 0
+
+    def test_validate_proper_nouns_embedding_wrong_dimensions(self):
+        """Test validation catches wrong proper nouns embedding dimensions"""
+        doc = OIPFDetailsDocument(
+            id="test-id",
+            oipf_proper_nouns_embedding=[0.1] * 512,  # Wrong size
+        )
+
+        errors = doc.validate()
+        assert len(errors) == 1
+        assert "1024 dimensions" in errors[0]
+
+    def test_to_dict_includes_proper_nouns(self):
+        """Test to_dict includes proper nouns when present"""
+        doc = OIPFDetailsDocument(
+            id="test-id",
+            oipf_abstract_embedding=[0.1] * 1024,
+            oipf_proper_nouns=["6S9", "CFRP", "RD-2024-001"],
+            oipf_proper_nouns_embedding=[0.2] * 1024,
+        )
+
+        result = doc.to_dict()
+
+        assert "oipf_proper_nouns" in result
+        assert result["oipf_proper_nouns"] == ["6S9", "CFRP", "RD-2024-001"]
+        assert "oipf_proper_nouns_embedding" in result
+        assert len(result["oipf_proper_nouns_embedding"]) == 1024
+
+    def test_to_dict_excludes_empty_proper_nouns(self):
+        """Test to_dict excludes proper nouns fields when empty"""
+        doc = OIPFDetailsDocument(
+            id="test-id",
+            oipf_abstract_embedding=[0.1] * 1024,
+            oipf_proper_nouns=[],
+            oipf_proper_nouns_embedding=[],
+        )
+
+        result = doc.to_dict()
+
+        assert "oipf_proper_nouns" not in result
+        assert "oipf_proper_nouns_embedding" not in result
 
     def test_timestamps_in_dict(self):
         """Test that timestamps are converted to ISO format in dict"""
@@ -466,7 +682,7 @@ class TestOIPFDetailsDocumentContentExtracted:
 
         errors = doc.validate()
         assert len(errors) == 1
-        assert "embedding is required" in errors[0]
+        assert "At least one embedding is required" in errors[0]
 
     def test_validation_skips_embedding_when_content_not_extracted(self):
         """Test that validation skips embedding check when is_content_extracted=False"""

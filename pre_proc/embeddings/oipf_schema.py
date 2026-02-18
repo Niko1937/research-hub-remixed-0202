@@ -24,18 +24,25 @@ class OIPFDocument:
     """
     id: str
     oipf_research_id: str = ""  # Research ID for exact match search
+    oipf_file_path: str = ""  # File path (same as oipf-details)
+    oipf_file_name: str = ""  # File name (same as oipf-details)
     related_researchers: list[str] = field(default_factory=list)
     oipf_research_abstract: str = ""
     oipf_research_abstract_embedding: list[float] = field(default_factory=list)
     oipf_spo_folderstructure_summary: str = ""
     oipf_research_richtext: str = ""
     oipf_research_themetags: list[str] = field(default_factory=list)
+    oipf_themetags_embedding: list[float] = field(default_factory=list)  # タグのエンベディング
+    oipf_research_proper_nouns: list[str] = field(default_factory=list)  # 固有名詞リスト
+    oipf_proper_nouns_embedding: list[float] = field(default_factory=list)  # 固有名詞エンベディング
 
     def to_dict(self) -> dict:
         """Convert to dictionary for OpenSearch"""
-        return {
+        result = {
             "id": self.id,
             "oipf_research_id": self.oipf_research_id,
+            "oipf_file_path": self.oipf_file_path,
+            "oipf_file_name": self.oipf_file_name,
             "related_researchers": self.related_researchers,
             "oipf_research_abstract": self.oipf_research_abstract,
             "oipf_research_abstract_embedding": self.oipf_research_abstract_embedding,
@@ -43,6 +50,15 @@ class OIPFDocument:
             "oipf_research_richtext": self.oipf_research_richtext,
             "oipf_research_themetags": self.oipf_research_themetags,
         }
+        # Only include tags embedding if present
+        if self.oipf_themetags_embedding:
+            result["oipf_themetags_embedding"] = self.oipf_themetags_embedding
+        # Include proper nouns if present
+        if self.oipf_research_proper_nouns:
+            result["oipf_research_proper_nouns"] = self.oipf_research_proper_nouns
+        if self.oipf_proper_nouns_embedding:
+            result["oipf_proper_nouns_embedding"] = self.oipf_proper_nouns_embedding
+        return result
 
     def validate(self) -> list[str]:
         """Validate document and return list of errors"""
@@ -51,10 +67,23 @@ class OIPFDocument:
         if not self.id:
             errors.append("id is required")
 
-        if not self.oipf_research_abstract_embedding:
-            errors.append("oipf_research_abstract_embedding is required")
-        elif len(self.oipf_research_abstract_embedding) != 1024:
+        # At least one embedding is required (abstract, tags, or proper_nouns)
+        has_abstract_embedding = bool(self.oipf_research_abstract_embedding)
+        has_tags_embedding = bool(self.oipf_themetags_embedding)
+        has_proper_nouns_embedding = bool(self.oipf_proper_nouns_embedding)
+
+        if not has_abstract_embedding and not has_tags_embedding and not has_proper_nouns_embedding:
+            errors.append("At least one embedding is required (oipf_research_abstract_embedding, oipf_themetags_embedding, or oipf_proper_nouns_embedding)")
+
+        # Validate dimensions if present
+        if has_abstract_embedding and len(self.oipf_research_abstract_embedding) != 1024:
             errors.append(f"oipf_research_abstract_embedding must have 1024 dimensions, got {len(self.oipf_research_abstract_embedding)}")
+
+        if has_tags_embedding and len(self.oipf_themetags_embedding) != 1024:
+            errors.append(f"oipf_themetags_embedding must have 1024 dimensions, got {len(self.oipf_themetags_embedding)}")
+
+        if has_proper_nouns_embedding and len(self.oipf_proper_nouns_embedding) != 1024:
+            errors.append(f"oipf_proper_nouns_embedding must have 1024 dimensions, got {len(self.oipf_proper_nouns_embedding)}")
 
         return errors
 
@@ -76,6 +105,9 @@ class OIPFDetailsDocument:
     oipf_abstract_embedding: list[float] = field(default_factory=list)
     oipf_file_richtext: str = ""
     oipf_file_tags: list[str] = field(default_factory=list)
+    oipf_tags_embedding: list[float] = field(default_factory=list)  # タグのエンベディング
+    oipf_proper_nouns: list[str] = field(default_factory=list)  # 固有名詞リスト（研究ID、製品識別番号、素材識別子）
+    oipf_proper_nouns_embedding: list[float] = field(default_factory=list)  # 固有名詞エンベディング
     oipf_folder_path: str = ""
     oipf_file_author: list[str] = field(default_factory=list)  # File creators/authors
     oipf_file_editor: list[str] = field(default_factory=list)  # Last editors/modifiers
@@ -104,6 +136,16 @@ class OIPFDetailsDocument:
         if self.oipf_abstract_embedding:
             result["oipf_abstract_embedding"] = self.oipf_abstract_embedding
 
+        # Only include tags embedding if present
+        if self.oipf_tags_embedding:
+            result["oipf_tags_embedding"] = self.oipf_tags_embedding
+
+        # Include proper nouns if present
+        if self.oipf_proper_nouns:
+            result["oipf_proper_nouns"] = self.oipf_proper_nouns
+        if self.oipf_proper_nouns_embedding:
+            result["oipf_proper_nouns_embedding"] = self.oipf_proper_nouns_embedding
+
         # Add timestamps in ISO format if present
         if self.created_at:
             result["created_at"] = self.created_at.isoformat()
@@ -119,12 +161,24 @@ class OIPFDetailsDocument:
         if not self.id:
             errors.append("id is required")
 
-        # Embedding is only required if content was extracted
+        # At least one embedding is required if content was extracted
         if self.is_content_extracted:
-            if not self.oipf_abstract_embedding:
-                errors.append("oipf_abstract_embedding is required when content is extracted")
-            elif len(self.oipf_abstract_embedding) != 1024:
+            has_abstract_embedding = bool(self.oipf_abstract_embedding)
+            has_tags_embedding = bool(self.oipf_tags_embedding)
+            has_proper_nouns_embedding = bool(self.oipf_proper_nouns_embedding)
+
+            if not has_abstract_embedding and not has_tags_embedding and not has_proper_nouns_embedding:
+                errors.append("At least one embedding is required when content is extracted (oipf_abstract_embedding, oipf_tags_embedding, or oipf_proper_nouns_embedding)")
+
+            # Validate dimensions if present
+            if has_abstract_embedding and len(self.oipf_abstract_embedding) != 1024:
                 errors.append(f"oipf_abstract_embedding must have 1024 dimensions, got {len(self.oipf_abstract_embedding)}")
+
+            if has_tags_embedding and len(self.oipf_tags_embedding) != 1024:
+                errors.append(f"oipf_tags_embedding must have 1024 dimensions, got {len(self.oipf_tags_embedding)}")
+
+            if has_proper_nouns_embedding and len(self.oipf_proper_nouns_embedding) != 1024:
+                errors.append(f"oipf_proper_nouns_embedding must have 1024 dimensions, got {len(self.oipf_proper_nouns_embedding)}")
 
         return errors
 
@@ -198,6 +252,9 @@ def create_oipf_document(
     base_folder: str = "",
     researchers: Optional[list[str]] = None,
     research_id: str = "",
+    tags_embedding: Optional[list[float]] = None,
+    proper_nouns: Optional[list[str]] = None,
+    proper_nouns_embedding: Optional[list[float]] = None,
 ) -> OIPFDocument:
     """
     Create OIPF document from processed file
@@ -211,22 +268,40 @@ def create_oipf_document(
         base_folder: Base folder for structure summary
         researchers: Related researcher IDs
         research_id: Research ID for exact match search
+        tags_embedding: Tags embedding vector (1024 dimensions)
+        proper_nouns: List of proper nouns extracted from path/filename
+        proper_nouns_embedding: Proper nouns embedding vector (1024 dimensions)
 
     Returns:
         OIPFDocument ready for indexing
     """
+    path = Path(file_path)
     doc_id = generate_document_id(file_path, base_folder)
     folder_summary = generate_folder_structure_summary(file_path, base_folder)
+
+    # Calculate relative file path (same logic as oipf-details)
+    if base_folder:
+        try:
+            rel_path = str(path.relative_to(base_folder))
+        except ValueError:
+            rel_path = file_path
+    else:
+        rel_path = file_path
 
     return OIPFDocument(
         id=doc_id,
         oipf_research_id=research_id,
+        oipf_file_path=rel_path,
+        oipf_file_name=path.name,
         related_researchers=researchers or [],
         oipf_research_abstract=abstract,
         oipf_research_abstract_embedding=embedding,
         oipf_spo_folderstructure_summary=folder_summary,
         oipf_research_richtext=full_text,
         oipf_research_themetags=tags,
+        oipf_themetags_embedding=tags_embedding or [],
+        oipf_research_proper_nouns=proper_nouns or [],
+        oipf_proper_nouns_embedding=proper_nouns_embedding or [],
     )
 
 
@@ -240,6 +315,9 @@ def create_oipf_details_document(
     authors: Optional[list[str]] = None,
     editors: Optional[list[str]] = None,
     research_id: str = "",
+    tags_embedding: Optional[list[float]] = None,
+    proper_nouns: Optional[list[str]] = None,
+    proper_nouns_embedding: Optional[list[float]] = None,
 ) -> OIPFDetailsDocument:
     """
     Create OIPF details document for file-level RAG indexing
@@ -254,6 +332,9 @@ def create_oipf_details_document(
         authors: List of file authors/creators
         editors: List of last editors/modifiers
         research_id: Research ID for exact match search
+        tags_embedding: Tags embedding vector (1024 dimensions)
+        proper_nouns: List of proper nouns extracted from path/filename
+        proper_nouns_embedding: Proper nouns embedding vector (1024 dimensions)
 
     Returns:
         OIPFDetailsDocument ready for indexing to oipf-details
@@ -292,6 +373,9 @@ def create_oipf_details_document(
         oipf_abstract_embedding=embedding,
         oipf_file_richtext=full_text,
         oipf_file_tags=tags,
+        oipf_tags_embedding=tags_embedding or [],
+        oipf_proper_nouns=proper_nouns or [],
+        oipf_proper_nouns_embedding=proper_nouns_embedding or [],
         oipf_folder_path=folder_path,
         oipf_file_author=authors or [],
         oipf_file_editor=editors or [],

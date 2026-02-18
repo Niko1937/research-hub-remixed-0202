@@ -84,6 +84,16 @@ OPENSEARCH_PASSWORD=your-password
 # ARXIV_ENABLED=true  # arXiv検索の有効/無効（false: 無効化、デフォルト: true）
 
 # ===========================================
+# ハイブリッドベクトル検索設定
+# ===========================================
+# 検索モード: abstract(要約のみ) | tags(タグのみ) | proper_nouns(固有名詞のみ) | hybrid(要約+タグ) | triple(全部)
+# SEARCH_MODE=hybrid
+# ハイブリッド検索時の重み（0-100、合計100推奨）
+# SEARCH_ABSTRACT_WEIGHT=50       # 要約エンベディング検索の重み
+# SEARCH_TAGS_WEIGHT=50           # タグエンベディング検索の重み
+# SEARCH_PROPER_NOUNS_WEIGHT=0    # 固有名詞エンベディング検索の重み（triple モード時に使用）
+
+# ===========================================
 # エンベディングAPI設定（社内研究検索に必須）
 # 注意: 社内研究検索を有効にするには、OpenSearchとEmbedding両方の設定が必要
 # ===========================================
@@ -113,6 +123,8 @@ EMBEDDING_MODEL=text-embedding-3-large
 # MAX_FOLDER_DEPTH=4
 # SKIP_INDEXED_FOLDERS=false
 # EMBEDDING_FILE_TYPES=all  # エンベディング対象: all(全て), documents(ドキュメントのみ), images(画像のみ)
+# EMBEDDING_TARGETS=both     # エンベディング種別: abstract(要約のみ), tags(タグのみ), proper_nouns(固有名詞のみ), both(要約+タグ), all(全部)
+# METADATA_ONLY=false  # trueでエンベディングを再生成せずメタデータのみ更新
 
 # ===========================================
 # 汎用プロキシ設定（前処理スクリプト用、オプション）
@@ -261,6 +273,41 @@ Internal Research Search:
   Status: ENABLED (OpenSearch)  ← または DISABLED (Mock Data)
 ```
 
+#### ハイブリッドベクトル検索設定
+
+社内研究検索のベクトル検索方式を設定できます。要約ベクトル、タグベクトル、固有名詞ベクトルを組み合わせたハイブリッド検索により、同義語（「アルミ」→「アルミニウム」など）や固有名詞（研究ID、製品識別番号、素材識別子）も意味的に捉えた高精度な検索が可能です。
+
+```env
+# 検索モード
+SEARCH_MODE=hybrid  # abstract | tags | proper_nouns | hybrid | triple（デフォルト: hybrid）
+
+# ハイブリッド検索時の重み（0-100、合計100推奨）
+SEARCH_ABSTRACT_WEIGHT=50       # 要約エンベディング検索の重み
+SEARCH_TAGS_WEIGHT=50           # タグエンベディング検索の重み
+SEARCH_PROPER_NOUNS_WEIGHT=0    # 固有名詞エンベディング検索の重み（tripleモード時）
+```
+
+| 設定値 | 説明 |
+|--------|------|
+| `abstract` | 要約エンベディングのみで検索（従来動作） |
+| `tags` | タグエンベディングのみで検索 |
+| `proper_nouns` | 固有名詞エンベディングのみで検索 |
+| `hybrid` | 要約+タグで検索し、重み付けでスコア統合（デフォルト） |
+| `triple` | 要約+タグ+固有名詞で検索し、3つの重み付けでスコア統合 |
+
+**重み設定例**:
+- `SEARCH_ABSTRACT_WEIGHT=50, SEARCH_TAGS_WEIGHT=50`: バランス型（デフォルト、hybridモード）
+- `SEARCH_ABSTRACT_WEIGHT=40, SEARCH_TAGS_WEIGHT=30, SEARCH_PROPER_NOUNS_WEIGHT=30`: 3ベクトル統合（tripleモード）
+- `SEARCH_ABSTRACT_WEIGHT=70, SEARCH_TAGS_WEIGHT=30`: 要約重視
+
+**固有名詞について**:
+固有名詞はファイルパスとファイル名からLLMで自動抽出されます:
+- 研究ID（例: RD-2024-001, 研究-A-123）
+- 製品識別番号（例: 6S9, AP4DI, M3X-500）
+- 素材識別子（例: CFRP, Al6061, SUS304）
+
+**注意**: ハイブリッド検索やトリプル検索を使用するには、OpenSearchインデックスの再作成とデータの再投入が必要です。詳細は前処理スクリプトのセクションを参照してください。
+
 #### OpenSearch設定
 
 OpenSearchを使用する場合は以下を設定:
@@ -336,6 +383,7 @@ EMBEDDING_FILE_TYPES=all
 | `MAX_FOLDER_DEPTH` | 4 | 最大フォルダ探索深度。0で無制限 |
 | `SKIP_INDEXED_FOLDERS` | false | 既にインデックス済みのサブフォルダをスキップするかどうか |
 | `EMBEDDING_FILE_TYPES` | all | エンベディング対象ファイルタイプ（下記参照） |
+| `METADATA_ONLY` | false | メタデータのみ更新モード（下記参照） |
 
 **EMBEDDING_FILE_TYPES の設定値**:
 | 値 | 説明 |
@@ -345,6 +393,27 @@ EMBEDDING_FILE_TYPES=all
 | `images` | 画像のみエンベディング（Vision LLM使用）。ドキュメントはスキップ |
 
 **注意**: `images`を選択した場合、LLMがVision対応モデル（例: `gemini-2.0-flash`）である必要があります。
+
+**EMBEDDING_TARGETS の設定値**:
+| 値 | 説明 |
+|----|------|
+| `both` | 要約とタグの両方をエンベディング（デフォルト、hybridモード用） |
+| `all` | 要約、タグ、固有名詞をすべてエンベディング（tripleモード用） |
+| `abstract` | 要約のみエンベディング（従来動作） |
+| `tags` | タグのみエンベディング |
+| `proper_nouns` | 固有名詞のみエンベディング |
+
+**注意**:
+- `EMBEDDING_TARGETS`は`SEARCH_MODE`と組み合わせて使用します
+- `SEARCH_MODE=hybrid`を使用する場合は`EMBEDDING_TARGETS=both`が必要です
+- `SEARCH_MODE=triple`を使用する場合は`EMBEDDING_TARGETS=all`が必要です
+- 片方のみエンベディングする場合、検索モードも合わせてください（例: `EMBEDDING_TARGETS=tags`と`SEARCH_MODE=tags`）
+
+**METADATA_ONLY について**:
+- `true` を設定すると、既存のエンベディングを再利用し、メタデータ（要約、タグ等）のみをLLMで再生成
+- OpenSearchに既存ドキュメントがない場合は処理をスキップ（新規ファイルは処理されません）
+- エンベディングAPIへのアクセスが不要なため、処理コストを削減できます
+- タグ体系の変更や要約の再生成など、メタデータのみを更新したい場合に有効
 
 **SKIP_INDEXED_FOLDERS について**:
 - `true` を設定すると、対象フォルダの1階層下のサブフォルダごとに既存インデックスをチェック
@@ -696,6 +765,9 @@ python embeddings/process_folder_embeddings.py /path/to/folder
 
 # ドライラン（実際に投入しない）
 python embeddings/process_folder_embeddings.py /path/to/folder --dry-run
+
+# メタデータのみ更新（既存エンベディングを再利用）
+python embeddings/process_folder_embeddings.py /path/to/folder --metadata-only
 
 # オプション指定
 python embeddings/process_folder_embeddings.py /path/to/folder \

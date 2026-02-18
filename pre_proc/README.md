@@ -11,6 +11,7 @@ pre_proc/
 │   ├── export_indices.py          # データエクスポート
 │   └── import_indices.py          # データインポート
 ├── embeddings/                    # データ登録スクリプト
+│   ├── process_folder_embeddings.py  # フォルダ一括処理（メイン）
 │   ├── process_summary_index.py   # oipf-summaryインデックス登録
 │   ├── process_details_index.py   # oipf-detailsインデックス登録
 │   └── process_employees.py       # employeesインデックス登録
@@ -134,6 +135,43 @@ python opensearch/import_indices.py --dir ./exports/export_20240101_120000 --bat
 ---
 
 ## データ登録
+
+### process_folder_embeddings.py（フォルダ一括処理）
+
+研究フォルダ内の全ファイルを処理し、LLMで要約・タグを生成、エンベディングを作成してOpenSearchに登録します。
+
+```bash
+# 基本的な使用方法
+python embeddings/process_folder_embeddings.py /path/to/research/folder
+
+# ドライラン（登録せずに確認）
+python embeddings/process_folder_embeddings.py /path/to/folder --dry-run
+
+# 並列処理（5ファイル同時処理）- 処理速度が大幅に向上
+python embeddings/process_folder_embeddings.py /path/to/folder --parallel 5
+
+# 並列処理（10ファイル同時処理）
+python embeddings/process_folder_embeddings.py /path/to/folder -p 10
+
+# 深度制限と無視パターン
+python embeddings/process_folder_embeddings.py /path/to/folder --depth 3 --ignore "*.tmp"
+
+# 結果をJSONで出力
+python embeddings/process_folder_embeddings.py /path/to/folder --output-json result.json
+```
+
+**並列処理について:**
+- `--parallel N` または `-p N` で同時処理ファイル数を指定
+- デフォルトは1（逐次処理）
+- LLM/エンベディングAPIのレート制限に応じて調整してください
+- 例: 100ファイルを `-p 5` で処理すると、5ファイルずつ同時に処理され処理時間が約1/5に短縮
+
+**対応ファイル形式:**
+- ドキュメント: PDF, DOCX, PPTX, TXT, MD, HTML, JSON
+- スプレッドシート: XLSX, XLS, CSV（Markdown形式で構造を保持）
+- 画像: JPG, PNG, GIF, WEBP（Vision LLMで解析）
+
+---
 
 ### oipf-summary（研究概要）
 

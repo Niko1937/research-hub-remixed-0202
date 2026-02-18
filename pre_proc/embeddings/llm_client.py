@@ -482,35 +482,177 @@ John Smith
     async def generate_research_summary(
         self,
         text: str,
-        max_length: int = 800,
+        max_length: int = 1200,
     ) -> LLMResult:
         """
-        Generate research summary for oipf_research_abstract
+        Generate structured research summary for oipf_research_abstract
 
-        研究資料から研究の概要を生成する。
+        研究資料から構造化されたAbstractを生成する。
+        Background, Objective, Method, Result, Discussion, Future Planの
+        各セクションで整理し、最終的に統合された要約を生成。
 
         Args:
             text: Full document text
             max_length: Maximum summary length
 
         Returns:
-            LLMResult with research summary
+            LLMResult with structured research summary
         """
-        system_prompt = f"""あなたは研究文書の要約専門家です。与えられた研究資料の内容を、以下の観点で要約してください：
+        system_prompt = f"""あなたは自動車業界の研究に広く、かつ深く精通した専門家です。
+研究の成果発表資料のAbstract作成を担当しています。
 
-1. 研究の目的・背景
-2. 主要な手法・アプローチ
-3. 主な成果・結論
-4. 意義・応用可能性
+【あなたの役割】
+技術的な内容や数値情報を適切に保持しつつ、読み手が研究の全体像を把握しやすい構成でまとめてください。
 
-要約は日本語で、{max_length}文字以内にしてください。
-段落分けせず、一つの文章としてまとめてください。"""
+【Abstract作成手順】
+以下の6つのセクションそれぞれについて、資料から該当する情報を抽出し、簡潔にまとめてください。
 
-        prompt = f"""以下の研究資料を要約してください：
+1. **Background（背景）**
+   - 研究の動機となった課題や社会的・技術的背景
+   - 既存技術の限界や解決すべき問題点
 
-{text[:12000]}"""
+2. **Objective（目的）**
+   - 本研究で達成しようとする具体的な目標
+   - 研究の狙いや期待される成果
 
-        return await self.generate(prompt, system_prompt, max_tokens=max_length * 2)
+3. **Method（手法）**
+   - 採用したアプローチ、技術、実験方法
+   - 使用したツール、材料、評価指標
+
+4. **Result（結果）**
+   - 得られた具体的な成果、数値データ
+   - 実験・解析の主要な結果
+
+5. **Discussion（考察）**
+   - 結果の意味・示唆
+   - 成果の限界や課題
+   - 他の研究との比較や位置づけ
+
+6. **Future Plan（今後の展開）**
+   - 今後の研究計画、発展の方向性
+   - 必要な追加検証、実装計画
+   - 実用化に向けた展望
+
+【出力ルール】
+- 各セクションの内容を統合し、一貫性のある流れのAbstractを作成
+- 重複する記述は排除し、全体の整合性を確保
+- 専門用語は適切に使用しつつ、明瞭な表現を心がける
+- 具体的な数値や技術名は可能な限り保持
+- 日本語で{max_length}文字以内にまとめる
+- 見出し（Background:等）は含めず、自然な文章として出力"""
+
+        prompt = f"""以下の研究資料から、構造化されたAbstractを作成してください。
+Background, Objective, Method, Result, Discussion, Future Planの各観点を網羅し、
+統合された読みやすい要約文として出力してください。
+
+【研究資料】
+{text[:15000]}"""
+
+        return await self.generate(prompt, system_prompt, max_tokens=max_length * 2, temperature=0.4)
+
+    async def generate_table_summary(
+        self,
+        table_context: str,
+        markdown_table: str,
+        max_length: int = 800,
+    ) -> LLMResult:
+        """
+        Generate summary for table data (Excel/CSV) optimized for research data retrieval.
+
+        表形式データ専用の要約生成。カラムの意味、数値情報、データの特徴を
+        後から検索・質問できるように要約する。
+
+        Args:
+            table_context: Summary context including schema and statistics
+            markdown_table: Full table in markdown format
+            max_length: Maximum summary length
+
+        Returns:
+            LLMResult with table summary
+        """
+        system_prompt = f"""あなたは研究データの分析専門家です。
+表形式のデータ（Excel/CSV）を分析し、後から検索や質問で見つけられるような要約を作成してください。
+
+【あなたの役割】
+研究者が「機種XXXの疲労試験結果を教えて」「素材YYYのピーク値は？」といった質問をした際に、
+この要約がベクトル検索でヒットし、詳細データにアクセスできるようにする。
+
+【要約に含めるべき情報】
+
+1. **データの概要**
+   - このデータが何を表しているか（試験結果、測定データ、仕様表など）
+   - 対象となる製品、機種、素材、試験条件など
+
+2. **カラム（列）の説明**
+   - 各カラムが何を意味するか
+   - 単位があれば記載（mm, MPa, %, 秒など）
+   - 特に重要な数値カラムを強調
+
+3. **数値データの特徴**
+   - 主要な数値の範囲（最小〜最大）
+   - 特徴的な値（ピーク値、閾値、基準値など）
+   - 傾向やパターンがあれば記載
+
+4. **キーワード**
+   - 検索でヒットすべき専門用語
+   - 製品名、試験名、規格名など
+
+【出力ルール】
+- 日本語で{max_length}文字以内
+- 箇条書きではなく、自然な文章として出力
+- 具体的な数値や固有名詞を含める
+- 「このデータは〜」のような説明口調で開始"""
+
+        prompt = f"""以下の表データを分析し、検索可能な要約を作成してください。
+
+【テーブル情報】
+{table_context}
+
+【データ（Markdown形式）】
+{markdown_table[:10000]}"""
+
+        return await self.generate(prompt, system_prompt, max_tokens=max_length * 2, temperature=0.3)
+
+    async def extract_table_tags(
+        self,
+        table_context: str,
+        num_tags: int = 8,
+    ) -> LLMResult:
+        """
+        Extract tags from table data for classification and search.
+
+        表形式データ専用のタグ抽出。データの種類、対象、測定項目などを
+        タグとして抽出する。
+
+        Args:
+            table_context: Summary context including schema and statistics
+            num_tags: Number of tags to generate
+
+        Returns:
+            LLMResult with tags (comma-separated)
+        """
+        system_prompt = f"""あなたは研究データ分類の専門家です。
+表形式データ（Excel/CSV）から、検索・分類に適したタグを{num_tags}個程度抽出してください。
+
+タグの種類：
+- データ種別（例：試験結果, 測定データ, 仕様表, 検証結果）
+- 対象（例：疲労試験, 引張試験, 熱特性, 強度評価）
+- 素材・材料（例：CFRP, アルミ合金, 鋼材, 複合材料）
+- 製品・部品（例：ボディパネル, シャフト, ギア, 電極）
+- 測定項目（例：ひずみ, 応力, 温度, 荷重, 変位）
+- 規格・基準（例：JIS, ISO, 社内規格）
+
+【重要】タグのみをカンマ区切りで出力してください。前置きや説明は一切不要です。"""
+
+        prompt = f"""以下の表データから、分類・検索用のタグを{num_tags}個程度抽出してください。
+
+【出力形式】タグ1, タグ2, タグ3
+※前置き不要。タグのみ出力。
+
+【テーブル情報】
+{table_context[:5000]}"""
+
+        return await self.generate(prompt, system_prompt, max_tokens=200)
 
     async def extract_research_tags(
         self,
@@ -549,6 +691,120 @@ John Smith
 {text[:8000]}"""
 
         return await self.generate(prompt, system_prompt, max_tokens=300)
+
+    async def extract_proper_nouns_from_path(
+        self,
+        file_path: str,
+        file_name: str,
+        folder_path: str,
+    ) -> LLMResult:
+        """
+        Extract proper nouns (research IDs, product identifiers, material identifiers)
+        from file path and file name.
+
+        Args:
+            file_path: Full file path
+            file_name: File name
+            folder_path: Folder path
+
+        Returns:
+            LLMResult with proper nouns as JSON array string
+        """
+        system_prompt = """あなたはファイルパスから固有名詞を抽出する専門家です。
+
+【重要】JSON配列形式で出力してください。説明文や前置きは一切不要です。
+
+抽出対象:
+- 研究ID（例: RD-2024-001, 研究-A-123, PROJ-001, AB12）
+- 製品識別番号（例: 6S9, AP4DI, M3X-500, X-100A）
+- 素材識別子（例: CFRP, Al6061, SUS304, アルミ合金, カーボン）
+
+除外:
+- プロジェクト名（一般的な名称）
+- 一般的な単語（report, document, 資料, データ, 結果, 報告書など）
+- 日付（2024, 202401, 2024-01など）
+- 拡張子（.pdf, .docx, .xlsxなど）
+- 一般的なフォルダ名（backup, archive, oldなど）
+
+出力例: ["6S9", "CFRP", "RD-2024-001"]
+固有名詞がない場合: []"""
+
+        prompt = f"""以下のファイルパスとファイル名から、固有名詞を抽出してJSON配列で出力してください。
+
+ファイルパス: {file_path}
+ファイル名: {file_name}
+フォルダパス: {folder_path}
+
+【出力形式】JSON配列のみ（説明不要）
+例: ["6S9", "CFRP", "RD-2024-001"]"""
+
+        return await self.generate(prompt, system_prompt, max_tokens=200, temperature=0.1)
+
+    def parse_proper_nouns(self, json_str: str) -> list[str]:
+        """
+        Parse proper nouns JSON string into list
+
+        Args:
+            json_str: JSON array string
+
+        Returns:
+            List of proper nouns
+        """
+        if not json_str:
+            return []
+
+        # Clean up the response
+        cleaned = json_str.strip()
+
+        # Remove common prefix phrases
+        prefixes_to_remove = [
+            "以下が抽出した固有名詞です：",
+            "以下が抽出した固有名詞です:",
+            "固有名詞：",
+            "固有名詞:",
+            "抽出結果：",
+            "抽出結果:",
+        ]
+        for prefix in prefixes_to_remove:
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+                break
+
+        # Try to parse as JSON
+        try:
+            result = json.loads(cleaned)
+            if isinstance(result, list):
+                # Filter out empty strings and common words
+                common_words = {
+                    "report", "document", "data", "result", "results",
+                    "資料", "データ", "結果", "報告書", "報告", "分析",
+                    "backup", "archive", "old", "new", "final", "draft",
+                    "バックアップ", "アーカイブ", "最終", "下書き",
+                }
+                filtered = [
+                    str(item).strip()
+                    for item in result
+                    if item and str(item).strip().lower() not in common_words
+                ]
+                return filtered
+        except json.JSONDecodeError:
+            pass
+
+        # Fallback: try to extract from text
+        # Look for patterns like ["item1", "item2"]
+        import re
+        match = re.search(r'\[([^\]]*)\]', cleaned)
+        if match:
+            items_str = match.group(1)
+            # Split by comma and clean up quotes
+            items = [
+                item.strip().strip('"\'')
+                for item in items_str.split(',')
+                if item.strip()
+            ]
+            return items
+
+        return []
 
     def _encode_image_to_base64(self, image_path: Path) -> tuple[str, str]:
         """

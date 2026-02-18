@@ -202,24 +202,76 @@ class SummaryIndexPipeline:
             except Exception as e:
                 self._log(f"    Warning: Tag generation error: {e}")
 
-        # 6. Generate embedding
-        self._log(f"[6/7] Generating embedding...")
+        # 6. Generate embedding (if enabled)
+        self._log(f"[6/7] Generating embeddings...")
         embedding = []
-        if self.embedding_client:
+        embed_abstract = config.processing.embed_abstract
+        embed_tags = config.processing.embed_tags
+        self._log(f"    Embedding targets: abstract={embed_abstract}, tags={embed_tags}")
+
+        if embed_abstract and self.embedding_client:
             try:
                 embedding_result = await self.embedding_client.embed_text(summary)
                 if embedding_result.success and embedding_result.embeddings:
                     embedding = embedding_result.embeddings[0]
-                    self._log(f"    Embedding generated: {len(embedding)} dimensions")
+                    self._log(f"    Abstract embedding generated: {len(embedding)} dimensions")
                 else:
-                    self._log(f"    Warning: Embedding failed: {embedding_result.error}")
+                    self._log(f"    Warning: Abstract embedding failed: {embedding_result.error}")
             except Exception as e:
-                self._log(f"    Warning: Embedding error: {e}")
+                self._log(f"    Warning: Abstract embedding error: {e}")
 
-        if not embedding:
+        # 6.5. Generate tags embedding (if enabled)
+        tags_embedding = []
+        if embed_tags and self.embedding_client and tags:
+            try:
+                tags_text = ", ".join(tags)
+                tags_embedding_result = await self.embedding_client.embed_text(tags_text)
+                if tags_embedding_result.success and tags_embedding_result.embeddings:
+                    tags_embedding = tags_embedding_result.embeddings[0]
+                    self._log(f"    Tags embedding generated: {len(tags_embedding)} dimensions")
+                else:
+                    self._log(f"    Warning: Tags embedding failed: {tags_embedding_result.error}")
+            except Exception as e:
+                self._log(f"    Warning: Tags embedding error: {e}")
+
+        # 6.6. Extract proper nouns from folder path and generate embedding (if enabled)
+        proper_nouns = []
+        proper_nouns_embedding = []
+        embed_proper_nouns = config.processing.embed_proper_nouns
+        self._log(f"    Embed proper nouns: {embed_proper_nouns}")
+
+        if embed_proper_nouns and self.llm_client:
+            try:
+                rel_path = str(file_path.relative_to(base_path)) if base_path else str(file_path)
+                folder_path_str = str(file_path.parent.relative_to(base_path)) if base_path else str(file_path.parent)
+
+                proper_nouns_result = await self.llm_client.extract_proper_nouns_from_path(
+                    file_path=rel_path,
+                    file_name=file_path.name,
+                    folder_path=folder_path_str,
+                )
+                if proper_nouns_result.success:
+                    proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
+                    self._log(f"    Extracted proper nouns: {proper_nouns}")
+
+                    if proper_nouns and self.embedding_client:
+                        proper_nouns_text = ", ".join(proper_nouns)
+                        proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
+                        if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
+                            proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
+                            self._log(f"    Proper nouns embedding generated: {len(proper_nouns_embedding)} dimensions")
+                        else:
+                            self._log(f"    Warning: Proper nouns embedding failed: {proper_nouns_embedding_result.error}")
+                else:
+                    self._log(f"    Warning: Proper nouns extraction failed: {proper_nouns_result.error}")
+            except Exception as e:
+                self._log(f"    Warning: Proper nouns extraction error: {e}")
+
+        # Ensure at least one embedding is generated
+        if not embedding and not tags_embedding and not proper_nouns_embedding:
             return ProcessingResult(
                 success=False,
-                error="Failed to generate embedding",
+                error="No embeddings generated (check EMBEDDING_TARGETS setting)",
                 research_id=research_id,
             )
 
@@ -258,6 +310,9 @@ class SummaryIndexPipeline:
             oipf_spo_folderstructure_summary=folder_structure,
             oipf_research_richtext=full_text[:100000],  # Limit richtext
             oipf_research_themetags=tags,
+            oipf_themetags_embedding=tags_embedding,
+            oipf_research_proper_nouns=proper_nouns,
+            oipf_proper_nouns_embedding=proper_nouns_embedding,
         )
 
         # Validate document
@@ -275,7 +330,10 @@ class SummaryIndexPipeline:
         self._log(f"  Research ID: {document.oipf_research_id}")
         self._log(f"  Researchers: {len(document.related_researchers)}")
         self._log(f"  Tags: {len(document.oipf_research_themetags)}")
-        self._log(f"  Embedding dims: {len(document.oipf_research_abstract_embedding)}")
+        self._log(f"  Proper Nouns: {len(document.oipf_research_proper_nouns)}")
+        self._log(f"  Abstract embedding dims: {len(document.oipf_research_abstract_embedding)}")
+        self._log(f"  Tags embedding dims: {len(document.oipf_themetags_embedding)}")
+        self._log(f"  Proper nouns embedding dims: {len(document.oipf_proper_nouns_embedding)}")
 
         # Index to OpenSearch
         indexed = False

@@ -12,7 +12,7 @@ import asyncio
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Callable
 from dataclasses import dataclass, field
 
 # Add parent to path for imports
@@ -25,6 +25,8 @@ from embeddings.document_loaders import (
     load_documents_from_folder,
     get_supported_extensions_info,
     LoaderResult,
+    is_table_file,
+    get_table_content,
 )
 from embeddings.text_processor import (
     process_documents,
@@ -98,6 +100,8 @@ class FolderEmbeddingsPipeline:
         max_depth: Optional[int] = None,
         skip_indexed_folders: Optional[bool] = None,
         embedding_file_types: Optional[str] = None,
+        embedding_targets: Optional[str] = None,
+        metadata_only: Optional[bool] = None,
         dry_run: bool = False,
         verbose: bool = True,
         max_concurrency: int = 1,
@@ -115,6 +119,8 @@ class FolderEmbeddingsPipeline:
             max_depth: Maximum folder depth to traverse (default: from env MAX_FOLDER_DEPTH or 4)
             skip_indexed_folders: Skip subfolders that already have indexed files (default: from env SKIP_INDEXED_FOLDERS)
             embedding_file_types: File types to embed: "all", "documents", "images" (default: from env EMBEDDING_FILE_TYPES)
+            embedding_targets: What to embed: "abstract", "tags", "both" (default: from env EMBEDDING_TARGETS)
+            metadata_only: Update metadata only, reuse existing embeddings (default: from env METADATA_ONLY)
             dry_run: If True, don't actually index documents
             verbose: Enable verbose output
             max_concurrency: Maximum concurrent API calls (default: 1)
@@ -128,6 +134,8 @@ class FolderEmbeddingsPipeline:
         self.max_depth = max_depth if max_depth is not None else config.processing.max_depth
         self.skip_indexed_folders = skip_indexed_folders if skip_indexed_folders is not None else config.processing.skip_indexed_folders
         self.embedding_file_types = embedding_file_types if embedding_file_types is not None else config.processing.embedding_file_types
+        self.embedding_targets = embedding_targets if embedding_targets is not None else config.processing.embedding_targets
+        self.metadata_only = metadata_only if metadata_only is not None else config.processing.metadata_only
         self.dry_run = dry_run
         self.verbose = verbose
         self.max_concurrency = max_concurrency
@@ -142,6 +150,21 @@ class FolderEmbeddingsPipeline:
     def process_images(self) -> bool:
         """Check if images should be processed"""
         return self.embedding_file_types in ("all", "images")
+
+    @property
+    def embed_abstract(self) -> bool:
+        """Check if abstract should be embedded"""
+        return self.embedding_targets in ("abstract", "both", "all")
+
+    @property
+    def embed_tags(self) -> bool:
+        """Check if tags should be embedded"""
+        return self.embedding_targets in ("tags", "both", "all")
+
+    @property
+    def embed_proper_nouns(self) -> bool:
+        """Check if proper nouns should be embedded"""
+        return self.embedding_targets in ("proper_nouns", "all")
 
     def _log(self, message: str):
         """Log message if verbose"""
@@ -307,6 +330,9 @@ class FolderEmbeddingsPipeline:
         file_name = Path(file_path).name
 
         try:
+            # Check if this is a table file (Excel/CSV)
+            is_table = is_table_file(Path(file_path))
+
             # Process documents into text
             processed = process_documents(
                 documents=loader_result.documents,
@@ -321,38 +347,111 @@ class FolderEmbeddingsPipeline:
                 self.stats.skipped_files += 1
                 return None
 
-            # Generate summary using LLM
-            summary_result = await self.llm_client.generate_summary(
-                processed.full_text,
-                max_length=500,
-            )
+            # For table files, use specialized summary and tag extraction
+            if is_table:
+                # Get table-specific content
+                markdown_content, summary_context, table_error = get_table_content(Path(file_path))
+                if table_error:
+                    self._log(f"  Warning: Could not get table content: {table_error}")
+                    # Fall back to regular processing
+                    is_table = False
 
-            if not summary_result.success:
-                self.stats.errors.append(f"{file_name}: Summary generation failed - {summary_result.error}")
-                summary = truncate_text(processed.full_text, 500)
+            if is_table:
+                # Generate summary using table-specific LLM prompt
+                summary_result = await self.llm_client.generate_table_summary(
+                    table_context=summary_context,
+                    markdown_table=markdown_content,
+                    max_length=500,
+                )
+
+                if not summary_result.success:
+                    self.stats.errors.append(f"{file_name}: Table summary generation failed - {summary_result.error}")
+                    summary = truncate_text(processed.full_text, 500)
+                else:
+                    summary = summary_result.content
+
+                # Extract tags using table-specific LLM prompt
+                tags_result = await self.llm_client.extract_table_tags(
+                    table_context=summary_context,
+                    num_tags=8,
+                )
             else:
-                summary = summary_result.content
+                # Generate summary using LLM (regular documents)
+                summary_result = await self.llm_client.generate_summary(
+                    processed.full_text,
+                    max_length=500,
+                )
 
-            # Extract tags using LLM
-            tags_result = await self.llm_client.extract_tags(processed.full_text)
+                if not summary_result.success:
+                    self.stats.errors.append(f"{file_name}: Summary generation failed - {summary_result.error}")
+                    summary = truncate_text(processed.full_text, 500)
+                else:
+                    summary = summary_result.content
+
+                # Extract tags using LLM (regular documents)
+                tags_result = await self.llm_client.extract_tags(processed.full_text)
 
             if tags_result.success:
                 tags = self.llm_client.parse_tags(tags_result.content)
             else:
                 tags = []
 
-            # Generate embedding for the summary
-            embedding_result = await self.embedding_client.embed_text(summary)
+            # Generate embedding for the summary (if enabled)
+            embedding = []
+            if self.embed_abstract:
+                embedding_result = await self.embedding_client.embed_text(summary)
 
-            if not embedding_result.success:
-                self.stats.errors.append(f"{file_name}: Embedding failed - {embedding_result.error}")
-                return None
+                if not embedding_result.success:
+                    self.stats.errors.append(f"{file_name}: Embedding failed - {embedding_result.error}")
+                    return None
 
-            embedding = embedding_result.embeddings[0] if embedding_result.embeddings else []
+                embedding = embedding_result.embeddings[0] if embedding_result.embeddings else []
 
-            # Validate embedding dimensions
-            if len(embedding) != 1024:
-                self.stats.errors.append(f"{file_name}: Invalid embedding dimensions ({len(embedding)} != 1024)")
+                # Validate embedding dimensions
+                if len(embedding) != 1024:
+                    self.stats.errors.append(f"{file_name}: Invalid embedding dimensions ({len(embedding)} != 1024)")
+                    return None
+
+            # Generate embedding for tags (if enabled)
+            tags_embedding = []
+            if self.embed_tags and tags:
+                tags_text = ", ".join(tags)
+                tags_embedding_result = await self.embedding_client.embed_text(tags_text)
+                if tags_embedding_result.success and tags_embedding_result.embeddings:
+                    tags_embedding = tags_embedding_result.embeddings[0]
+                    if len(tags_embedding) != 1024:
+                        self._log(f"  Warning: Invalid tags embedding dimensions for {file_name}")
+                        tags_embedding = []
+
+            # Extract proper nouns from path/filename and generate embedding (if enabled)
+            proper_nouns = []
+            proper_nouns_embedding = []
+            if self.embed_proper_nouns:
+                # Calculate relative path and folder path for extraction
+                rel_path = str(Path(file_path).relative_to(base_folder)) if base_folder else file_path
+                folder_path = str(Path(rel_path).parent) if Path(rel_path).parent != Path(".") else ""
+
+                proper_nouns_result = await self.llm_client.extract_proper_nouns_from_path(
+                    file_path=rel_path,
+                    file_name=file_name,
+                    folder_path=folder_path,
+                )
+                if proper_nouns_result.success:
+                    proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
+                    if proper_nouns:
+                        self._log(f"  Extracted proper nouns: {proper_nouns}")
+                        # Generate embedding for proper nouns
+                        proper_nouns_text = ", ".join(proper_nouns)
+                        proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
+                        if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
+                            proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
+                            if len(proper_nouns_embedding) != 1024:
+                                self._log(f"  Warning: Invalid proper nouns embedding dimensions for {file_name}")
+                                proper_nouns_embedding = []
+
+            # Ensure at least one embedding is generated
+            if not embedding and not tags_embedding and not proper_nouns_embedding:
+                self.stats.errors.append(f"{file_name}: No embeddings generated (check EMBEDDING_TARGETS setting)")
                 return None
 
             # Extract author/editor metadata
@@ -370,12 +469,340 @@ class FolderEmbeddingsPipeline:
                 authors=authors,
                 editors=editors,
                 research_id=research_id,
+                tags_embedding=tags_embedding,
+                proper_nouns=proper_nouns,
+                proper_nouns_embedding=proper_nouns_embedding,
             )
 
             return oipf_doc
 
         except Exception as e:
             self.stats.errors.append(f"{file_name}: Processing error - {str(e)}")
+            return None
+
+    async def _process_single_file_metadata_only(
+        self,
+        loader_result: LoaderResult,
+        base_folder: str,
+        research_id: str = "",
+    ) -> Optional[OIPFDetailsDocument]:
+        """
+        Process a single file in metadata-only mode (reuse existing embedding)
+
+        Args:
+            loader_result: Document loader result
+            base_folder: Base folder path
+            research_id: Research ID for grouping files
+
+        Returns:
+            OIPFDocument or None if failed
+        """
+        file_path = loader_result.file_path
+        file_name = Path(file_path).name
+
+        try:
+            # Check if document exists and get existing embedding
+            from embeddings.oipf_schema import generate_document_id
+
+            # Generate the expected document ID
+            doc_id = generate_document_id(file_path, base_folder)
+
+            # Try to get existing document with embedding
+            existing_doc = await self.opensearch_client.get_document(
+                index_name=self.index_name,
+                doc_id=doc_id,
+            )
+
+            if not existing_doc:
+                # Also try searching by file path
+                result = await self.opensearch_client.find_document_with_embedding(
+                    index_name=self.index_name,
+                    file_path=str(Path(file_path).relative_to(base_folder)),
+                    file_name=file_name,
+                )
+                if result:
+                    doc_id, existing_embedding = result
+                    self._log(f"  Found existing embedding for: {file_name}")
+                else:
+                    self._log(f"  No existing embedding found, skipping: {file_name}")
+                    self.stats.skipped_files += 1
+                    return None
+            else:
+                existing_embedding = existing_doc.get("oipf_abstract_embedding", [])
+                if not existing_embedding:
+                    self._log(f"  Existing document has no embedding, skipping: {file_name}")
+                    self.stats.skipped_files += 1
+                    return None
+
+            # Validate embedding dimensions
+            if len(existing_embedding) != 1024:
+                self.stats.errors.append(f"{file_name}: Invalid existing embedding dimensions ({len(existing_embedding)} != 1024)")
+                return None
+
+            # Check if this is a table file (Excel/CSV)
+            is_table = is_table_file(Path(file_path))
+
+            # Process documents into text
+            processed = process_documents(
+                documents=loader_result.documents,
+                source_path=file_path,
+                file_name=file_name,
+                file_type=loader_result.file_type,
+                chunk_size=self.chunk_size,
+            )
+
+            if not processed.full_text.strip():
+                self._log(f"  Skipped (empty content): {file_name}")
+                self.stats.skipped_files += 1
+                return None
+
+            # For table files, use specialized summary and tag extraction
+            if is_table:
+                markdown_content, summary_context, table_error = get_table_content(Path(file_path))
+                if table_error:
+                    self._log(f"  Warning: Could not get table content: {table_error}")
+                    is_table = False
+
+            if is_table:
+                # Generate summary using table-specific LLM prompt
+                summary_result = await self.llm_client.generate_table_summary(
+                    table_context=summary_context,
+                    markdown_table=markdown_content,
+                    max_length=500,
+                )
+
+                if not summary_result.success:
+                    self.stats.errors.append(f"{file_name}: Table summary generation failed - {summary_result.error}")
+                    summary = truncate_text(processed.full_text, 500)
+                else:
+                    summary = summary_result.content
+
+                # Extract tags using table-specific LLM prompt
+                tags_result = await self.llm_client.extract_table_tags(
+                    table_context=summary_context,
+                    num_tags=8,
+                )
+            else:
+                # Generate summary using LLM (regular documents)
+                summary_result = await self.llm_client.generate_summary(
+                    processed.full_text,
+                    max_length=500,
+                )
+
+                if not summary_result.success:
+                    self.stats.errors.append(f"{file_name}: Summary generation failed - {summary_result.error}")
+                    summary = truncate_text(processed.full_text, 500)
+                else:
+                    summary = summary_result.content
+
+                # Extract tags using LLM (regular documents)
+                tags_result = await self.llm_client.extract_tags(processed.full_text)
+
+            if tags_result.success:
+                tags = self.llm_client.parse_tags(tags_result.content)
+            else:
+                tags = []
+
+            # Generate embedding for tags (if enabled, even in metadata-only mode)
+            tags_embedding = []
+            if self.embed_tags and tags:
+                tags_text = ", ".join(tags)
+                tags_embedding_result = await self.embedding_client.embed_text(tags_text)
+                if tags_embedding_result.success and tags_embedding_result.embeddings:
+                    tags_embedding = tags_embedding_result.embeddings[0]
+                    if len(tags_embedding) != 1024:
+                        self._log(f"  Warning: Invalid tags embedding dimensions for {file_name}")
+                        tags_embedding = []
+
+            # Extract proper nouns from path/filename and generate embedding (if enabled)
+            proper_nouns = []
+            proper_nouns_embedding = []
+            if self.embed_proper_nouns:
+                rel_path = str(Path(file_path).relative_to(base_folder)) if base_folder else file_path
+                folder_path = str(Path(rel_path).parent) if Path(rel_path).parent != Path(".") else ""
+
+                proper_nouns_result = await self.llm_client.extract_proper_nouns_from_path(
+                    file_path=rel_path,
+                    file_name=file_name,
+                    folder_path=folder_path,
+                )
+                if proper_nouns_result.success:
+                    proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
+                    if proper_nouns:
+                        self._log(f"  Extracted proper nouns: {proper_nouns}")
+                        proper_nouns_text = ", ".join(proper_nouns)
+                        proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
+                        if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
+                            proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
+                            if len(proper_nouns_embedding) != 1024:
+                                self._log(f"  Warning: Invalid proper nouns embedding dimensions for {file_name}")
+                                proper_nouns_embedding = []
+
+            # Extract author/editor metadata
+            authors = loader_result.metadata.authors if loader_result.metadata else []
+            editors = loader_result.metadata.editors if loader_result.metadata else []
+
+            # Create OIPF details document with EXISTING embedding
+            oipf_doc = create_oipf_details_document(
+                file_path=file_path,
+                full_text=truncate_richtext(processed.full_text),
+                abstract=summary,
+                embedding=existing_embedding,  # Reuse existing embedding
+                tags=tags,
+                base_folder=base_folder,
+                authors=authors,
+                editors=editors,
+                research_id=research_id,
+                tags_embedding=tags_embedding,  # Generate new tags embedding (if enabled)
+                proper_nouns=proper_nouns,
+                proper_nouns_embedding=proper_nouns_embedding,
+            )
+
+            return oipf_doc
+
+        except Exception as e:
+            self.stats.errors.append(f"{file_name}: Processing error - {str(e)}")
+            return None
+
+    async def _process_image_file_metadata_only(
+        self,
+        loader_result: LoaderResult,
+        base_folder: str,
+        research_id: str = "",
+    ) -> Optional[OIPFDetailsDocument]:
+        """
+        Process an image file in metadata-only mode (reuse existing embedding)
+
+        Args:
+            loader_result: Document loader result (with is_image=True)
+            base_folder: Base folder path
+            research_id: Research ID for grouping files
+
+        Returns:
+            OIPFDocument or None if failed
+        """
+        file_path = loader_result.file_path
+        file_name = Path(file_path).name
+
+        try:
+            # Check if document exists and get existing embedding
+            from embeddings.oipf_schema import generate_document_id
+
+            # Generate the expected document ID
+            doc_id = generate_document_id(file_path, base_folder)
+
+            # Try to get existing document with embedding
+            existing_doc = await self.opensearch_client.get_document(
+                index_name=self.index_name,
+                doc_id=doc_id,
+            )
+
+            if not existing_doc:
+                # Also try searching by file path
+                result = await self.opensearch_client.find_document_with_embedding(
+                    index_name=self.index_name,
+                    file_path=str(Path(file_path).relative_to(base_folder)),
+                    file_name=file_name,
+                )
+                if result:
+                    doc_id, existing_embedding = result
+                    self._log(f"  Found existing embedding for image: {file_name}")
+                else:
+                    self._log(f"  No existing embedding found, skipping image: {file_name}")
+                    self.stats.skipped_files += 1
+                    return None
+            else:
+                existing_embedding = existing_doc.get("oipf_abstract_embedding", [])
+                if not existing_embedding:
+                    self._log(f"  Existing document has no embedding, skipping image: {file_name}")
+                    self.stats.skipped_files += 1
+                    return None
+
+            # Validate embedding dimensions
+            if len(existing_embedding) != 1024:
+                self.stats.errors.append(f"{file_name}: Invalid existing embedding dimensions ({len(existing_embedding)} != 1024)")
+                return None
+
+            # Analyze image using Vision LLM
+            self._log(f"  Analyzing image: {file_name}")
+            description_result = await self.llm_client.analyze_image(
+                file_path,
+                max_length=500,
+            )
+
+            if not description_result.success:
+                self.stats.errors.append(f"{file_name}: Image analysis failed - {description_result.error}")
+                return None
+
+            description = description_result.content
+
+            # Extract tags using Vision LLM
+            tags_result = await self.llm_client.extract_tags_from_image(file_path)
+
+            if tags_result.success:
+                tags = self.llm_client.parse_tags(tags_result.content)
+            else:
+                tags = []
+
+            # Generate embedding for tags (if enabled, even in metadata-only mode)
+            tags_embedding = []
+            if self.embed_tags and tags:
+                tags_text = ", ".join(tags)
+                tags_embedding_result = await self.embedding_client.embed_text(tags_text)
+                if tags_embedding_result.success and tags_embedding_result.embeddings:
+                    tags_embedding = tags_embedding_result.embeddings[0]
+                    if len(tags_embedding) != 1024:
+                        self._log(f"  Warning: Invalid tags embedding dimensions for image {file_name}")
+                        tags_embedding = []
+
+            # Extract proper nouns from path/filename and generate embedding (if enabled)
+            proper_nouns = []
+            proper_nouns_embedding = []
+            if self.embed_proper_nouns:
+                rel_path = str(Path(file_path).relative_to(base_folder)) if base_folder else file_path
+                folder_path = str(Path(rel_path).parent) if Path(rel_path).parent != Path(".") else ""
+
+                proper_nouns_result = await self.llm_client.extract_proper_nouns_from_path(
+                    file_path=rel_path,
+                    file_name=file_name,
+                    folder_path=folder_path,
+                )
+                if proper_nouns_result.success:
+                    proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
+                    if proper_nouns:
+                        self._log(f"  Extracted proper nouns for image: {proper_nouns}")
+                        proper_nouns_text = ", ".join(proper_nouns)
+                        proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
+                        if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
+                            proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
+                            if len(proper_nouns_embedding) != 1024:
+                                self._log(f"  Warning: Invalid proper nouns embedding dimensions for image {file_name}")
+                                proper_nouns_embedding = []
+
+            # Extract author/editor metadata
+            authors = loader_result.metadata.authors if loader_result.metadata else []
+            editors = loader_result.metadata.editors if loader_result.metadata else []
+
+            # Create OIPF details document with EXISTING embedding
+            oipf_doc = create_oipf_details_document(
+                file_path=file_path,
+                full_text=f"[Image: {file_name}]\n\n{description}",
+                abstract=description,
+                embedding=existing_embedding,  # Reuse existing embedding
+                tags=tags,
+                base_folder=base_folder,
+                authors=authors,
+                editors=editors,
+                research_id=research_id,
+                tags_embedding=tags_embedding,  # Generate new tags embedding (if enabled)
+                proper_nouns=proper_nouns,
+                proper_nouns_embedding=proper_nouns_embedding,
+            )
+
+            return oipf_doc
+
+        except Exception as e:
+            self.stats.errors.append(f"{file_name}: Image processing error - {str(e)}")
             return None
 
     async def _process_image_file(
@@ -420,18 +847,60 @@ class FolderEmbeddingsPipeline:
             else:
                 tags = []
 
-            # Generate embedding for the description
-            embedding_result = await self.embedding_client.embed_text(description)
+            # Generate embedding for the description (if enabled)
+            embedding = []
+            if self.embed_abstract:
+                embedding_result = await self.embedding_client.embed_text(description)
 
-            if not embedding_result.success:
-                self.stats.errors.append(f"{file_name}: Embedding failed - {embedding_result.error}")
-                return None
+                if not embedding_result.success:
+                    self.stats.errors.append(f"{file_name}: Embedding failed - {embedding_result.error}")
+                    return None
 
-            embedding = embedding_result.embeddings[0] if embedding_result.embeddings else []
+                embedding = embedding_result.embeddings[0] if embedding_result.embeddings else []
 
-            # Validate embedding dimensions
-            if len(embedding) != 1024:
-                self.stats.errors.append(f"{file_name}: Invalid embedding dimensions ({len(embedding)} != 1024)")
+                # Validate embedding dimensions
+                if len(embedding) != 1024:
+                    self.stats.errors.append(f"{file_name}: Invalid embedding dimensions ({len(embedding)} != 1024)")
+                    return None
+
+            # Generate embedding for tags (if enabled)
+            tags_embedding = []
+            if self.embed_tags and tags:
+                tags_text = ", ".join(tags)
+                tags_embedding_result = await self.embedding_client.embed_text(tags_text)
+                if tags_embedding_result.success and tags_embedding_result.embeddings:
+                    tags_embedding = tags_embedding_result.embeddings[0]
+                    if len(tags_embedding) != 1024:
+                        self._log(f"  Warning: Invalid tags embedding dimensions for image {file_name}")
+                        tags_embedding = []
+
+            # Extract proper nouns from path/filename and generate embedding (if enabled)
+            proper_nouns = []
+            proper_nouns_embedding = []
+            if self.embed_proper_nouns:
+                rel_path = str(Path(file_path).relative_to(base_folder)) if base_folder else file_path
+                folder_path = str(Path(rel_path).parent) if Path(rel_path).parent != Path(".") else ""
+
+                proper_nouns_result = await self.llm_client.extract_proper_nouns_from_path(
+                    file_path=rel_path,
+                    file_name=file_name,
+                    folder_path=folder_path,
+                )
+                if proper_nouns_result.success:
+                    proper_nouns = self.llm_client.parse_proper_nouns(proper_nouns_result.content)
+                    if proper_nouns:
+                        self._log(f"  Extracted proper nouns for image: {proper_nouns}")
+                        proper_nouns_text = ", ".join(proper_nouns)
+                        proper_nouns_embedding_result = await self.embedding_client.embed_text(proper_nouns_text)
+                        if proper_nouns_embedding_result.success and proper_nouns_embedding_result.embeddings:
+                            proper_nouns_embedding = proper_nouns_embedding_result.embeddings[0]
+                            if len(proper_nouns_embedding) != 1024:
+                                self._log(f"  Warning: Invalid proper nouns embedding dimensions for image {file_name}")
+                                proper_nouns_embedding = []
+
+            # Ensure at least one embedding is generated
+            if not embedding and not tags_embedding and not proper_nouns_embedding:
+                self.stats.errors.append(f"{file_name}: No embeddings generated (check EMBEDDING_TARGETS setting)")
                 return None
 
             # Extract author/editor metadata
@@ -449,6 +918,9 @@ class FolderEmbeddingsPipeline:
                 authors=authors,
                 editors=editors,
                 research_id=research_id,
+                tags_embedding=tags_embedding,
+                proper_nouns=proper_nouns,
+                proper_nouns_embedding=proper_nouns_embedding,
             )
 
             return oipf_doc
@@ -500,6 +972,263 @@ class FolderEmbeddingsPipeline:
 
         return True, is_update
 
+    async def _process_document_file_complete(
+        self,
+        loader_result: LoaderResult,
+        folder_path: str,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> dict:
+        """
+        Process a single document file completely (process + index).
+
+        Args:
+            loader_result: Document loader result
+            folder_path: Base folder path
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            Dict with processing result stats
+        """
+        file_name = Path(loader_result.file_path).name
+        result = {
+            "processed": False,
+            "indexed": False,
+            "updated": False,
+            "failed": False,
+            "is_image": False,
+        }
+
+        try:
+            # Extract research_id from immediate subfolder name
+            research_id = self._extract_research_id(loader_result.file_path, folder_path)
+
+            # Process file (metadata-only or full)
+            if self.metadata_only:
+                oipf_doc = await self._process_single_file_metadata_only(loader_result, folder_path, research_id)
+            else:
+                oipf_doc = await self._process_single_file(loader_result, folder_path, research_id)
+
+            if oipf_doc is None:
+                result["failed"] = True
+                return result
+
+            result["processed"] = True
+
+            # Index document
+            success, is_update = await self._index_document(oipf_doc)
+            if success:
+                result["indexed"] = True
+                result["updated"] = is_update
+            else:
+                result["failed"] = True
+
+            if progress_callback:
+                progress_callback(file_name)
+
+        except Exception as e:
+            self.stats.errors.append(f"{file_name}: Processing error - {str(e)}")
+            result["failed"] = True
+
+        return result
+
+    async def _process_image_file_complete(
+        self,
+        loader_result: LoaderResult,
+        folder_path: str,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> dict:
+        """
+        Process a single image file completely (process + index).
+
+        Args:
+            loader_result: Document loader result
+            folder_path: Base folder path
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            Dict with processing result stats
+        """
+        file_name = Path(loader_result.file_path).name
+        result = {
+            "processed": False,
+            "indexed": False,
+            "updated": False,
+            "failed": False,
+            "is_image": True,
+        }
+
+        try:
+            # Extract research_id from immediate subfolder name
+            research_id = self._extract_research_id(loader_result.file_path, folder_path)
+
+            # Process image (metadata-only or full)
+            if self.metadata_only:
+                oipf_doc = await self._process_image_file_metadata_only(loader_result, folder_path, research_id)
+            else:
+                oipf_doc = await self._process_image_file(loader_result, folder_path, research_id)
+
+            if oipf_doc is None:
+                result["failed"] = True
+                return result
+
+            result["processed"] = True
+
+            # Index document
+            success, is_update = await self._index_document(oipf_doc)
+            if success:
+                result["indexed"] = True
+                result["updated"] = is_update
+            else:
+                result["failed"] = True
+
+            if progress_callback:
+                progress_callback(file_name)
+
+        except Exception as e:
+            self.stats.errors.append(f"{file_name}: Image processing error - {str(e)}")
+            result["failed"] = True
+
+        return result
+
+    async def _process_unsupported_file_complete(
+        self,
+        loader_result: LoaderResult,
+        folder_path: str,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> dict:
+        """
+        Process a single unsupported file (path-only indexing).
+
+        Args:
+            loader_result: Document loader result
+            folder_path: Base folder path
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            Dict with processing result stats
+        """
+        file_name = Path(loader_result.file_path).name
+        result = {
+            "processed": False,
+            "indexed": False,
+            "updated": False,
+            "failed": False,
+            "is_unsupported": True,
+        }
+
+        try:
+            # Extract research_id from immediate subfolder name
+            research_id = self._extract_research_id(loader_result.file_path, folder_path)
+
+            # Extract author/editor metadata
+            authors = loader_result.metadata.authors if loader_result.metadata else []
+            editors = loader_result.metadata.editors if loader_result.metadata else []
+
+            # Create path-only document
+            oipf_doc = create_oipf_details_document_path_only(
+                file_path=loader_result.file_path,
+                base_folder=folder_path,
+                authors=authors,
+                editors=editors,
+                research_id=research_id,
+            )
+
+            result["processed"] = True
+
+            # Index document
+            success, is_update = await self._index_document(oipf_doc)
+            if success:
+                result["indexed"] = True
+                result["updated"] = is_update
+            else:
+                result["failed"] = True
+
+            if progress_callback:
+                progress_callback(file_name)
+
+        except Exception as e:
+            self.stats.errors.append(f"{file_name}: Path-only indexing error - {str(e)}")
+            result["failed"] = True
+
+        return result
+
+    async def _process_files_parallel(
+        self,
+        files: list[LoaderResult],
+        folder_path: str,
+        file_type: str,  # "document", "image", or "unsupported"
+        desc: str = "Processing",
+    ) -> None:
+        """
+        Process multiple files in parallel with concurrency limit.
+
+        Args:
+            files: List of LoaderResult objects
+            folder_path: Base folder path
+            file_type: Type of files being processed
+            desc: Description for progress display
+        """
+        if not files:
+            return
+
+        # Create semaphore for concurrency control
+        semaphore = asyncio.Semaphore(self.max_concurrency)
+
+        # Progress tracking
+        completed = 0
+        total = len(files)
+        lock = asyncio.Lock()
+
+        async def process_with_semaphore(loader_result: LoaderResult) -> dict:
+            nonlocal completed
+            async with semaphore:
+                if file_type == "document":
+                    result = await self._process_document_file_complete(loader_result, folder_path)
+                elif file_type == "image":
+                    result = await self._process_image_file_complete(loader_result, folder_path)
+                else:  # unsupported
+                    result = await self._process_unsupported_file_complete(loader_result, folder_path)
+
+                # Update progress
+                async with lock:
+                    completed += 1
+                    if self.verbose:
+                        # Print progress inline
+                        print(f"\r{desc}: {completed}/{total} ({completed*100//total}%)", end="", flush=True)
+
+                return result
+
+        # Process all files in parallel (with semaphore limiting concurrency)
+        self._log(f"\n{desc} ({total} files, {self.max_concurrency} parallel)...")
+        results = await asyncio.gather(*[process_with_semaphore(f) for f in files], return_exceptions=True)
+
+        # Print newline after progress
+        if self.verbose:
+            print()
+
+        # Aggregate results
+        for result in results:
+            if isinstance(result, Exception):
+                self.stats.errors.append(f"Unexpected error: {str(result)}")
+                self.stats.failed_files += 1
+                continue
+
+            if result.get("failed"):
+                self.stats.failed_files += 1
+            elif result.get("processed"):
+                self.stats.processed_files += 1
+                if result.get("is_image"):
+                    self.stats.processed_images += 1
+                if result.get("is_unsupported"):
+                    self.stats.unsupported_files += 1
+
+                if result.get("indexed"):
+                    self.stats.indexed_documents += 1
+                    if result.get("updated"):
+                        self.stats.updated_documents += 1
+                else:
+                    self.stats.failed_index += 1
+
     async def process_folder(
         self,
         folder_path: str,
@@ -528,6 +1257,11 @@ class FolderEmbeddingsPipeline:
         self._log(f"Dry run: {self.dry_run}")
         self._log(f"Max depth: {self.max_depth}")
         self._log(f"Skip indexed folders: {self.skip_indexed_folders}")
+        self._log(f"Metadata only: {self.metadata_only}")
+        self._log(f"Embedding targets: {self.embedding_targets}")
+        self._log(f"  - Abstract: {'Yes' if self.embed_abstract else 'No'}")
+        self._log(f"  - Tags: {'Yes' if self.embed_tags else 'No'}")
+        self._log(f"  - Proper Nouns: {'Yes' if self.embed_proper_nouns else 'No'}")
         self._log(f"{'='*60}\n")
 
         # Initialize clients
@@ -634,96 +1368,34 @@ class FolderEmbeddingsPipeline:
         if skipped_by_type > 0:
             self._log(f"Skipped {skipped_by_type} files due to EMBEDDING_FILE_TYPES setting")
 
-        # Process document files
+        # Process document files in parallel
         if document_files:
-            self._log(f"\nProcessing {len(document_files)} document files...")
+            mode_desc = "metadata-only" if self.metadata_only else "full"
+            await self._process_files_parallel(
+                files=document_files,
+                folder_path=folder_path,
+                file_type="document",
+                desc=f"Processing documents ({mode_desc})",
+            )
 
-            for loader_result in tqdm(document_files, desc="Processing documents"):
-                file_name = Path(loader_result.file_path).name
-
-                # Extract research_id from immediate subfolder name (first 4 alphanumeric chars)
-                research_id = self._extract_research_id(loader_result.file_path, folder_path)
-
-                # Process file
-                oipf_doc = await self._process_single_file(loader_result, folder_path, research_id)
-
-                if oipf_doc is None:
-                    self.stats.failed_files += 1
-                    continue
-
-                self.stats.processed_files += 1
-
-                # Index document
-                success, is_update = await self._index_document(oipf_doc)
-                if success:
-                    self.stats.indexed_documents += 1
-                    if is_update:
-                        self.stats.updated_documents += 1
-                else:
-                    self.stats.failed_index += 1
-
-        # Process image files using Vision LLM
+        # Process image files in parallel
         if image_files:
-            self._log(f"\nProcessing {len(image_files)} image files (Vision LLM)...")
+            mode_desc = "metadata-only" if self.metadata_only else "full"
+            await self._process_files_parallel(
+                files=image_files,
+                folder_path=folder_path,
+                file_type="image",
+                desc=f"Processing images ({mode_desc})",
+            )
 
-            for loader_result in tqdm(image_files, desc="Processing images"):
-                file_name = Path(loader_result.file_path).name
-
-                # Extract research_id from immediate subfolder name (first 4 alphanumeric chars)
-                research_id = self._extract_research_id(loader_result.file_path, folder_path)
-
-                # Process image
-                oipf_doc = await self._process_image_file(loader_result, folder_path, research_id)
-
-                if oipf_doc is None:
-                    self.stats.failed_files += 1
-                    continue
-
-                self.stats.processed_files += 1
-                self.stats.processed_images += 1
-
-                # Index document
-                success, is_update = await self._index_document(oipf_doc)
-                if success:
-                    self.stats.indexed_documents += 1
-                    if is_update:
-                        self.stats.updated_documents += 1
-                else:
-                    self.stats.failed_index += 1
-
-        # Process unsupported files (path-only)
+        # Process unsupported files in parallel (path-only)
         if unsupported_files:
-            self._log("\nIndexing unsupported files (path-only)...")
-
-            for loader_result in tqdm(unsupported_files, desc="Indexing path-only"):
-                file_name = Path(loader_result.file_path).name
-
-                # Extract research_id from immediate subfolder name (first 4 alphanumeric chars)
-                research_id = self._extract_research_id(loader_result.file_path, folder_path)
-
-                # Extract author/editor metadata
-                authors = loader_result.metadata.authors if loader_result.metadata else []
-                editors = loader_result.metadata.editors if loader_result.metadata else []
-
-                # Create path-only document
-                oipf_doc = create_oipf_details_document_path_only(
-                    file_path=loader_result.file_path,
-                    base_folder=folder_path,
-                    authors=authors,
-                    editors=editors,
-                    research_id=research_id,
-                )
-
-                self.stats.unsupported_files += 1
-
-                # Index document
-                success, is_update = await self._index_document(oipf_doc)
-                if success:
-                    self.stats.indexed_documents += 1
-                    if is_update:
-                        self.stats.updated_documents += 1
-                else:
-                    self.stats.failed_index += 1
+            await self._process_files_parallel(
+                files=unsupported_files,
+                folder_path=folder_path,
+                file_type="unsupported",
+                desc="Indexing path-only",
+            )
 
         self.stats.end_time = datetime.now()
 
@@ -848,13 +1520,25 @@ def main():
         "--parallel", "-p",
         type=int,
         default=1,
-        help="並列処理数（デフォルト: 1）"
+        help="ファイル単位の並列処理数（デフォルト: 1）。複数ファイルを同時にLLM要約・エンベディング・インデックス投入する"
     )
     parser.add_argument(
         "--skip-indexed-folders",
         action="store_true",
         default=None,
         help=f"既にインデックスされたサブフォルダをスキップ（デフォルト: 環境変数 SKIP_INDEXED_FOLDERS または {config.processing.skip_indexed_folders}）"
+    )
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        default=None,
+        help=f"メタデータのみ更新（エンベディングは既存を再利用）（デフォルト: 環境変数 METADATA_ONLY または {config.processing.metadata_only}）"
+    )
+    parser.add_argument(
+        "--embedding-targets",
+        choices=["abstract", "tags", "both"],
+        default=None,
+        help=f"エンベディング対象: abstract(要約のみ), tags(タグのみ), both(両方)（デフォルト: 環境変数 EMBEDDING_TARGETS または {config.processing.embedding_targets}）"
     )
 
     args = parser.parse_args()
@@ -883,6 +1567,8 @@ def main():
         max_file_size_mb=args.max_file_size,  # None uses config default
         max_depth=args.depth,  # None uses config default
         skip_indexed_folders=args.skip_indexed_folders,  # None uses config default
+        metadata_only=args.metadata_only,  # None uses config default
+        embedding_targets=args.embedding_targets,  # None uses config default
         dry_run=args.dry_run,
         verbose=not args.quiet,
         max_concurrency=args.parallel,

@@ -187,6 +187,11 @@ class InternalResearchSearchService:
         """
         Initial query search using vector similarity on oipf-summary
 
+        Supports three search modes via SEARCH_MODE environment variable:
+        - "abstract": Search only abstract embeddings (default behavior)
+        - "tags": Search only tag embeddings
+        - "hybrid": Search both and combine scores with configurable weights
+
         Args:
             query: User's question
             limit: Maximum number of results
@@ -202,17 +207,67 @@ class InternalResearchSearchService:
 
         print(f"[InternalResearchSearch] search_initial: Searching for '{query[:50]}...'")
 
+        # Get search configuration
+        search_mode = self.settings.search_mode
+        abstract_weight = self.settings.search_abstract_weight / 100.0
+        tags_weight = self.settings.search_tags_weight / 100.0
+        proper_nouns_weight = self.settings.search_proper_nouns_weight / 100.0
+        print(f"  - search_mode: {search_mode}")
+        print(f"  - weights: abstract={abstract_weight}, tags={tags_weight}, proper_nouns={proper_nouns_weight}")
+
         try:
             # 1. Embed the query
             query_embedding = await embedding_client.embed_text(query)
 
-            # 2. Perform vector search on oipf-summary
-            response = await opensearch_client.vector_search(
-                index="oipf-summary",
-                vector_field="oipf_research_abstract_embedding",
-                query_vector=query_embedding,
-                k=limit,
-            )
+            # 2. Perform vector search based on mode
+            if search_mode == "abstract":
+                # Abstract embeddings only (traditional behavior)
+                response = await opensearch_client.vector_search(
+                    index="oipf-summary",
+                    vector_field="oipf_research_abstract_embedding",
+                    query_vector=query_embedding,
+                    k=limit,
+                )
+            elif search_mode == "tags":
+                # Tags embeddings only
+                response = await opensearch_client.vector_search(
+                    index="oipf-summary",
+                    vector_field="oipf_themetags_embedding",
+                    query_vector=query_embedding,
+                    k=limit,
+                )
+            elif search_mode == "proper_nouns":
+                # Proper nouns embeddings only
+                response = await opensearch_client.vector_search(
+                    index="oipf-summary",
+                    vector_field="oipf_proper_nouns_embedding",
+                    query_vector=query_embedding,
+                    k=limit,
+                )
+            elif search_mode == "triple":
+                # Triple hybrid search (abstract + tags + proper_nouns)
+                response = await opensearch_client.triple_hybrid_vector_search(
+                    index="oipf-summary",
+                    query_vector=query_embedding,
+                    abstract_field="oipf_research_abstract_embedding",
+                    tags_field="oipf_themetags_embedding",
+                    proper_nouns_field="oipf_proper_nouns_embedding",
+                    abstract_weight=abstract_weight,
+                    tags_weight=tags_weight,
+                    proper_nouns_weight=proper_nouns_weight,
+                    k=limit,
+                )
+            else:
+                # Hybrid search (abstract + tags, default)
+                response = await opensearch_client.hybrid_vector_search(
+                    index="oipf-summary",
+                    query_vector=query_embedding,
+                    abstract_field="oipf_research_abstract_embedding",
+                    tags_field="oipf_themetags_embedding",
+                    abstract_weight=abstract_weight,
+                    tags_weight=tags_weight,
+                    k=limit,
+                )
 
             # 3. Parse results
             results = []
@@ -260,6 +315,11 @@ class InternalResearchSearchService:
         Uses cosine similarity (same as search_initial) for consistent scoring.
         The oipf-details index has oipf_abstract_embedding for KNN vector search.
 
+        Supports three search modes via SEARCH_MODE environment variable:
+        - "abstract": Search only abstract embeddings (default behavior)
+        - "tags": Search only tag embeddings
+        - "hybrid": Search both and combine scores with configurable weights
+
         Args:
             query: User's question
             chat_history: Previous chat messages
@@ -277,6 +337,14 @@ class InternalResearchSearchService:
 
         print(f"[InternalResearchSearch] search_followup: Searching for '{query[:50]}...'")
 
+        # Get search configuration
+        search_mode = self.settings.search_mode
+        abstract_weight = self.settings.search_abstract_weight / 100.0
+        tags_weight = self.settings.search_tags_weight / 100.0
+        proper_nouns_weight = self.settings.search_proper_nouns_weight / 100.0
+        print(f"  - search_mode: {search_mode}")
+        print(f"  - weights: abstract={abstract_weight}, tags={tags_weight}, proper_nouns={proper_nouns_weight}")
+
         try:
             # 1. Embed the query (same as search_initial)
             query_embedding = await embedding_client.embed_text(query)
@@ -286,16 +354,63 @@ class InternalResearchSearchService:
             if research_id_filter:
                 filters = {"term": {"oipf_research_id": research_id_filter}}
 
-            # 3. Perform vector search on oipf-details
+            # 3. Perform vector search on oipf-details based on mode
             # Fetch more results for deduplication (3x limit)
             fetch_size = limit * 3
-            response = await opensearch_client.vector_search(
-                index="oipf-details",
-                vector_field="oipf_abstract_embedding",
-                query_vector=query_embedding,
-                k=fetch_size,
-                filters=filters,
-            )
+
+            if search_mode == "abstract":
+                # Abstract embeddings only (traditional behavior)
+                response = await opensearch_client.vector_search(
+                    index="oipf-details",
+                    vector_field="oipf_abstract_embedding",
+                    query_vector=query_embedding,
+                    k=fetch_size,
+                    filters=filters,
+                )
+            elif search_mode == "tags":
+                # Tags embeddings only
+                response = await opensearch_client.vector_search(
+                    index="oipf-details",
+                    vector_field="oipf_tags_embedding",
+                    query_vector=query_embedding,
+                    k=fetch_size,
+                    filters=filters,
+                )
+            elif search_mode == "proper_nouns":
+                # Proper nouns embeddings only
+                response = await opensearch_client.vector_search(
+                    index="oipf-details",
+                    vector_field="oipf_proper_nouns_embedding",
+                    query_vector=query_embedding,
+                    k=fetch_size,
+                    filters=filters,
+                )
+            elif search_mode == "triple":
+                # Triple hybrid search (abstract + tags + proper_nouns)
+                response = await opensearch_client.triple_hybrid_vector_search(
+                    index="oipf-details",
+                    query_vector=query_embedding,
+                    abstract_field="oipf_abstract_embedding",
+                    tags_field="oipf_tags_embedding",
+                    proper_nouns_field="oipf_proper_nouns_embedding",
+                    abstract_weight=abstract_weight,
+                    tags_weight=tags_weight,
+                    proper_nouns_weight=proper_nouns_weight,
+                    k=fetch_size,
+                    filters=filters,
+                )
+            else:
+                # Hybrid search (default)
+                response = await opensearch_client.hybrid_vector_search(
+                    index="oipf-details",
+                    query_vector=query_embedding,
+                    abstract_field="oipf_abstract_embedding",
+                    tags_field="oipf_tags_embedding",
+                    abstract_weight=abstract_weight,
+                    tags_weight=tags_weight,
+                    k=fetch_size,
+                    filters=filters,
+                )
 
             # 4. Parse results
             results = []
@@ -531,6 +646,11 @@ JSON形式で出力（説明不要）:"""
         optionally filtered by research_id. This is used to find related
         internal documents when diving deep into a research topic.
 
+        Supports three search modes via SEARCH_MODE environment variable:
+        - "abstract": Search only abstract embeddings (default behavior)
+        - "tags": Search only tag embeddings
+        - "hybrid": Search both and combine scores with configurable weights
+
         Args:
             query: User's search query
             research_id_filter: Optional oipf_research_id to filter by
@@ -548,6 +668,12 @@ JSON形式で出力（説明不要）:"""
         if research_id_filter:
             print(f"  - research_id_filter: {research_id_filter}")
 
+        # Get search configuration
+        search_mode = self.settings.search_mode
+        abstract_weight = self.settings.search_abstract_weight / 100.0
+        tags_weight = self.settings.search_tags_weight / 100.0
+        proper_nouns_weight = self.settings.search_proper_nouns_weight / 100.0
+
         try:
             # Build search query combining user query and paper keywords
             search_terms = [query]
@@ -564,16 +690,63 @@ JSON形式で出力（説明不要）:"""
             if research_id_filter:
                 filters = {"term": {"oipf_research_id": research_id_filter}}
 
-            # 3. Perform vector search on oipf-details
+            # 3. Perform vector search on oipf-details based on mode
             # Fetch more results for deduplication (3x limit)
             fetch_size = limit * 3
-            response = await opensearch_client.vector_search(
-                index="oipf-details",
-                vector_field="oipf_abstract_embedding",
-                query_vector=query_embedding,
-                k=fetch_size,
-                filters=filters,
-            )
+
+            if search_mode == "abstract":
+                # Abstract embeddings only (traditional behavior)
+                response = await opensearch_client.vector_search(
+                    index="oipf-details",
+                    vector_field="oipf_abstract_embedding",
+                    query_vector=query_embedding,
+                    k=fetch_size,
+                    filters=filters,
+                )
+            elif search_mode == "tags":
+                # Tags embeddings only
+                response = await opensearch_client.vector_search(
+                    index="oipf-details",
+                    vector_field="oipf_tags_embedding",
+                    query_vector=query_embedding,
+                    k=fetch_size,
+                    filters=filters,
+                )
+            elif search_mode == "proper_nouns":
+                # Proper nouns embeddings only
+                response = await opensearch_client.vector_search(
+                    index="oipf-details",
+                    vector_field="oipf_proper_nouns_embedding",
+                    query_vector=query_embedding,
+                    k=fetch_size,
+                    filters=filters,
+                )
+            elif search_mode == "triple":
+                # Triple hybrid search (abstract + tags + proper_nouns)
+                response = await opensearch_client.triple_hybrid_vector_search(
+                    index="oipf-details",
+                    query_vector=query_embedding,
+                    abstract_field="oipf_abstract_embedding",
+                    tags_field="oipf_tags_embedding",
+                    proper_nouns_field="oipf_proper_nouns_embedding",
+                    abstract_weight=abstract_weight,
+                    tags_weight=tags_weight,
+                    proper_nouns_weight=proper_nouns_weight,
+                    k=fetch_size,
+                    filters=filters,
+                )
+            else:
+                # Hybrid search (default)
+                response = await opensearch_client.hybrid_vector_search(
+                    index="oipf-details",
+                    query_vector=query_embedding,
+                    abstract_field="oipf_abstract_embedding",
+                    tags_field="oipf_tags_embedding",
+                    abstract_weight=abstract_weight,
+                    tags_weight=tags_weight,
+                    k=fetch_size,
+                    filters=filters,
+                )
 
             # 4. Parse results
             results = []

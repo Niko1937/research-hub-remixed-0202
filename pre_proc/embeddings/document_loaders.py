@@ -16,19 +16,29 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import chardet
 
-# LangChain document loaders
+# LangChain document loaders (Excel/CSV handled by table_loader.py)
 from langchain_community.document_loaders import (
     TextLoader,
     PyPDFLoader,
     Docx2txtLoader,
-    UnstructuredExcelLoader,
     UnstructuredPowerPointLoader,
     UnstructuredMarkdownLoader,
     UnstructuredHTMLLoader,
-    CSVLoader,
     JSONLoader,
 )
 from langchain_core.documents import Document
+
+# Import table loader for Excel/CSV handling
+from embeddings.table_loader import (
+    load_table_file,
+    is_table_file,
+    TableLoaderResult,
+    combine_table_documents,
+)
+
+
+# Table file extensions (processed via pandas, not LangChain loaders)
+TABLE_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 
 
 @dataclass
@@ -58,7 +68,7 @@ class LoaderResult:
     metadata: Optional[FileMetadata] = None  # Author/editor metadata
 
 
-# File extension to loader mapping
+# File extension to loader mapping (excludes table files which use pandas)
 LOADER_MAPPING: dict[str, tuple[type, dict]] = {
     # Text files
     ".txt": (TextLoader, {"autodetect_encoding": True}),
@@ -68,26 +78,23 @@ LOADER_MAPPING: dict[str, tuple[type, dict]] = {
     # PDF
     ".pdf": (PyPDFLoader, {}),
 
-    # Microsoft Office
+    # Microsoft Office (except Excel - handled by table_loader)
     ".docx": (Docx2txtLoader, {}),
-    ".xlsx": (UnstructuredExcelLoader, {"mode": "elements"}),
-    ".xls": (UnstructuredExcelLoader, {"mode": "elements"}),
     ".pptx": (UnstructuredPowerPointLoader, {}),
 
     # Web
     ".html": (UnstructuredHTMLLoader, {}),
     ".htm": (UnstructuredHTMLLoader, {}),
 
-    # Data files
-    ".csv": (CSVLoader, {}),
+    # Data files (except CSV - handled by table_loader)
     ".json": (JSONLoader, {"jq_schema": ".", "text_content": False}),
 }
 
 # Image file extensions (processed via Vision LLM, not LangChain loaders)
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
-# Supported extensions set (includes both LangChain loaders and image files)
-SUPPORTED_EXTENSIONS = set(LOADER_MAPPING.keys()) | IMAGE_EXTENSIONS
+# Supported extensions set (includes LangChain loaders, image files, and table files)
+SUPPORTED_EXTENSIONS = set(LOADER_MAPPING.keys()) | IMAGE_EXTENSIONS | TABLE_EXTENSIONS
 
 
 def detect_encoding(file_path: Path) -> str:
@@ -335,6 +342,48 @@ def load_document(
             file_path=str(file_path),
             file_type=file_path.suffix.lower(),
             is_image=True,
+            metadata=file_metadata,
+        )
+
+    # Check if it's a table file (handled by pandas table_loader)
+    if is_table_file(file_path):
+        table_result = load_table_file(file_path)
+        if not table_result.success:
+            return LoaderResult(
+                success=False,
+                documents=[],
+                error=table_result.error,
+                file_path=str(file_path),
+                file_type=file_path.suffix.lower(),
+                metadata=file_metadata,
+            )
+
+        # Convert TableDocuments to LangChain Documents
+        documents = []
+        for table_doc in table_result.documents:
+            # Use markdown content as page_content
+            doc = Document(
+                page_content=table_doc.markdown_content,
+                metadata={
+                    "source_path": str(file_path),
+                    "file_name": file_path.name,
+                    "file_type": file_path.suffix.lower(),
+                    "is_table": True,
+                    "sheet_name": table_doc.metadata.sheet_name,
+                    "columns": table_doc.metadata.columns,
+                    "row_count": table_doc.metadata.row_count,
+                    "schema_description": table_doc.schema_description,
+                    "summary_context": table_doc.summary_context,
+                    "truncated": table_doc.truncated,
+                }
+            )
+            documents.append(doc)
+
+        return LoaderResult(
+            success=True,
+            documents=documents,
+            file_path=str(file_path),
+            file_type=file_path.suffix.lower(),
             metadata=file_metadata,
         )
 
@@ -664,6 +713,47 @@ def get_document_text(
             text_parts.append(doc.page_content)
 
     return "\n\n".join(text_parts), None
+
+
+def get_table_content(
+    file_path: Path,
+    max_file_size_mb: float = 100.0,
+) -> tuple[str, str, Optional[str]]:
+    """
+    Get table content with summary context for LLM processing.
+
+    表形式ファイル専用の関数。Markdownテーブルとサマリーコンテキストを返す。
+
+    Args:
+        file_path: Path to table file (Excel or CSV)
+        max_file_size_mb: Maximum file size in MB
+
+    Returns:
+        Tuple of (markdown_content, summary_context, error_message)
+        If successful, error_message is None
+    """
+    file_path = Path(file_path)
+
+    if not is_table_file(file_path):
+        return "", "", f"Not a table file: {file_path.suffix}"
+
+    # Check file size
+    file_size_mb = file_path.stat().st_size / (1024 * 1024)
+    if file_size_mb > max_file_size_mb:
+        return "", "", f"File too large: {file_size_mb:.2f}MB (max: {max_file_size_mb}MB)"
+
+    result = load_table_file(file_path)
+
+    if not result.success:
+        return "", "", result.error
+
+    if not result.documents:
+        return "", "", "No tables found in file"
+
+    # Combine all table documents
+    combined_markdown, combined_context = combine_table_documents(result.documents)
+
+    return combined_markdown, combined_context, None
 
 
 if __name__ == "__main__":

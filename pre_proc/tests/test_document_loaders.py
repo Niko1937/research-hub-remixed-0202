@@ -16,6 +16,8 @@ from embeddings.document_loaders import (
     detect_encoding,
     SUPPORTED_EXTENSIONS,
     get_supported_extensions_info,
+    is_table_file,
+    get_table_content,
 )
 
 
@@ -34,13 +36,27 @@ class TestIsSupportedFile:
         assert is_supported_file(Path("document.xlsx")) is True
         assert is_supported_file(Path("document.pptx")) is True
 
+    def test_image_extensions_supported(self):
+        """Test that image extensions are supported (via Vision LLM)"""
+        assert is_supported_file(Path("image.jpg")) is True
+        assert is_supported_file(Path("image.jpeg")) is True
+        assert is_supported_file(Path("image.png")) is True
+        assert is_supported_file(Path("image.gif")) is True
+        assert is_supported_file(Path("image.webp")) is True
+
+    def test_table_extensions_supported(self):
+        """Test that table extensions are supported (via pandas)"""
+        assert is_supported_file(Path("data.xlsx")) is True
+        assert is_supported_file(Path("data.xls")) is True
+        assert is_supported_file(Path("data.csv")) is True
+
     def test_unsupported_extensions(self):
         """Test that unsupported extensions return False"""
         assert is_supported_file(Path("document.exe")) is False
         assert is_supported_file(Path("document.zip")) is False
         assert is_supported_file(Path("document.mp3")) is False
-        assert is_supported_file(Path("document.jpg")) is False
-        assert is_supported_file(Path("document.png")) is False
+        assert is_supported_file(Path("document.avi")) is False
+        assert is_supported_file(Path("document.dll")) is False
 
     def test_case_insensitive(self):
         """Test that extension check is case insensitive"""
@@ -171,3 +187,97 @@ class TestSupportedExtensions:
         assert ".html" in SUPPORTED_EXTENSIONS
         assert ".csv" in SUPPORTED_EXTENSIONS
         assert ".json" in SUPPORTED_EXTENSIONS
+
+
+class TestIsTableFile:
+    """Tests for is_table_file function"""
+
+    def test_excel_files(self):
+        """Test that Excel files are identified as table files"""
+        assert is_table_file(Path("data.xlsx")) is True
+        assert is_table_file(Path("data.xls")) is True
+
+    def test_csv_files(self):
+        """Test that CSV files are identified as table files"""
+        assert is_table_file(Path("data.csv")) is True
+
+    def test_non_table_files(self):
+        """Test that non-table files return False"""
+        assert is_table_file(Path("document.pdf")) is False
+        assert is_table_file(Path("document.docx")) is False
+        assert is_table_file(Path("document.txt")) is False
+
+    def test_case_insensitive(self):
+        """Test that extension check is case insensitive"""
+        assert is_table_file(Path("data.CSV")) is True
+        assert is_table_file(Path("data.XLSX")) is True
+
+
+class TestGetTableContent:
+    """Tests for get_table_content function"""
+
+    def test_non_table_file(self):
+        """Test that non-table files return error"""
+        markdown, context, error = get_table_content(Path("document.pdf"))
+        assert markdown == ""
+        assert context == ""
+        assert "Not a table file" in error
+
+    def test_csv_file(self):
+        """Test loading a CSV file"""
+        import pandas as pd
+
+        # Create a test CSV file
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as f:
+            f.write("name,value,status\n")
+            f.write("A,100,OK\n")
+            f.write("B,200,NG\n")
+            f.flush()
+
+            markdown, context, error = get_table_content(Path(f.name))
+
+            assert error is None
+            assert "name" in markdown
+            assert "value" in markdown
+            assert "status" in markdown
+            assert "100" in markdown
+            assert "200" in markdown
+
+    def test_csv_file_context_includes_metadata(self):
+        """Test that context includes table metadata"""
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as f:
+            f.write("機種ID,素材,試験結果\n")
+            f.write("6S9,CFRP,1250.5\n")
+            f.write("AP4DI,Al6061,820.3\n")
+            f.flush()
+
+            markdown, context, error = get_table_content(Path(f.name))
+
+            assert error is None
+            # Context should include column names
+            assert "機種ID" in context
+            assert "素材" in context
+            assert "試験結果" in context
+
+
+class TestLoadTableDocument:
+    """Tests for loading table documents"""
+
+    def test_csv_document_has_table_metadata(self):
+        """Test that CSV documents have table metadata"""
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as f:
+            f.write("col1,col2\n")
+            f.write("a,1\n")
+            f.write("b,2\n")
+            f.flush()
+
+            result = load_document(Path(f.name))
+
+            assert result.success is True
+            assert len(result.documents) == 1
+
+            doc = result.documents[0]
+            assert doc.metadata.get("is_table") is True
+            assert "col1" in doc.metadata.get("columns", [])
+            assert "col2" in doc.metadata.get("columns", [])
+            assert doc.metadata.get("row_count") == 2

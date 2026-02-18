@@ -195,6 +195,8 @@ class ProcessingConfig:
     max_depth: int = 4
     skip_indexed_folders: bool = False  # Skip subfolders that have already been indexed
     embedding_file_types: str = "all"  # "all", "documents", "images"
+    metadata_only: bool = False  # Update metadata only, reuse existing embeddings
+    embedding_targets: str = "both"  # "abstract" | "tags" | "proper_nouns" | "both" | "all"
 
     @classmethod
     def from_env(cls) -> "ProcessingConfig":
@@ -203,22 +205,58 @@ class ProcessingConfig:
         if file_types not in ("all", "documents", "images"):
             print(f"Warning: Invalid EMBEDDING_FILE_TYPES '{file_types}', using 'all'")
             file_types = "all"
+
+        embedding_targets = os.getenv("EMBEDDING_TARGETS", "both").lower()
+        # Validate embedding_targets
+        if embedding_targets not in ("abstract", "tags", "proper_nouns", "both", "all"):
+            print(f"Warning: Invalid EMBEDDING_TARGETS '{embedding_targets}', using 'both'")
+            embedding_targets = "both"
+
         return cls(
             max_file_size_mb=float(os.getenv("MAX_FILE_SIZE_MB", "100.0")),
             max_depth=int(os.getenv("MAX_FOLDER_DEPTH", "4")),
             skip_indexed_folders=os.getenv("SKIP_INDEXED_FOLDERS", "false").lower() == "true",
             embedding_file_types=file_types,
+            metadata_only=os.getenv("METADATA_ONLY", "false").lower() == "true",
+            embedding_targets=embedding_targets,
         )
 
     @property
-    def process_documents(self) -> bool:
-        """Check if documents should be processed"""
-        return self.embedding_file_types in ("all", "documents")
+    def embed_abstract(self) -> bool:
+        """Check if abstract should be embedded"""
+        return self.embedding_targets in ("abstract", "both", "all")
 
     @property
-    def process_images(self) -> bool:
-        """Check if images should be processed"""
-        return self.embedding_file_types in ("all", "images")
+    def embed_tags(self) -> bool:
+        """Check if tags should be embedded"""
+        return self.embedding_targets in ("tags", "both", "all")
+
+    @property
+    def embed_proper_nouns(self) -> bool:
+        """Check if proper nouns should be embedded"""
+        return self.embedding_targets in ("proper_nouns", "all")
+
+
+@dataclass
+class SearchConfig:
+    """Hybrid vector search configuration"""
+    mode: str = "hybrid"  # "abstract" | "tags" | "proper_nouns" | "hybrid" | "triple"
+    abstract_weight: int = 50  # 0-100
+    tags_weight: int = 50  # 0-100
+    proper_nouns_weight: int = 0  # 0-100 (default 0 for backward compatibility)
+
+    @classmethod
+    def from_env(cls) -> "SearchConfig":
+        mode = os.getenv("SEARCH_MODE", "hybrid").lower()
+        if mode not in ("abstract", "tags", "proper_nouns", "hybrid", "triple"):
+            print(f"Warning: Invalid SEARCH_MODE '{mode}', using 'hybrid'")
+            mode = "hybrid"
+        return cls(
+            mode=mode,
+            abstract_weight=int(os.getenv("SEARCH_ABSTRACT_WEIGHT", "50")),
+            tags_weight=int(os.getenv("SEARCH_TAGS_WEIGHT", "50")),
+            proper_nouns_weight=int(os.getenv("SEARCH_PROPER_NOUNS_WEIGHT", "0")),
+        )
 
 
 @dataclass
@@ -229,6 +267,7 @@ class Config:
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig.from_env)
     llm: LLMConfig = field(default_factory=LLMConfig.from_env)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig.from_env)
+    search: SearchConfig = field(default_factory=SearchConfig.from_env)
 
     @classmethod
     def load(cls) -> "Config":
@@ -239,6 +278,7 @@ class Config:
             embedding=EmbeddingConfig.from_env(),
             llm=LLMConfig.from_env(),
             processing=ProcessingConfig.from_env(),
+            search=SearchConfig.from_env(),
         )
 
     def validate(self) -> list[str]:
@@ -297,6 +337,17 @@ class Config:
         print(f"  Max File Size: {self.processing.max_file_size_mb}MB")
         print(f"  Max Folder Depth: {self.processing.max_depth}")
         print(f"  Embedding File Types: {self.processing.embedding_file_types}")
+        print(f"  Embedding Targets: {self.processing.embedding_targets}")
+        print(f"    - Abstract: {'Yes' if self.processing.embed_abstract else 'No'}")
+        print(f"    - Tags: {'Yes' if self.processing.embed_tags else 'No'}")
+        print(f"    - Proper Nouns: {'Yes' if self.processing.embed_proper_nouns else 'No'}")
+        print(f"  Metadata Only: {self.processing.metadata_only}")
+
+        print(f"Search:")
+        print(f"  Mode: {self.search.mode}")
+        print(f"  Abstract Weight: {self.search.abstract_weight}%")
+        print(f"  Tags Weight: {self.search.tags_weight}%")
+        print(f"  Proper Nouns Weight: {self.search.proper_nouns_weight}%")
         print("=" * 28 + "\n")
 
 

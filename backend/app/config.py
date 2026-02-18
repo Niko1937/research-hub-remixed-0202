@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     # External Search Configuration
     arxiv_enabled: bool = True  # Enable/disable arXiv search
 
+    # Hybrid Vector Search Configuration
+    search_mode: str = "hybrid"  # "abstract" | "tags" | "proper_nouns" | "hybrid" | "triple"
+    search_abstract_weight: int = 50  # 0-100, weight for abstract embedding search
+    search_tags_weight: int = 50  # 0-100, weight for tags embedding search
+    search_proper_nouns_weight: int = 0  # 0-100, weight for proper nouns embedding search
+
     model_config = {
         "env_prefix": "",
         "case_sensitive": False,

@@ -468,6 +468,64 @@ class OpenSearchClient:
         except Exception:
             return None
 
+    async def find_document_with_embedding(
+        self,
+        index_name: str,
+        file_path: str,
+        file_name: str,
+    ) -> Optional[tuple[str, list[float]]]:
+        """
+        Find existing document by oipf_file_path and oipf_file_name,
+        returning both ID and embedding vector.
+
+        Args:
+            index_name: Index name
+            file_path: File path to match (oipf_file_path)
+            file_name: File name to match (oipf_file_name)
+
+        Returns:
+            Tuple of (doc_id, embedding) if found, None otherwise
+        """
+        url = f"{self.url}/{index_name}/_search"
+
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"oipf_file_path.keyword": file_path}},
+                        {"term": {"oipf_file_name.keyword": file_name}},
+                    ]
+                }
+            },
+            "size": 1,
+            "_source": ["oipf_abstract_embedding"],
+        }
+
+        try:
+            async with httpx.AsyncClient(**self._get_client_kwargs()) as client:
+                response = await client.post(
+                    url,
+                    headers=self._get_headers(),
+                    json=query,
+                )
+
+                if response.status_code != 200:
+                    return None
+
+                result = response.json()
+                hits = result.get("hits", {}).get("hits", [])
+
+                if hits:
+                    doc_id = hits[0].get("_id")
+                    source = hits[0].get("_source", {})
+                    embedding = source.get("oipf_abstract_embedding", [])
+                    if doc_id and embedding:
+                        return (doc_id, embedding)
+                return None
+
+        except Exception:
+            return None
+
     def find_document_by_file_path_sync(
         self,
         index_name: str,

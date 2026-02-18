@@ -144,6 +144,213 @@ class OpenSearchClient:
         response.raise_for_status()
         return response.json()
 
+    async def hybrid_vector_search(
+        self,
+        index: str,
+        query_vector: list[float],
+        abstract_field: str,
+        tags_field: str,
+        abstract_weight: float = 0.5,
+        tags_weight: float = 0.5,
+        k: int = 10,
+        filters: Optional[dict] = None,
+    ) -> dict:
+        """
+        Execute hybrid KNN vector similarity search using two vector fields.
+
+        Combines scores from abstract embedding and tags embedding searches
+        using the specified weights.
+
+        Args:
+            index: Index name (e.g., "oipf-summary", "oipf-details")
+            query_vector: Query embedding vector
+            abstract_field: Name of the abstract vector field
+            tags_field: Name of the tags vector field
+            abstract_weight: Weight for abstract field (0.0 - 1.0)
+            tags_weight: Weight for tags field (0.0 - 1.0)
+            k: Number of results to return
+            filters: Optional filter query
+
+        Returns:
+            OpenSearch response as dict
+        """
+        if not self.is_configured:
+            raise RuntimeError("OpenSearch is not configured")
+
+        client = await self._get_client()
+        url = f"{self.settings.opensearch_url.rstrip('/')}/{index}/_search"
+
+        # Build should clauses for hybrid search
+        should_clauses = []
+
+        # Abstract vector search (if weight > 0)
+        if abstract_weight > 0:
+            abstract_knn = {
+                "knn": {
+                    abstract_field: {
+                        "vector": query_vector,
+                        "k": k,
+                        "boost": abstract_weight,
+                    }
+                }
+            }
+            if filters:
+                abstract_knn["knn"][abstract_field]["filter"] = filters
+            should_clauses.append(abstract_knn)
+
+        # Tags vector search (if weight > 0)
+        if tags_weight > 0:
+            tags_knn = {
+                "knn": {
+                    tags_field: {
+                        "vector": query_vector,
+                        "k": k,
+                        "boost": tags_weight,
+                    }
+                }
+            }
+            if filters:
+                tags_knn["knn"][tags_field]["filter"] = filters
+            should_clauses.append(tags_knn)
+
+        # Build final query
+        if len(should_clauses) == 1:
+            # Single vector search
+            query = should_clauses[0]
+        else:
+            # Hybrid search with bool should
+            query = {
+                "bool": {
+                    "should": should_clauses,
+                }
+            }
+
+        body = {
+            "size": k,
+            "query": query,
+        }
+
+        response = await client.post(
+            url,
+            json=body,
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def triple_hybrid_vector_search(
+        self,
+        index: str,
+        query_vector: list[float],
+        abstract_field: str,
+        tags_field: str,
+        proper_nouns_field: str,
+        abstract_weight: float = 0.4,
+        tags_weight: float = 0.3,
+        proper_nouns_weight: float = 0.3,
+        k: int = 10,
+        filters: Optional[dict] = None,
+    ) -> dict:
+        """
+        Execute triple hybrid KNN vector similarity search using three vector fields.
+
+        Combines scores from abstract, tags, and proper nouns embedding searches
+        using the specified weights.
+
+        Args:
+            index: Index name (e.g., "oipf-summary", "oipf-details")
+            query_vector: Query embedding vector
+            abstract_field: Name of the abstract vector field
+            tags_field: Name of the tags vector field
+            proper_nouns_field: Name of the proper nouns vector field
+            abstract_weight: Weight for abstract field (0.0 - 1.0)
+            tags_weight: Weight for tags field (0.0 - 1.0)
+            proper_nouns_weight: Weight for proper nouns field (0.0 - 1.0)
+            k: Number of results to return
+            filters: Optional filter query
+
+        Returns:
+            OpenSearch response as dict
+        """
+        if not self.is_configured:
+            raise RuntimeError("OpenSearch is not configured")
+
+        client = await self._get_client()
+        url = f"{self.settings.opensearch_url.rstrip('/')}/{index}/_search"
+
+        # Build should clauses for triple hybrid search
+        should_clauses = []
+
+        # Abstract vector search (if weight > 0)
+        if abstract_weight > 0:
+            abstract_knn = {
+                "knn": {
+                    abstract_field: {
+                        "vector": query_vector,
+                        "k": k,
+                        "boost": abstract_weight,
+                    }
+                }
+            }
+            if filters:
+                abstract_knn["knn"][abstract_field]["filter"] = filters
+            should_clauses.append(abstract_knn)
+
+        # Tags vector search (if weight > 0)
+        if tags_weight > 0:
+            tags_knn = {
+                "knn": {
+                    tags_field: {
+                        "vector": query_vector,
+                        "k": k,
+                        "boost": tags_weight,
+                    }
+                }
+            }
+            if filters:
+                tags_knn["knn"][tags_field]["filter"] = filters
+            should_clauses.append(tags_knn)
+
+        # Proper nouns vector search (if weight > 0)
+        if proper_nouns_weight > 0:
+            proper_nouns_knn = {
+                "knn": {
+                    proper_nouns_field: {
+                        "vector": query_vector,
+                        "k": k,
+                        "boost": proper_nouns_weight,
+                    }
+                }
+            }
+            if filters:
+                proper_nouns_knn["knn"][proper_nouns_field]["filter"] = filters
+            should_clauses.append(proper_nouns_knn)
+
+        # Build final query
+        if len(should_clauses) == 1:
+            # Single vector search
+            query = should_clauses[0]
+        else:
+            # Triple hybrid search with bool should
+            query = {
+                "bool": {
+                    "should": should_clauses,
+                }
+            }
+
+        body = {
+            "size": k,
+            "query": query,
+        }
+
+        response = await client.post(
+            url,
+            json=body,
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+        return response.json()
+
     async def get_document(
         self,
         index: str,

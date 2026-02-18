@@ -140,6 +140,24 @@ def create_oipf_summary_index() -> bool:
                 "oipf_research_id": {
                     "type": "keyword"
                 },
+                "oipf_file_path": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "oipf_file_name": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                        }
+                    }
+                },
                 "related_researchers": {
                     "type": "keyword"
                 },
@@ -163,6 +181,27 @@ def create_oipf_summary_index() -> bool:
                 },
                 "oipf_research_themetags": {
                     "type": "keyword"
+                },
+                "oipf_themetags_embedding": {
+                    "type": "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "faiss"
+                    }
+                },
+                "oipf_research_proper_nouns": {
+                    "type": "keyword"
+                },
+                "oipf_proper_nouns_embedding": {
+                    "type": "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "faiss"
+                    }
                 }
             }
         }
@@ -239,6 +278,27 @@ def create_oipf_details_index() -> bool:
                 },
                 "oipf_file_tags": {
                     "type": "keyword"
+                },
+                "oipf_tags_embedding": {
+                    "type": "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "faiss"
+                    }
+                },
+                "oipf_proper_nouns": {
+                    "type": "keyword"
+                },
+                "oipf_proper_nouns_embedding": {
+                    "type": "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "faiss"
+                    }
                 },
                 "oipf_folder_path": {
                     "type": "text",
