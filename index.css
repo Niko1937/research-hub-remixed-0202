@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 25 95% 58%;
+    --primary-foreground: 0 0% 8%;
+
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 20 90% 55%;
+    --accent-foreground: 0 0% 8%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 18%;
+    --ring: 25 95% 58%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 25 95% 58%;
+    --sidebar-primary-foreground: 0 0% 8%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 85%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 25 95% 58%;
+
+    /* Custom tokens for research platform */
+    --card-hover: 0 0% 16%;
+    --highlight: 25 95% 65%;
+    --gradient-start: 25 95% 58%;
+    --gradient-end: 15 90% 60%;
+
+    /* Chart colors for data visualization */
+    --chart-1: 25 95% 58%; /* Orange - Internal */
+    --chart-2: 150 70% 55%; /* Green - External */
+    --chart-3: 210 90% 58%;  /* Blue - Target */
+    --chart-4: 280 75% 65%; /* Purple */
+    --chart-5: 340 85% 60%; /* Pink */
+    
+    /* Shadows */
+    --shadow-card: 0 4px 12px -2px hsl(220 25% 5% / 0.4);
+    --shadow-hover: 0 8px 24px -4px hsl(210 90% 58% / 0.2);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Markdown prose styling for better contrast */
+  .prose {
+    --tw-prose-body: hsl(var(--card-foreground));
+    --tw-prose-headings: hsl(var(--card-foreground));
+    --tw-prose-links: hsl(var(--primary));
+    --tw-prose-bold: hsl(var(--card-foreground));
+    --tw-prose-counters: hsl(var(--muted-foreground));
+    --tw-prose-bullets: hsl(var(--muted-foreground));
+    --tw-prose-quotes: hsl(var(--card-foreground));
+    --tw-prose-code: hsl(var(--primary));
+    --tw-prose-pre-bg: hsl(var(--muted));
+    --tw-prose-pre-code: hsl(var(--card-foreground));
+  }
+
+  .prose.dark\:prose-invert {
+    --tw-prose-body: hsl(var(--card-foreground));
+    --tw-prose-headings: hsl(var(--card-foreground));
+    --tw-prose-links: hsl(var(--primary));
+    --tw-prose-bold: hsl(var(--card-foreground));
+    --tw-prose-counters: hsl(var(--muted-foreground));
+    --tw-prose-bullets: hsl(var(--muted-foreground));
+    --tw-prose-quotes: hsl(var(--card-foreground));
+    --tw-prose-code: hsl(var(--primary));
+    --tw-prose-pre-bg: hsl(var(--muted));
+    --tw-prose-pre-code: hsl(var(--card-foreground));
+  }
+}
+
+@layer utilities {
+  @keyframes slide-in-right {
+    0% {
+      transform: translateX(100%);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+}

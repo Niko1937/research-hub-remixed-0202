@@ -103,6 +103,10 @@ class Settings(BaseSettings):
     search_oipf_summary_limit: int = int(os.getenv("SEARCH_OIPF_SUMMARY_LIMIT", "3"))
     search_oipf_details_limit: int = int(os.getenv("SEARCH_OIPF_DETAILS_LIMIT", "5"))
 
+    # フロントエンドに返却するタグの最大数
+    # 検索クエリにマッチしたタグを優先的に返却
+    search_result_max_tags: int = int(os.getenv("SEARCH_RESULT_MAX_TAGS", "10"))
+
     def get_search_weights(self) -> dict:
         """Get all search weights as a dictionary"""
         return {

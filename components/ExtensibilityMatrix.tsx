@@ -1,0 +1,470 @@
+import { useState, useCallback } from 'react';
+import { Card } from './ui/card';
+import { cn } from '@/lib/utils';
+import { X, Sparkles, Search, FileText, BarChart3, PenTool } from 'lucide-react';
+
+// Data complexity levels (vertical axis)
+const dataLevels = [
+  { id: 'llm', label: 'LLM知識', description: '事前学習された一般知識' },
+  { id: 'web-general', label: 'Web一般', description: '最新ニュース・一般情報' },
+  { id: 'internal-structured', label: '社内構造化', description: 'DB・スプレッドシート等' },
+  { id: 'internal-unstructured', label: '社内非構造化', description: 'Slack・メール・議事録' },
+  { id: 'tacit-rules', label: '暗黙ルール', description: '社内ルール・慣習' },
+  { id: 'web-expert', label: 'Web専門', description: '論文・特許・専門情報' },
+  { id: 'tacit-knowledge', label: '暗黙知', description: '経験・ノウハウ・人脈' },
+];
+
+// AI sophistication levels (horizontal axis) - Progressive difficulty stages
+const aiLevels = [
+  { id: 'simple-search', label: '単回検索', description: '1クエリ1応答', icon: Search, stage: '基礎', stageNum: 1 },
+  { id: 'advanced-search', label: '高度検索', description: 'マルチホップ・Agentic', icon: Search, stage: '応用', stageNum: 2 },
+  { id: 'qualitative', label: '推論・定性分析', description: '文脈理解・解釈', icon: FileText, stage: '高度', stageNum: 3 },
+  { id: 'quantitative', label: '定量分析', description: '統計・可視化', icon: BarChart3, stage: '専門', stageNum: 4 },
+  { id: 'creation', label: '創造・実行', description: '生成・自律行動', icon: PenTool, stage: '先端', stageNum: 5 },
+];
+
+// Use cases mapped to the matrix
+type UseCase = {
+  id: string;
+  name: string;
+  dataLevel: string;
+  aiLevel: string;
+  status: 'implemented' | 'mock' | 'future';
+  description: string;
+  why: string[];
+  value: string;
+};
+
+const useCases: UseCase[] = [
+  // 単回検索
+  {
+    id: 'llm-qa',
+    name: '一般知識Q&A',
+    dataLevel: 'llm',
+    aiLevel: 'simple-search',
+    status: 'implemented',
+    description: 'LLMの事前学習知識に基づく回答',
+    why: ['基本的な概念を確認したい', '用語の意味を知りたい'],
+    value: '即座に基礎知識を確認',
+  },
+  {
+    id: 'web-search',
+    name: 'Web一般検索',
+    dataLevel: 'web-general',
+    aiLevel: 'simple-search',
+    status: 'implemented',
+    description: '最新ニュースや一般情報の検索',
+    why: ['最新の情報を知りたい', '一般的なトピックを調べたい'],
+    value: 'リアルタイムな情報へのアクセス',
+  },
+
+  // 高度検索（マルチホップ・Agentic）
+  {
+    id: 'paper-search',
+    name: '論文検索・調査',
+    dataLevel: 'web-expert',
+    aiLevel: 'advanced-search',
+    status: 'implemented',
+    description: '複数のAPIを組み合わせて論文を探索',
+    why: ['この分野の全体像を把握したい', '見落としている重要な研究がないか確認したい'],
+    value: '単純な検索ではなく、複数ソースの横断的探索',
+  },
+  {
+    id: 'internal-search',
+    name: '社内ナレッジ検索',
+    dataLevel: 'internal-unstructured',
+    aiLevel: 'advanced-search',
+    status: 'future',
+    description: '過去のレポート・Slack・メールを横断検索',
+    why: ['過去の類似研究を知りたい', '誰が何を知っているか把握したい'],
+    value: '散在する情報を一元的にアクセス可能に',
+  },
+  {
+    id: 'expert-network-search',
+    name: '専門家ネットワーク探索',
+    dataLevel: 'web-expert',
+    aiLevel: 'advanced-search',
+    status: 'implemented',
+    description: '著者情報から共著関係を辿って探索',
+    why: ['この分野のキーパーソンは誰か？', '誰と誰がつながっているか？'],
+    value: 'マルチホップで人脈ネットワークを発見',
+  },
+
+  // 推論・定性分析
+  {
+    id: 'field-understanding',
+    name: '分野理解・要約',
+    dataLevel: 'web-expert',
+    aiLevel: 'qualitative',
+    status: 'implemented',
+    description: '論文群から分野の構造と動向を解釈',
+    why: ['自分の研究がどの位置にあるか知りたい', '新しい研究テーマのヒントを得たい'],
+    value: '断片的な情報から全体像を構築',
+  },
+  {
+    id: 'expert-discovery',
+    name: '専門家発見',
+    dataLevel: 'tacit-knowledge',
+    aiLevel: 'qualitative',
+    status: 'implemented',
+    description: '文脈から関連専門家を推定・提案',
+    why: ['困ったとき相談できる人を見つけたい', '共同研究のパートナーを探したい'],
+    value: '名前のリストではなく、アプローチの道筋を提案',
+  },
+  {
+    id: 'llm-analysis',
+    name: '概念分析',
+    dataLevel: 'llm',
+    aiLevel: 'qualitative',
+    status: 'implemented',
+    description: '複雑な概念の整理と説明',
+    why: ['複雑な概念を整理したい', '関係性を理解したい'],
+    value: '抽象的な情報を構造化',
+  },
+  {
+    id: 'seeds-needs',
+    name: 'シーズ・ニーズマッチ',
+    dataLevel: 'internal-structured',
+    aiLevel: 'qualitative',
+    status: 'mock',
+    description: '技術シーズと市場ニーズのマッチング',
+    why: ['研究成果の応用先を見つけたい', '市場ニーズに合った研究テーマを探したい'],
+    value: '技術と市場の橋渡しを支援',
+  },
+  {
+    id: 'internal-expert',
+    name: '社内専門家推薦',
+    dataLevel: 'tacit-knowledge',
+    aiLevel: 'qualitative',
+    status: 'future',
+    description: '社内の誰に相談すべきかを提案',
+    why: ['社内で〇〇に詳しい人を知りたい', '適切な相談相手を見つけたい'],
+    value: '組織内の知識ネットワークを可視化',
+  },
+  {
+    id: 'approval-flow',
+    name: '承認フロー提案',
+    dataLevel: 'tacit-rules',
+    aiLevel: 'qualitative',
+    status: 'future',
+    description: '社内の暗黙的なルールに基づく提案',
+    why: ['うちの承認フローは？', '適切な手続きを知りたい'],
+    value: '暗黙知を形式知に変換',
+  },
+
+  // 定量データ分析
+  {
+    id: 'positioning',
+    name: 'ポジショニング分析',
+    dataLevel: 'internal-structured',
+    aiLevel: 'quantitative',
+    status: 'mock',
+    description: '比較対象と軸を動的に生成し可視化',
+    why: ['競合との差別化ポイントを知りたい', '戦略的な研究計画を立てたい'],
+    value: '定性的な比較を定量的に可視化',
+  },
+  {
+    id: 'citation-analysis',
+    name: '引用ネットワーク分析',
+    dataLevel: 'web-expert',
+    aiLevel: 'quantitative',
+    status: 'mock',
+    description: '論文間の引用関係を定量的に分析',
+    why: ['影響力のある論文を特定したい', '研究のトレンドを数値で把握したい'],
+    value: '主観ではなくデータに基づく評価',
+  },
+  {
+    id: 'trend-analysis',
+    name: '研究トレンド分析',
+    dataLevel: 'web-expert',
+    aiLevel: 'quantitative',
+    status: 'future',
+    description: '時系列での研究動向を定量化',
+    why: ['この分野は成長しているか？', '投資すべき領域はどこか？'],
+    value: '未来予測のための定量的根拠',
+  },
+  {
+    id: 'internal-analytics',
+    name: '社内データ分析',
+    dataLevel: 'internal-structured',
+    aiLevel: 'quantitative',
+    status: 'future',
+    description: '社内データの統計分析・可視化',
+    why: ['過去のプロジェクト成功率は？', 'リソース配分の最適化'],
+    value: '意思決定を数値で支援',
+  },
+
+  // 創造・実行
+  {
+    id: 'report-generation',
+    name: '報告書生成',
+    dataLevel: 'web-expert',
+    aiLevel: 'creation',
+    status: 'implemented',
+    description: '調査結果からインフォグラフィック形式のHTMLを生成',
+    why: ['見やすい報告書を作りたい', '報告時間を削減したい'],
+    value: '分析結果を即座に共有可能な形式に変換',
+  },
+  {
+    id: 'proposal-draft',
+    name: '提案書ドラフト',
+    dataLevel: 'internal-structured',
+    aiLevel: 'creation',
+    status: 'future',
+    description: '調査結果から提案書の初稿を自動生成',
+    why: ['提案書作成の時間を削減したい', '構成のたたき台がほしい'],
+    value: 'ゼロからではなく編集から始められる',
+  },
+  {
+    id: 'auto-outreach',
+    name: '自動アプローチ',
+    dataLevel: 'tacit-knowledge',
+    aiLevel: 'creation',
+    status: 'future',
+    description: '専門家へのコンタクトメール自動生成・送信',
+    why: ['専門家にアプローチしたい', '適切な依頼文を書きたい'],
+    value: '発見から行動までを一気通貫',
+  },
+];
+
+// Get position on grid
+const getGridPosition = (dataLevel: string, aiLevel: string) => {
+  const dataIndex = dataLevels.findIndex(d => d.id === dataLevel);
+  const aiIndex = aiLevels.findIndex(a => a.id === aiLevel);
+  return { row: dataLevels.length - 1 - dataIndex, col: aiIndex };
+};
+
+// Status colors
+const statusColors = {
+  implemented: 'bg-primary text-primary-foreground',
+  mock: 'bg-amber-500/80 text-amber-50',
+  future: 'bg-muted text-muted-foreground border border-dashed border-border',
+};
+
+const statusLabels = {
+  implemented: '実装済み',
+  mock: 'モック',
+  future: '将来拡張',
+};
+
+export function ExtensibilityMatrix() {
+  const [selectedUseCase, setSelectedUseCase] = useState<UseCase | null>(null);
+  const [hoveredUseCase, setHoveredUseCase] = useState<UseCase | null>(null);
+
+  const handleUseCaseClick = useCallback((useCase: UseCase) => {
+    setSelectedUseCase(prev => prev?.id === useCase.id ? null : useCase);
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setSelectedUseCase(null);
+  }, []);
+
+  return (
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-10">
+      {/* Header */}
+      <div className="text-center mb-6 sm:mb-8">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-2">
+          拡張性マップ
+        </h2>
+        <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
+          このUIのまま、Agentを追加するだけでマップ上の空白が埋まっていく
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+        {/* Matrix */}
+        <Card className="p-4 sm:p-6 overflow-x-auto">
+          <div className="min-w-[600px]">
+            {/* AI Axis Labels (top) with stage gradient */}
+            <div className="grid grid-cols-[100px_repeat(5,1fr)] gap-1 mb-2">
+              <div className="text-xs text-muted-foreground text-right pr-2 flex items-end justify-end pb-1">
+                <span className="flex flex-col items-end">
+                  <span className="text-[10px]">難易度</span>
+                  <span>AI →</span>
+                </span>
+              </div>
+              {aiLevels.map((level, idx) => {
+                // Gradient from light to dark (increasing difficulty)
+                const opacity = 0.1 + (idx * 0.15);
+                return (
+                  <div 
+                    key={level.id} 
+                    className="text-center group relative rounded-lg py-2"
+                    style={{ 
+                      background: `linear-gradient(180deg, hsl(var(--primary) / ${opacity}) 0%, transparent 100%)` 
+                    }}
+                  >
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="text-[8px] sm:text-[10px] font-bold text-primary/80 uppercase tracking-wider">
+                        Stage {level.stageNum} · {level.stage}
+                      </span>
+                      <level.icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                      <span className="text-[10px] sm:text-xs font-medium text-foreground leading-tight">{level.label}</span>
+                      <span className="text-[8px] sm:text-[10px] text-muted-foreground hidden sm:block">{level.description}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Grid */}
+            <div className="relative">
+              {/* Data Axis Label (left side) */}
+              <div className="absolute -left-1 top-1/2 -translate-y-1/2 -rotate-90 text-xs text-muted-foreground whitespace-nowrap origin-center">
+                Data ↑
+              </div>
+
+              {dataLevels.slice().reverse().map((dataLevel, rowIndex) => (
+                <div key={dataLevel.id} className="grid grid-cols-[100px_repeat(5,1fr)] gap-1 mb-1">
+                  {/* Data level label */}
+                  <div className="text-xs text-right pr-2 flex items-center justify-end">
+                    <span className="text-foreground font-medium">{dataLevel.label}</span>
+                  </div>
+
+                  {/* Cells */}
+                  {aiLevels.map((aiLevel, colIndex) => {
+                    const cellUseCases = useCases.filter(
+                      uc => uc.dataLevel === dataLevel.id && uc.aiLevel === aiLevel.id
+                    );
+
+                    return (
+                      <div
+                        key={`${dataLevel.id}-${aiLevel.id}`}
+                        className="relative aspect-square sm:aspect-[4/3] bg-accent/5 rounded-lg border border-border/30 flex items-center justify-center p-1"
+                      >
+                        {cellUseCases.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {cellUseCases.map(useCase => (
+                              <button
+                                key={useCase.id}
+                                onClick={() => handleUseCaseClick(useCase)}
+                                onMouseEnter={() => setHoveredUseCase(useCase)}
+                                onMouseLeave={() => setHoveredUseCase(null)}
+                                className={cn(
+                                  'w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center',
+                                  'transition-all duration-200 hover:scale-110 cursor-pointer',
+                                  'text-[10px] sm:text-xs font-bold',
+                                  statusColors[useCase.status],
+                                  selectedUseCase?.id === useCase.id && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-110',
+                                  useCase.status === 'future' && 'animate-pulse'
+                                )}
+                                aria-label={useCase.name}
+                              >
+                                {useCase.status === 'implemented' ? '●' : useCase.status === 'mock' ? '○' : '◌'}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border border-dashed border-border/50 opacity-30" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap items-center justify-center gap-4 mt-4 pt-4 border-t border-border/50">
+              {Object.entries(statusLabels).map(([status, label]) => (
+                <div key={status} className="flex items-center gap-2 text-xs sm:text-sm">
+                  <span className={cn(
+                    'w-4 h-4 rounded-full flex items-center justify-center text-[10px]',
+                    statusColors[status as keyof typeof statusColors]
+                  )}>
+                    {status === 'implemented' ? '●' : status === 'mock' ? '○' : '◌'}
+                  </span>
+                  <span className="text-muted-foreground">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* Detail Panel */}
+        <Card className={cn(
+          'p-4 sm:p-6 transition-all duration-300',
+          selectedUseCase ? 'opacity-100' : 'opacity-60'
+        )}>
+          {selectedUseCase ? (
+            <div className="space-y-4 animate-fade-in">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={cn(
+                      'px-2 py-0.5 rounded text-xs font-medium',
+                      statusColors[selectedUseCase.status]
+                    )}>
+                      {statusLabels[selectedUseCase.status]}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {selectedUseCase.name}
+                  </h3>
+                </div>
+                <button
+                  onClick={closeDetail}
+                  className="p-1 rounded hover:bg-muted transition-colors"
+                  aria-label="閉じる"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                {selectedUseCase.description}
+              </p>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  なぜこれが必要か？
+                </h4>
+                <ul className="space-y-1">
+                  {selectedUseCase.why.map((reason, idx) => (
+                    <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                      <span className="text-primary mt-0.5">•</span>
+                      <span>「{reason}」</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="p-3 bg-primary/5 rounded-lg border-l-2 border-primary">
+                <p className="text-sm text-foreground font-medium">
+                  {selectedUseCase.value}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-border/50 text-xs text-muted-foreground">
+                <div className="flex items-center gap-4">
+                  <span>Data: {dataLevels.find(d => d.id === selectedUseCase.dataLevel)?.label}</span>
+                  <span>AI: {aiLevels.find(a => a.id === selectedUseCase.aiLevel)?.label}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center py-8">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                <Search className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                マップ上のポイントをクリックして<br />詳細を表示
+              </p>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Hover Tooltip (mobile-friendly) */}
+      {hoveredUseCase && !selectedUseCase && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <Card className="px-3 py-2 shadow-lg animate-fade-in">
+            <p className="text-sm font-medium text-foreground">{hoveredUseCase.name}</p>
+            <p className="text-xs text-muted-foreground">{statusLabels[hoveredUseCase.status]}</p>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}

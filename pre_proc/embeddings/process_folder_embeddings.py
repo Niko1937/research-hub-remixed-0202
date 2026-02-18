@@ -166,6 +166,11 @@ class FolderEmbeddingsPipeline:
         """Check if proper nouns should be embedded"""
         return self.embedding_targets in ("proper_nouns", "all")
 
+    @property
+    def max_tags(self) -> int:
+        """Get maximum number of tags to extract per file"""
+        return config.processing.metadata_max_tags
+
     def _log(self, message: str):
         """Log message if verbose"""
         if self.verbose:
@@ -373,7 +378,7 @@ class FolderEmbeddingsPipeline:
                 # Extract tags using table-specific LLM prompt
                 tags_result = await self.llm_client.extract_table_tags(
                     table_context=summary_context,
-                    num_tags=8,
+                    num_tags=self.max_tags,
                 )
             else:
                 # Generate summary using LLM (regular documents)
@@ -389,7 +394,7 @@ class FolderEmbeddingsPipeline:
                     summary = summary_result.content
 
                 # Extract tags using LLM (regular documents)
-                tags_result = await self.llm_client.extract_tags(processed.full_text)
+                tags_result = await self.llm_client.extract_tags(processed.full_text, max_tags=self.max_tags)
 
             if tags_result.success:
                 tags = self.llm_client.parse_tags(tags_result.content)
@@ -580,7 +585,7 @@ class FolderEmbeddingsPipeline:
                 # Extract tags using table-specific LLM prompt
                 tags_result = await self.llm_client.extract_table_tags(
                     table_context=summary_context,
-                    num_tags=8,
+                    num_tags=self.max_tags,
                 )
             else:
                 # Generate summary using LLM (regular documents)
@@ -596,7 +601,7 @@ class FolderEmbeddingsPipeline:
                     summary = summary_result.content
 
                 # Extract tags using LLM (regular documents)
-                tags_result = await self.llm_client.extract_tags(processed.full_text)
+                tags_result = await self.llm_client.extract_tags(processed.full_text, max_tags=self.max_tags)
 
             if tags_result.success:
                 tags = self.llm_client.parse_tags(tags_result.content)
@@ -737,7 +742,7 @@ class FolderEmbeddingsPipeline:
             description = description_result.content
 
             # Extract tags using Vision LLM
-            tags_result = await self.llm_client.extract_tags_from_image(file_path)
+            tags_result = await self.llm_client.extract_tags_from_image(file_path, max_tags=self.max_tags)
 
             if tags_result.success:
                 tags = self.llm_client.parse_tags(tags_result.content)
@@ -840,7 +845,7 @@ class FolderEmbeddingsPipeline:
             description = description_result.content
 
             # Extract tags using Vision LLM
-            tags_result = await self.llm_client.extract_tags_from_image(file_path)
+            tags_result = await self.llm_client.extract_tags_from_image(file_path, max_tags=self.max_tags)
 
             if tags_result.success:
                 tags = self.llm_client.parse_tags(tags_result.content)

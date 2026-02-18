@@ -131,6 +131,7 @@ EMBEDDING_MODEL=text-embedding-3-large
 # SKIP_INDEXED_FOLDERS=false
 # EMBEDDING_FILE_TYPES=all  # エンベディング対象: all(全て), documents(ドキュメントのみ), images(画像のみ)
 # EMBEDDING_TARGETS=both     # エンベディング種別: abstract(要約のみ), tags(タグのみ), proper_nouns(固有名詞のみ), both(要約+タグ), all(全部)
+# METADATA_MAX_TAGS=30       # ファイルごとに抽出するタグの最大数（デフォルト: 30）
 # METADATA_ONLY=false  # trueでエンベディングを再生成せずメタデータのみ更新
 
 # ===========================================
@@ -361,11 +362,17 @@ LLM回答生成に使用する検索結果の件数を設定できます。
 # 検索結果件数設定
 SEARCH_OIPF_SUMMARY_LIMIT=3   # 研究プロジェクトの検索結果件数
 SEARCH_OIPF_DETAILS_LIMIT=5   # ファイルの検索結果件数
+
+# フロントエンド返却タグ数
+SEARCH_RESULT_MAX_TAGS=10     # 検索結果1件あたりの最大タグ数（マッチしたタグ優先）
 ```
 
 **ユースケース例**:
 - 精度重視: 件数を少なく（3〜5件）→ LLMが詳細に分析
 - 網羅性重視: 件数を多く（10〜20件）→ より多くの関連情報を参照
+
+**タグの優先順位**:
+検索結果のタグは、検索クエリにマッチしたものが先頭に配置されます。
 
 #### OpenSearch設定
 

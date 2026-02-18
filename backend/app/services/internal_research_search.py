@@ -252,8 +252,11 @@ class InternalResearchSearchService:
                 score = hit.get("_score", 0.0)
 
                 # Extract year from tags or use default
-                tags = source.get("oipf_research_themetags", [])
-                year = self._extract_year_from_tags(tags) or "2024"
+                all_tags = source.get("oipf_research_themetags", [])
+                year = self._extract_year_from_tags(all_tags) or "2024"
+
+                # Filter tags: prioritize those matching query
+                filtered_tags = self._filter_tags_by_relevance(all_tags, query)
 
                 # Create title from abstract (first 50 chars) or folder summary
                 abstract = source.get("oipf_research_abstract", "")
@@ -262,7 +265,7 @@ class InternalResearchSearchService:
 
                 results.append(InternalResearchResult(
                     title=title,
-                    tags=tags[:5],  # Limit tags
+                    tags=filtered_tags,
                     similarity=min(score, 1.0),  # Normalize score
                     year=year,
                     research_id=source.get("oipf_research_id", ""),
@@ -369,12 +372,15 @@ class InternalResearchSearchService:
                 abstract = source.get("oipf_file_abstract", "")
                 title = file_name or self._create_title(abstract, "")
 
-                tags = source.get("oipf_file_tags", [])
+                all_tags = source.get("oipf_file_tags", [])
                 year = self._extract_year_from_source(source) or "2024"
+
+                # Filter tags: prioritize those matching query
+                filtered_tags = self._filter_tags_by_relevance(all_tags, query)
 
                 results.append(InternalResearchResult(
                     title=title,
-                    tags=tags[:5],
+                    tags=filtered_tags,
                     similarity=min(score, 1.0),  # Cosine similarity is already 0-1
                     year=year,
                     research_id=source.get("oipf_research_id", ""),
@@ -552,6 +558,55 @@ JSON形式で出力（説明不要）:"""
 
         return "Untitled Research"
 
+    def _filter_tags_by_relevance(
+        self,
+        tags: list[str],
+        query: str,
+        max_tags: Optional[int] = None,
+    ) -> list[str]:
+        """
+        Filter and prioritize tags based on query relevance.
+
+        Tags that match the query (partial match) are prioritized and placed first.
+        Remaining tags are appended in original order.
+
+        Args:
+            tags: List of tags from the document
+            query: Search query
+            max_tags: Maximum number of tags to return (default: from settings)
+
+        Returns:
+            Filtered list of tags with matched tags first
+        """
+        if max_tags is None:
+            max_tags = self.settings.search_result_max_tags
+
+        if not tags:
+            return []
+
+        # Normalize query for matching
+        query_lower = query.lower()
+        query_words = set(query_lower.split())
+
+        # Separate matched and unmatched tags
+        matched_tags = []
+        unmatched_tags = []
+
+        for tag in tags:
+            tag_lower = tag.lower()
+            # Check if tag matches query (partial match)
+            if (tag_lower in query_lower or
+                query_lower in tag_lower or
+                any(word in tag_lower for word in query_words) or
+                any(tag_lower in word for word in query_words)):
+                matched_tags.append(tag)
+            else:
+                unmatched_tags.append(tag)
+
+        # Combine: matched first, then unmatched
+        result = matched_tags + unmatched_tags
+        return result[:max_tags]
+
     def _extract_year_from_tags(self, tags: list[str]) -> Optional[str]:
         """Extract year from tags"""
         import re
@@ -674,18 +729,24 @@ JSON形式で出力（説明不要）:"""
                 file_path = source.get("oipf_file_path", "")
                 file_name = source.get("oipf_file_name", "")
                 abstract = source.get("oipf_file_abstract", "")
-                tags = source.get("oipf_file_tags", [])
+                all_tags = source.get("oipf_file_tags", [])
                 file_type = source.get("oipf_file_type", "")
 
                 # Determine file type category for display
                 type_category = self._categorize_file_type(file_path, file_name, file_type)
+
+                # Filter keywords: prioritize those matching query
+                filtered_keywords = self._filter_tags_by_relevance(
+                    all_tags if isinstance(all_tags, list) else [],
+                    combined_query
+                )
 
                 results.append(DeepFileSearchResult(
                     path=file_path or file_name,
                     relevantContent=abstract[:300] if abstract else "",
                     type=type_category,
                     score=min(score, 1.0),  # Cosine similarity is already 0-1
-                    keywords=tags[:5] if isinstance(tags, list) else [],
+                    keywords=filtered_keywords,
                     research_id=source.get("oipf_research_id", ""),
                     file_name=file_name,
                 ))

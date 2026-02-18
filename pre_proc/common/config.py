@@ -197,6 +197,7 @@ class ProcessingConfig:
     embedding_file_types: str = "all"  # "all", "documents", "images"
     metadata_only: bool = False  # Update metadata only, reuse existing embeddings
     embedding_targets: str = "both"  # "abstract" | "tags" | "proper_nouns" | "both" | "all"
+    metadata_max_tags: int = 30  # Maximum number of tags to extract per file
 
     @classmethod
     def from_env(cls) -> "ProcessingConfig":
@@ -219,6 +220,7 @@ class ProcessingConfig:
             embedding_file_types=file_types,
             metadata_only=os.getenv("METADATA_ONLY", "false").lower() == "true",
             embedding_targets=embedding_targets,
+            metadata_max_tags=int(os.getenv("METADATA_MAX_TAGS", "30")),
         )
 
     @property
@@ -337,6 +339,7 @@ class Config:
         print(f"  Max File Size: {self.processing.max_file_size_mb}MB")
         print(f"  Max Folder Depth: {self.processing.max_depth}")
         print(f"  Embedding File Types: {self.processing.embedding_file_types}")
+        print(f"  Metadata Max Tags: {self.processing.metadata_max_tags}")
         print(f"  Embedding Targets: {self.processing.embedding_targets}")
         print(f"    - Abstract: {'Yes' if self.processing.embed_abstract else 'No'}")
         print(f"    - Tags: {'Yes' if self.processing.embed_tags else 'No'}")
