@@ -1349,6 +1349,7 @@ class FolderEmbeddingsPipeline:
             ignore_patterns=ignore_patterns,
             on_progress=on_load_progress,
             include_unsupported=True,  # Include unsupported files for path-only indexing
+            file_types_filter=self.embedding_file_types,  # Skip unnecessary file types early
         )
 
         # Separate unsupported files and too large files from truly failed loads

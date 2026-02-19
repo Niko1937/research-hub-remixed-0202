@@ -11,8 +11,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from embeddings.document_loaders import (
     is_supported_file,
+    is_image_file,
     get_loader_for_file,
     load_document,
+    load_documents_from_folder,
     detect_encoding,
     SUPPORTED_EXTENSIONS,
     get_supported_extensions_info,
@@ -281,3 +283,115 @@ class TestLoadTableDocument:
             assert "col1" in doc.metadata.get("columns", [])
             assert "col2" in doc.metadata.get("columns", [])
             assert doc.metadata.get("row_count") == 2
+
+
+class TestLoadDocumentsFromFolder:
+    """Tests for load_documents_from_folder function"""
+
+    def test_file_types_filter_documents_only(self):
+        """Test that file_types_filter='documents' skips image files"""
+        import os
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create test files
+            (Path(tmpdir) / "doc1.txt").write_text("Hello")
+            (Path(tmpdir) / "image1.png").write_bytes(b"\x89PNG\r\n\x1a\n")  # Minimal PNG header
+            (Path(tmpdir) / "doc2.pdf").write_bytes(b"%PDF-1.4")  # Minimal PDF header
+
+            # Load with documents filter
+            successful, failed = load_documents_from_folder(
+                folder_path=Path(tmpdir),
+                file_types_filter="documents",
+            )
+
+            # Should only have document files, not images
+            file_paths = [r.file_path for r in successful + failed]
+            file_names = [Path(p).name for p in file_paths]
+
+            assert "doc1.txt" in file_names
+            assert "doc2.pdf" in file_names
+            assert "image1.png" not in file_names
+
+    def test_file_types_filter_images_only(self):
+        """Test that file_types_filter='images' skips document files"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create test files
+            (Path(tmpdir) / "doc1.txt").write_text("Hello")
+            (Path(tmpdir) / "image1.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            (Path(tmpdir) / "image2.jpg").write_bytes(b"\xff\xd8\xff\xe0")
+
+            # Load with images filter
+            successful, failed = load_documents_from_folder(
+                folder_path=Path(tmpdir),
+                file_types_filter="images",
+            )
+
+            # Should only have image files
+            file_paths = [r.file_path for r in successful + failed]
+            file_names = [Path(p).name for p in file_paths]
+
+            assert "image1.png" in file_names
+            assert "image2.jpg" in file_names
+            assert "doc1.txt" not in file_names
+
+    def test_file_types_filter_all(self):
+        """Test that file_types_filter='all' includes both documents and images"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create test files
+            (Path(tmpdir) / "doc1.txt").write_text("Hello")
+            (Path(tmpdir) / "image1.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+
+            # Load with all filter (default)
+            successful, failed = load_documents_from_folder(
+                folder_path=Path(tmpdir),
+                file_types_filter="all",
+            )
+
+            file_paths = [r.file_path for r in successful + failed]
+            file_names = [Path(p).name for p in file_paths]
+
+            assert "doc1.txt" in file_names
+            assert "image1.png" in file_names
+
+    def test_file_types_filter_none_includes_all(self):
+        """Test that file_types_filter=None (default) includes all files"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create test files
+            (Path(tmpdir) / "doc1.txt").write_text("Hello")
+            (Path(tmpdir) / "image1.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+
+            # Load without filter
+            successful, failed = load_documents_from_folder(
+                folder_path=Path(tmpdir),
+            )
+
+            file_paths = [r.file_path for r in successful + failed]
+            file_names = [Path(p).name for p in file_paths]
+
+            assert "doc1.txt" in file_names
+            assert "image1.png" in file_names
+
+
+class TestIsImageFile:
+    """Tests for is_image_file function"""
+
+    def test_image_extensions(self):
+        """Test that image extensions return True"""
+        assert is_image_file(Path("image.jpg")) is True
+        assert is_image_file(Path("image.jpeg")) is True
+        assert is_image_file(Path("image.png")) is True
+        assert is_image_file(Path("image.gif")) is True
+        assert is_image_file(Path("image.webp")) is True
+        assert is_image_file(Path("image.bmp")) is True
+
+    def test_non_image_extensions(self):
+        """Test that non-image extensions return False"""
+        assert is_image_file(Path("document.pdf")) is False
+        assert is_image_file(Path("document.txt")) is False
+        assert is_image_file(Path("document.docx")) is False
+        assert is_image_file(Path("document.csv")) is False
+
+    def test_case_insensitive(self):
+        """Test that extension check is case insensitive"""
+        assert is_image_file(Path("image.JPG")) is True
+        assert is_image_file(Path("image.PNG")) is True

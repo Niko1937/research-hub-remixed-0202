@@ -457,6 +457,7 @@ def load_documents_from_folder(
     ignore_patterns: Optional[list[str]] = None,
     on_progress: Optional[Callable[[str, int, int], None]] = None,
     include_unsupported: bool = False,
+    file_types_filter: Optional[str] = None,
 ) -> tuple[list[LoaderResult], list[LoaderResult]]:
     """
     Load all supported documents from a folder
@@ -469,6 +470,7 @@ def load_documents_from_folder(
         ignore_patterns: Patterns to ignore
         on_progress: Progress callback (file_path, current, total)
         include_unsupported: If True, also collect unsupported files (marked with unsupported=True)
+        file_types_filter: Filter files by type: "all" (default), "documents" (skip images), "images" (skip documents)
 
     Returns:
         Tuple of (successful_results, failed_results)
@@ -517,6 +519,11 @@ def load_documents_from_folder(
 
                 if item.is_file():
                     if is_supported_file(item):
+                        # Apply file_types_filter to skip unnecessary files early
+                        if file_types_filter == "documents" and is_image_file(item):
+                            continue  # Skip image files when only documents are requested
+                        elif file_types_filter == "images" and not is_image_file(item):
+                            continue  # Skip non-image files when only images are requested
                         files_to_process.append((item, True))  # (path, is_supported)
                     elif include_unsupported:
                         files_to_process.append((item, False))  # unsupported but included
