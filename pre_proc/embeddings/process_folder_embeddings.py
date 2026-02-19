@@ -400,8 +400,11 @@ class FolderEmbeddingsPipeline:
 
             if tags_result.success:
                 tags = self.llm_client.parse_tags(tags_result.content)
+                if not tags:
+                    self._log(f"  Warning: Tags extraction returned empty for {file_name}")
             else:
                 tags = []
+                self._log(f"  Warning: Tags extraction failed for {file_name}: {tags_result.error}")
 
             # Generate embedding for the summary (if enabled)
             embedding = []
@@ -472,7 +475,9 @@ class FolderEmbeddingsPipeline:
 
             # Ensure at least one embedding is generated
             if not embedding and not tags_embedding and not proper_nouns_embedding:
-                self.stats.errors.append(f"{file_name}: No embeddings generated (check EMBEDDING_TARGETS setting)")
+                error_msg = f"No embeddings generated - tags extraction may have failed or returned empty"
+                self.stats.errors.append(f"{file_name}: {error_msg}")
+                self._log(f"  [SKIP] {file_name}: {error_msg}")
                 return None
 
             # Extract author/editor metadata
@@ -937,7 +942,9 @@ class FolderEmbeddingsPipeline:
 
             # Ensure at least one embedding is generated
             if not embedding and not tags_embedding and not proper_nouns_embedding:
-                self.stats.errors.append(f"{file_name}: No embeddings generated (check EMBEDDING_TARGETS setting)")
+                error_msg = f"No embeddings generated - tags extraction may have failed or returned empty"
+                self.stats.errors.append(f"{file_name}: {error_msg}")
+                self._log(f"  [SKIP] {file_name}: {error_msg}")
                 return None
 
             # Extract author/editor metadata
