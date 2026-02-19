@@ -195,9 +195,13 @@ class ProcessingConfig:
     max_depth: int = 4
     skip_indexed_folders: bool = False  # Skip subfolders that have already been indexed
     embedding_file_types: str = "all"  # "all", "documents", "images"
-    metadata_only: bool = False  # Update metadata only, reuse existing embeddings
-    embedding_targets: str = "both"  # "abstract" | "tags" | "proper_nouns" | "both" | "all"
+    generate_embeddings: bool = True  # Generate new embeddings (False = reuse existing cache)
+    embedding_types: set = None  # Set of types: {"abstract", "tags", "proper_nouns"}
     metadata_max_tags: int = 30  # Maximum number of tags to extract per file
+
+    def __post_init__(self):
+        if self.embedding_types is None:
+            self.embedding_types = {"abstract", "tags"}  # Default
 
     @classmethod
     def from_env(cls) -> "ProcessingConfig":
@@ -207,36 +211,75 @@ class ProcessingConfig:
             print(f"Warning: Invalid EMBEDDING_FILE_TYPES '{file_types}', using 'all'")
             file_types = "all"
 
-        embedding_targets = os.getenv("EMBEDDING_TARGETS", "both").lower()
-        # Validate embedding_targets
-        if embedding_targets not in ("abstract", "tags", "proper_nouns", "both", "all"):
-            print(f"Warning: Invalid EMBEDDING_TARGETS '{embedding_targets}', using 'both'")
-            embedding_targets = "both"
+        # Parse EMBEDDING_TYPES (comma-separated: "abstract,tags,proper_nouns")
+        embedding_types_str = os.getenv("EMBEDDING_TYPES", "").strip()
+
+        # Backward compatibility: check old EMBEDDING_TARGETS if new setting not present
+        if not embedding_types_str:
+            old_targets = os.getenv("EMBEDDING_TARGETS", "").lower()
+            if old_targets:
+                # Convert old format to new format
+                if old_targets == "both":
+                    embedding_types_str = "abstract,tags"
+                elif old_targets == "all":
+                    embedding_types_str = "abstract,tags,proper_nouns"
+                elif old_targets in ("abstract", "tags", "proper_nouns"):
+                    embedding_types_str = old_targets
+                print(f"Note: Using legacy EMBEDDING_TARGETS='{old_targets}' -> EMBEDDING_TYPES='{embedding_types_str}'")
+
+        # Default if not set
+        if not embedding_types_str:
+            embedding_types_str = "abstract,tags"
+
+        # Parse and validate
+        valid_types = {"abstract", "tags", "proper_nouns"}
+        embedding_types = set()
+        for t in embedding_types_str.split(","):
+            t = t.strip().lower()
+            if t in valid_types:
+                embedding_types.add(t)
+            elif t:
+                print(f"Warning: Invalid embedding type '{t}', ignoring")
+
+        if not embedding_types:
+            print("Warning: No valid EMBEDDING_TYPES, using 'abstract,tags'")
+            embedding_types = {"abstract", "tags"}
+
+        # Parse GENERATE_EMBEDDINGS (with backward compatibility for METADATA_ONLY)
+        generate_embeddings_str = os.getenv("GENERATE_EMBEDDINGS", "").strip().lower()
+        if generate_embeddings_str:
+            generate_embeddings = generate_embeddings_str == "true"
+        else:
+            # Backward compatibility: METADATA_ONLY=true means GENERATE_EMBEDDINGS=false
+            metadata_only = os.getenv("METADATA_ONLY", "false").lower() == "true"
+            if metadata_only:
+                print("Note: Using legacy METADATA_ONLY=true -> GENERATE_EMBEDDINGS=false")
+            generate_embeddings = not metadata_only
 
         return cls(
             max_file_size_mb=float(os.getenv("MAX_FILE_SIZE_MB", "100.0")),
             max_depth=int(os.getenv("MAX_FOLDER_DEPTH", "4")),
             skip_indexed_folders=os.getenv("SKIP_INDEXED_FOLDERS", "false").lower() == "true",
             embedding_file_types=file_types,
-            metadata_only=os.getenv("METADATA_ONLY", "false").lower() == "true",
-            embedding_targets=embedding_targets,
+            generate_embeddings=generate_embeddings,
+            embedding_types=embedding_types,
             metadata_max_tags=int(os.getenv("METADATA_MAX_TAGS", "30")),
         )
 
     @property
     def embed_abstract(self) -> bool:
         """Check if abstract should be embedded"""
-        return self.embedding_targets in ("abstract", "both", "all")
+        return "abstract" in self.embedding_types
 
     @property
     def embed_tags(self) -> bool:
         """Check if tags should be embedded"""
-        return self.embedding_targets in ("tags", "both", "all")
+        return "tags" in self.embedding_types
 
     @property
     def embed_proper_nouns(self) -> bool:
         """Check if proper nouns should be embedded"""
-        return self.embedding_targets in ("proper_nouns", "all")
+        return "proper_nouns" in self.embedding_types
 
 
 @dataclass
@@ -340,11 +383,11 @@ class Config:
         print(f"  Max Folder Depth: {self.processing.max_depth}")
         print(f"  Embedding File Types: {self.processing.embedding_file_types}")
         print(f"  Metadata Max Tags: {self.processing.metadata_max_tags}")
-        print(f"  Embedding Targets: {self.processing.embedding_targets}")
+        print(f"  Generate Embeddings: {self.processing.generate_embeddings}")
+        print(f"  Embedding Types: {','.join(sorted(self.processing.embedding_types))}")
         print(f"    - Abstract: {'Yes' if self.processing.embed_abstract else 'No'}")
         print(f"    - Tags: {'Yes' if self.processing.embed_tags else 'No'}")
         print(f"    - Proper Nouns: {'Yes' if self.processing.embed_proper_nouns else 'No'}")
-        print(f"  Metadata Only: {self.processing.metadata_only}")
 
         print(f"Search:")
         print(f"  Mode: {self.search.mode}")

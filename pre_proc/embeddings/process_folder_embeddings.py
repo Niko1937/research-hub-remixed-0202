@@ -100,8 +100,8 @@ class FolderEmbeddingsPipeline:
         max_depth: Optional[int] = None,
         skip_indexed_folders: Optional[bool] = None,
         embedding_file_types: Optional[str] = None,
-        embedding_targets: Optional[str] = None,
-        metadata_only: Optional[bool] = None,
+        generate_embeddings: Optional[bool] = None,
+        embedding_types: Optional[set] = None,
         dry_run: bool = False,
         verbose: bool = True,
         max_concurrency: int = 1,
@@ -119,8 +119,8 @@ class FolderEmbeddingsPipeline:
             max_depth: Maximum folder depth to traverse (default: from env MAX_FOLDER_DEPTH or 4)
             skip_indexed_folders: Skip subfolders that already have indexed files (default: from env SKIP_INDEXED_FOLDERS)
             embedding_file_types: File types to embed: "all", "documents", "images" (default: from env EMBEDDING_FILE_TYPES)
-            embedding_targets: What to embed: "abstract", "tags", "both" (default: from env EMBEDDING_TARGETS)
-            metadata_only: Update metadata only, reuse existing embeddings (default: from env METADATA_ONLY)
+            generate_embeddings: Generate new embeddings (False = reuse existing cache) (default: from env GENERATE_EMBEDDINGS)
+            embedding_types: Set of embedding types: {"abstract", "tags", "proper_nouns"} (default: from env EMBEDDING_TYPES)
             dry_run: If True, don't actually index documents
             verbose: Enable verbose output
             max_concurrency: Maximum concurrent API calls (default: 1)
@@ -134,8 +134,8 @@ class FolderEmbeddingsPipeline:
         self.max_depth = max_depth if max_depth is not None else config.processing.max_depth
         self.skip_indexed_folders = skip_indexed_folders if skip_indexed_folders is not None else config.processing.skip_indexed_folders
         self.embedding_file_types = embedding_file_types if embedding_file_types is not None else config.processing.embedding_file_types
-        self.embedding_targets = embedding_targets if embedding_targets is not None else config.processing.embedding_targets
-        self.metadata_only = metadata_only if metadata_only is not None else config.processing.metadata_only
+        self.generate_embeddings = generate_embeddings if generate_embeddings is not None else config.processing.generate_embeddings
+        self.embedding_types = embedding_types if embedding_types is not None else config.processing.embedding_types
         self.dry_run = dry_run
         self.verbose = verbose
         self.max_concurrency = max_concurrency
@@ -154,17 +154,17 @@ class FolderEmbeddingsPipeline:
     @property
     def embed_abstract(self) -> bool:
         """Check if abstract should be embedded"""
-        return self.embedding_targets in ("abstract", "both", "all")
+        return "abstract" in self.embedding_types
 
     @property
     def embed_tags(self) -> bool:
         """Check if tags should be embedded"""
-        return self.embedding_targets in ("tags", "both", "all")
+        return "tags" in self.embedding_types
 
     @property
     def embed_proper_nouns(self) -> bool:
         """Check if proper nouns should be embedded"""
-        return self.embedding_targets in ("proper_nouns", "all")
+        return "proper_nouns" in self.embedding_types
 
     @property
     def max_tags(self) -> int:
@@ -1049,8 +1049,8 @@ class FolderEmbeddingsPipeline:
             # Extract research_id from immediate subfolder name
             research_id = self._extract_research_id(loader_result.file_path, folder_path)
 
-            # Process file (metadata-only or full)
-            if self.metadata_only:
+            # Process file (reuse existing embeddings or generate new)
+            if not self.generate_embeddings:
                 oipf_doc = await self._process_single_file_metadata_only(loader_result, folder_path, research_id)
             else:
                 oipf_doc = await self._process_single_file(loader_result, folder_path, research_id)
@@ -1108,8 +1108,8 @@ class FolderEmbeddingsPipeline:
             # Extract research_id from immediate subfolder name
             research_id = self._extract_research_id(loader_result.file_path, folder_path)
 
-            # Process image (metadata-only or full)
-            if self.metadata_only:
+            # Process image (reuse existing embeddings or generate new)
+            if not self.generate_embeddings:
                 oipf_doc = await self._process_image_file_metadata_only(loader_result, folder_path, research_id)
             else:
                 oipf_doc = await self._process_image_file(loader_result, folder_path, research_id)
@@ -1304,8 +1304,8 @@ class FolderEmbeddingsPipeline:
         self._log(f"Dry run: {self.dry_run}")
         self._log(f"Max depth: {self.max_depth}")
         self._log(f"Skip indexed folders: {self.skip_indexed_folders}")
-        self._log(f"Metadata only: {self.metadata_only}")
-        self._log(f"Embedding targets: {self.embedding_targets}")
+        self._log(f"Generate embeddings: {self.generate_embeddings}")
+        self._log(f"Embedding types: {','.join(sorted(self.embedding_types))}")
         self._log(f"  - Abstract: {'Yes' if self.embed_abstract else 'No'}")
         self._log(f"  - Tags: {'Yes' if self.embed_tags else 'No'}")
         self._log(f"  - Proper Nouns: {'Yes' if self.embed_proper_nouns else 'No'}")
@@ -1423,7 +1423,7 @@ class FolderEmbeddingsPipeline:
 
         # Process document files in parallel
         if document_files:
-            mode_desc = "metadata-only" if self.metadata_only else "full"
+            mode_desc = "full" if self.generate_embeddings else "reuse"
             await self._process_files_parallel(
                 files=document_files,
                 folder_path=folder_path,
@@ -1433,7 +1433,7 @@ class FolderEmbeddingsPipeline:
 
         # Process image files in parallel
         if image_files:
-            mode_desc = "metadata-only" if self.metadata_only else "full"
+            mode_desc = "full" if self.generate_embeddings else "reuse"
             await self._process_files_parallel(
                 files=image_files,
                 folder_path=folder_path,
@@ -1582,16 +1582,17 @@ def main():
         help=f"既にインデックスされたサブフォルダをスキップ（デフォルト: 環境変数 SKIP_INDEXED_FOLDERS または {config.processing.skip_indexed_folders}）"
     )
     parser.add_argument(
-        "--metadata-only",
-        action="store_true",
+        "--no-generate", "--reuse",
+        dest="generate_embeddings",
+        action="store_false",
         default=None,
-        help=f"メタデータのみ更新（エンベディングは既存を再利用）（デフォルト: 環境変数 METADATA_ONLY または {config.processing.metadata_only}）"
+        help=f"既存のエンベディングを再利用（新規生成しない）（デフォルト: 環境変数 GENERATE_EMBEDDINGS または {config.processing.generate_embeddings}）"
     )
     parser.add_argument(
-        "--embedding-targets",
-        choices=["abstract", "tags", "both"],
+        "--embedding-types",
+        type=str,
         default=None,
-        help=f"エンベディング対象: abstract(要約のみ), tags(タグのみ), both(両方)（デフォルト: 環境変数 EMBEDDING_TARGETS または {config.processing.embedding_targets}）"
+        help=f"エンベディング対象（カンマ区切り）: abstract,tags,proper_nouns（デフォルト: 環境変数 EMBEDDING_TYPES または {','.join(sorted(config.processing.embedding_types))}）"
     )
 
     args = parser.parse_args()
@@ -1613,6 +1614,19 @@ def main():
         ".DS_Store",
     ] + args.ignore
 
+    # Parse embedding_types if provided
+    embedding_types = None
+    if args.embedding_types:
+        valid_types = {"abstract", "tags", "proper_nouns"}
+        embedding_types = set()
+        for t in args.embedding_types.split(","):
+            t = t.strip().lower()
+            if t in valid_types:
+                embedding_types.add(t)
+        if not embedding_types:
+            print(f"Warning: No valid embedding types in '{args.embedding_types}', using config default")
+            embedding_types = None
+
     # Create pipeline (use args if specified, otherwise fall back to config/defaults)
     pipeline = FolderEmbeddingsPipeline(
         index_name=args.index,
@@ -1620,8 +1634,8 @@ def main():
         max_file_size_mb=args.max_file_size,  # None uses config default
         max_depth=args.depth,  # None uses config default
         skip_indexed_folders=args.skip_indexed_folders,  # None uses config default
-        metadata_only=args.metadata_only,  # None uses config default
-        embedding_targets=args.embedding_targets,  # None uses config default
+        generate_embeddings=args.generate_embeddings,  # None uses config default
+        embedding_types=embedding_types,  # None uses config default
         dry_run=args.dry_run,
         verbose=not args.quiet,
         max_concurrency=args.parallel,

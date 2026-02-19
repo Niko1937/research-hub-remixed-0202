@@ -129,10 +129,10 @@ EMBEDDING_MODEL=text-embedding-3-large
 # MAX_FILE_SIZE_MB=100
 # MAX_FOLDER_DEPTH=4
 # SKIP_INDEXED_FOLDERS=false
-# EMBEDDING_FILE_TYPES=all  # エンベディング対象: all(全て), documents(ドキュメントのみ), images(画像のみ)
-# EMBEDDING_TARGETS=both     # エンベディング種別: abstract(要約のみ), tags(タグのみ), proper_nouns(固有名詞のみ), both(要約+タグ), all(全部)
-# METADATA_MAX_TAGS=30       # ファイルごとに抽出するタグの最大数（デフォルト: 30）
-# METADATA_ONLY=false  # trueでエンベディングを再生成せずメタデータのみ更新
+# EMBEDDING_FILE_TYPES=all       # 対象ファイル: all, documents, images
+# GENERATE_EMBEDDINGS=true       # エンベディング生成: true(新規生成), false(既存キャッシュ再利用)
+# EMBEDDING_TYPES=abstract,tags  # 生成する種類（カンマ区切り）: abstract, tags, proper_nouns
+# METADATA_MAX_TAGS=30           # ファイルごとに抽出するタグの最大数
 
 # ===========================================
 # 汎用プロキシ設定（前処理スクリプト用、オプション）
@@ -453,7 +453,8 @@ EMBEDDING_FILE_TYPES=all
 | `MAX_FOLDER_DEPTH` | 4 | 最大フォルダ探索深度。0で無制限 |
 | `SKIP_INDEXED_FOLDERS` | false | 既にインデックス済みのサブフォルダをスキップするかどうか |
 | `EMBEDDING_FILE_TYPES` | all | エンベディング対象ファイルタイプ（下記参照） |
-| `METADATA_ONLY` | false | メタデータのみ更新モード（下記参照） |
+| `GENERATE_EMBEDDINGS` | true | エンベディング生成モード（下記参照） |
+| `EMBEDDING_TYPES` | abstract,tags | 生成するエンベディングの種類（下記参照） |
 
 **EMBEDDING_FILE_TYPES の設定値**:
 | 値 | 説明 |
@@ -464,28 +465,40 @@ EMBEDDING_FILE_TYPES=all
 
 **注意**: `images`を選択した場合、LLMがVision対応モデル（例: `gemini-2.0-flash`）である必要があります。
 
-**EMBEDDING_TARGETS の設定値**:
+**GENERATE_EMBEDDINGS の設定値**:
 | 値 | 説明 |
 |----|------|
-| `both` | 要約とタグの両方をエンベディング（デフォルト、hybridモード用） |
-| `all` | 要約、タグ、固有名詞をすべてエンベディング（tripleモード用） |
-| `abstract` | 要約のみエンベディング（従来動作） |
-| `tags` | タグのみエンベディング |
-| `proper_nouns` | 固有名詞のみエンベディング |
+| `true` | 新規エンベディングを生成（デフォルト） |
+| `false` | 既存のエンベディングキャッシュを再利用（新規ファイルはスキップ） |
+
+**EMBEDDING_TYPES の設定値**（カンマ区切りで複数指定可能）:
+| 値 | 説明 |
+|----|------|
+| `abstract` | 要約のエンベディング |
+| `tags` | タグのエンベディング |
+| `proper_nouns` | 固有名詞のエンベディング |
+
+**設定例**:
+```env
+# 要約とタグのみ（デフォルト）
+EMBEDDING_TYPES=abstract,tags
+
+# 全て有効
+EMBEDDING_TYPES=abstract,tags,proper_nouns
+
+# タグのみ
+EMBEDDING_TYPES=tags
+```
 
 **注意**:
-- `EMBEDDING_TARGETS`は検索重み設定と組み合わせて使用します
+- `EMBEDDING_TYPES`は検索重み設定と組み合わせて使用します
 - ベクトル検索（`SEARCH_*_VECTOR_WEIGHT`）を使用する場合、対応するエンベディングが必要です
-  - 要約ベクトル検索 → `EMBEDDING_TARGETS`に`abstract`を含む設定
-  - タグベクトル検索 → `EMBEDDING_TARGETS`に`tags`を含む設定
-  - 固有名詞ベクトル検索 → `EMBEDDING_TARGETS`に`proper_nouns`または`all`を含む設定
+  - 要約ベクトル検索 → `EMBEDDING_TYPES`に`abstract`を含む
+  - タグベクトル検索 → `EMBEDDING_TYPES`に`tags`を含む
+  - 固有名詞ベクトル検索 → `EMBEDDING_TYPES`に`proper_nouns`を含む
 - テキスト検索（`SEARCH_*_TEXT_WEIGHT`）はエンベディング不要で動作します
 
-**METADATA_ONLY について**:
-- `true` を設定すると、既存のエンベディングを再利用し、メタデータ（要約、タグ等）のみをLLMで再生成
-- OpenSearchに既存ドキュメントがない場合は処理をスキップ（新規ファイルは処理されません）
-- エンベディングAPIへのアクセスが不要なため、処理コストを削減できます
-- タグ体系の変更や要約の再生成など、メタデータのみを更新したい場合に有効
+**後方互換性**: 旧設定（`METADATA_ONLY`, `EMBEDDING_TARGETS`）も引き続き使用可能です。新設定が未設定の場合、旧設定から自動変換されます。
 
 **SKIP_INDEXED_FOLDERS について**:
 - `true` を設定すると、対象フォルダの1階層下のサブフォルダごとに既存インデックスをチェック
